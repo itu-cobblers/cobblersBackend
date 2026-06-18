@@ -16,7 +16,7 @@ public class ExecutorService
 
         // runtime errors
         if (response.Run.Code is not 0)
-            return response.Run.Stdout;
+            return response.Run.Stderr;
 
         // successful result
         return response.Run.Stdout;
