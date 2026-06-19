@@ -42,10 +42,9 @@ Key layering decisions:
 
 ## In-progress / gotchas
 
-- **`ExecutorController.Execute` does not compile** — the method body is an unfinished stub (`var output = RunExecutor`). It needs to be wired to `ExecutorService` before the project builds. Run a build to confirm before assuming the app is runnable.
-- **`ExecutorService` is not registered in DI.** Only `IPistonClient` is added in [Program.cs](cobblersBackend/Program.cs); wiring up the controller will also require registering `ExecutorService` (or injecting it).
 - **Java-only, single-class assumption.** `PistonClient` hardcodes the filename `Main.java`, so it only works for submissions shaped like `public class Main { ... }` (Java requires the filename to match the public class name). The `language` passed from `ExecutorService` is also hardcoded to `"java"`. See the comment in `PistonClient` before generalizing.
-- Running the API for real requires a reachable Piston instance at `Piston:BaseUrl`.
+- **Piston URL is set via environment variable.** Do not hardcode the droplet IP in `appsettings.json`. Set it at runtime with `export Piston__BaseUrl=http://<ip>:2000/` (double underscore maps to the `Piston:BaseUrl` config key). The `appsettings.json` placeholder (`http://localhost:2000/`) is intentional — it documents the expected shape without leaking the real address.
+- **`PistonClient` has no HTTP error handling.** `EnsureSuccessStatusCode()` will throw an unhandled `HttpRequestException` if Piston returns 4xx/5xx. Fine for now; catch and wrap before exposing to real users.
 
 ## Testing
 
