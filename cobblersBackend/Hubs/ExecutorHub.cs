@@ -16,6 +16,6 @@ public class ExecutorHub : Hub<IExecutorClient>
     {
         var output = await _executorService.ExecuteAsync(code);
 
-        await Clients.Caller.RecieveResult(output);
+        await Clients.Caller.ReceiveResult(output);
     }
 }
