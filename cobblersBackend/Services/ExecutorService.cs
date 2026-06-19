@@ -1,7 +1,7 @@
 
 namespace cobblersBackend.Services;
 
-public class ExecutorService
+public class ExecutorService : IExecutorService
 {
     private readonly IPistonClient _piston;
     public ExecutorService(IPistonClient piston) => _piston = piston;
