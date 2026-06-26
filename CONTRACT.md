@@ -88,6 +88,34 @@ JoinSession({ code, studentId, displayName })
 { "activeTimer": { "endsAt": "2026-06-19T14:30:00Z" } }   // activeTimer omitted if none
 ```
 
+- On a successful join the server also **broadcasts** `StudentJoined` to the group
+  so an observing teacher updates live (see roster below).
+
+> **Hub path:** the client connects to **`/hub`** (proxied in dev to the backend).
+
+### `ObserveSession` — SignalR hub method (teacher watches a room)
+```
+ObserveSession(code)   // → returns the current roster
+```
+- Server adds the teacher's connection to Group `code` as an observer.
+- **Returns** the current roster to the caller (so a reconnecting teacher re-syncs):
+```json
+// reply to caller only
+[ { "studentId": "uuid", "displayName": "Maria" }, { "studentId": "uuid", "displayName": "Jonas" } ]
+```
+
+### Roster events (server → teacher observers in the room)
+```json
+// StudentJoined — one student, sent when someone joins
+{ "studentId": "uuid", "displayName": "Maria" }
+
+// RosterUpdated — the full list (sent on changes, e.g. a leave); optional but preferred
+[ { "studentId": "uuid", "displayName": "Maria" } ]
+```
+
+A `Student` is `{ studentId: string, displayName: string }`. The teacher dashboard
+renders `displayName`s; `studentId` keys them so duplicates merge.
+
 ---
 
 ## `POST /api/execute`
@@ -104,11 +132,18 @@ the payload.
 
 | Field | Type | Notes |
 |---|---|---|
-| `code` | string | The full contents of one file. Beginners write single-class programs (`public class Main { ... }`), so one file is enough. |
+| `code` | string? | Single-file sugar: the full contents of one `Main.java`. Use this for the common case (most Day 1–2 exercises). |
+| `files` | `{name, content}[]`? | Multi-file run. Each item is one source file. Used for Day-3 class tasks (student class + a hidden grader `Main`) and the Day-3 mini-projects (student uploads several `.java` files). |
+| `entryClass` | string? | When `files` is given, the class whose `main` to run (e.g. `"Main"`). |
+| `stdin` | string? | Standard input piped to the program — for interactive programs (e.g. the guess-the-number game). Omit/`""` when none. |
 
+> **`code` XOR `files`.** Send `code` for one file, or `files` + `entryClass` for several — not both. `code: X` is equivalent to `files: [{name:"Main.java", content:X}], entryClass:"Main"`.
+>
 > Language is **implicit** — the backend is Java-only for now (it hardcodes `java`).
 > If more languages are ever needed, add a `language` field rather than reusing `code`;
 > that's a deliberate future change, not a silent one.
+
+The **response** shape is unchanged (`status` / `stdout` / `stderr`) regardless of single- or multi-file input. The frontend grades by inspecting `stdout` (its task `check()` runs client-side); the executor only compiles + runs.
 
 ### Response — `200 OK`
 ```json
@@ -179,16 +214,43 @@ The timer is a **non-coercive reminder** — nothing is forced if it elapses.
 
 ---
 
+## Predict-quiz answers (future — frontend grades locally for now)
+
+Day 2 has "predict the output" loop quizzes. Today the **frontend grades them
+locally** (it knows the expected output) and only needs an endpoint later to
+*collect* answers + return correctness centrally. The frontend already calls this
+through a seam that falls back to local grading, so when it lands, no frontend change.
+
+### `POST /api/quiz/check`
+```json
+// request
+{ "studentId": "uuid", "taskId": 17, "answer": "10\n9\n8\n..." }
+
+// → 200 OK
+{ "correct": true }
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `correct` | boolean | Did the answer match the expected output (whitespace-normalized)? |
+| `expected` | string? | Optional — the canonical output, if you want the server to drive the reveal. |
+
+---
+
 ## Open decisions
 
 Resolve each *in this file* before the relevant feature is built.
 
 - [ ] **`POST /api/submission`** — payload for submitting a task attempt
-  (`studentId`, `taskId`, `code` → records progress + result).
-- [ ] **Tasks** — how the sidebar gets its task list (static bundle vs. `GET /api/tasks`).
-- [ ] **SignalR hub path** — the URL the client connects to (e.g. `/hub`).
-- [ ] **Progress → teacher** — real-time `ProgressUpdated` event so the teacher
-  dashboard updates live (teacher joins the room as an observer to receive it).
+  (`studentId`, `taskId`, `code` → records progress + result). **Persistence/DB
+  shape deferred** — being discussed separately; the frontend's submit flow runs
+  but progress isn't stored yet.
+- [ ] **Tasks** — how the sidebar gets its task list (static bundle in the
+  frontend today; maybe `GET /api/tasks` later).
+- [x] **SignalR hub path** — `/hub` (see Sessions).
+- [x] **Roster → teacher** — `ObserveSession` + `StudentJoined` / `RosterUpdated`
+  (see Sessions). A richer `ProgressUpdated` (per-task progress, not just names)
+  is still open.
 - [ ] **Progress persistence** — store keyed by `studentId` (in-memory for the
   skeleton; a real store later).
 - [ ] **Session lifetime** — when does a room end (teacher ends it / idle timeout)?
