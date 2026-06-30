@@ -1,4 +1,7 @@
 
+using cobblersBackend.DTOs;
+using cobblersBackend.Models;
+
 namespace cobblersBackend.Services;
 
 public class ExecutorService
@@ -6,19 +9,19 @@ public class ExecutorService
     private readonly IPistonClient _piston;
     public ExecutorService(IPistonClient piston) => _piston = piston;
 
-    public async Task<string> ExecuteAsync(string javaSource)
+    public async Task<ExecuteResponseDto> ExecuteAsync(string javaSource)
     {
         var response = await _piston.ExecuteAsync("java", javaSource);
 
         // compile errors
         if (response.Compile is { Code: not 0})
-            return response.Compile.Stderr;
+            return new ExecuteResponseDto(ExecuteStatus.CompileError, "", response.Compile.Stderr);
 
         // runtime errors
         if (response.Run.Code is not 0)
-            return response.Run.Stderr;
+            return new ExecuteResponseDto(ExecuteStatus.RuntimeError, response.Run.Stdout, response.Run.Stderr);
 
         // successful result
-        return response.Run.Stdout;
+        return new ExecuteResponseDto(ExecuteStatus.Success, response.Run.Stdout, "");
     }
 }
