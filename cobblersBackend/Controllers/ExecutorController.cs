@@ -1,4 +1,3 @@
-using cobblersBackend.Models;
 using cobblersBackend.DTOs;
 using cobblersBackend.Services;
 using Microsoft.AspNetCore.Mvc;
