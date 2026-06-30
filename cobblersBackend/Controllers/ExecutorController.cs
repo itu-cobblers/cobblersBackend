@@ -14,6 +14,10 @@ public class ExecutorController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Execute([FromBody] ExecuteRequestDto request)
     {
+        //temporyary guard for multi file submissions. TBD.
+        if (string.IsNullOrEmpty(request.Code))
+            return BadRequest("Only single-file `code` requests are supported currently");
+            
         var result = await _executor.ExecuteAsync(request.Code!);
         return Ok(result);
     }
