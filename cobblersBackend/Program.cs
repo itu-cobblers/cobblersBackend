@@ -6,7 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddScoped<ExecutorService>();
-builder.Services.AddSingleton<SessionService>();
 builder.Services.AddHttpClient<IPistonClient, PistonClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Piston:BaseUrl"] ?? "http://localhost:2000/");
