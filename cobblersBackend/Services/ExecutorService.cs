@@ -24,13 +24,13 @@ public class ExecutorService
 
         // compile errors
         if (response.Compile is { Code: not 0})
-            return new ExecuteResponseDto(ExecuteStatus.CompileError, "", response.Compile.Stderr);
+            return new ExecuteResponseDto(ExecuteStatus.COMPILE_ERROR, "", response.Compile.Stderr);
 
         // runtime errors
         if (response.Run.Code is not 0)
-            return new ExecuteResponseDto(ExecuteStatus.RuntimeError, response.Run.Stdout, response.Run.Stderr);
+            return new ExecuteResponseDto(ExecuteStatus.RUNTIME_ERROR, response.Run.Stdout, response.Run.Stderr);
 
         // successful result
-        return new ExecuteResponseDto(ExecuteStatus.Success, response.Run.Stdout, "");
+        return new ExecuteResponseDto(ExecuteStatus.SUCCESS, response.Run.Stdout, response.Run.Stderr);
     }
 }
