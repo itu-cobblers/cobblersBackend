@@ -1,3 +1,4 @@
+using System.Text.Json;
 using cobblersBackend.Services;
 
 
@@ -9,7 +10,11 @@ builder.Services.AddHttpClient<IPistonClient, PistonClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Piston:BaseUrl"] ?? "http://localhost:2000/");
 });
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    });
 
 var app = builder.Build();
 
