@@ -21,6 +21,13 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
     });
 
+// Live rooms (teacher↔student) — in-memory store + SignalR hub. The store is a
+// singleton so every request/connection shares the same room state.
+builder.Services.AddSingleton<SessionStore>();
+builder.Services.AddSignalR();
+
+builder.Services.AddControllers();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -31,6 +38,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.MapControllers();
+app.MapHub<SessionHub>("/hub");
 
 // run
 app.Run();
