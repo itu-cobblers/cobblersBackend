@@ -1,11 +1,14 @@
 
+using System.Text.Json.Serialization;
+
 namespace cobblersBackend.DTOs;
 
-public record ExecuteResponseDto(string Status, string Stdout, string Stderr);
+public record ExecuteResponseDto(ExecuteStatus Status, string Stdout, string Stderr);
 
-public static class ExecuteStatus
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ExecuteStatus
 {
-    public const string Success = "success";
-    public const string CompileError = "compile_error";
-    public const string RuntimeError = "runtime_error";
+    [JsonStringEnumMemberName("success")] SUCCESS,
+    [JsonStringEnumMemberName("compile_error")] COMPILE_ERROR,
+    [JsonStringEnumMemberName("runtime_error")] RUNTIME_ERROR
 }
