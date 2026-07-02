@@ -1,3 +1,4 @@
+using System.Text.Json;
 
 using cobblersBackend.DTOs;
 
@@ -11,6 +12,11 @@ public class ExecutorService
     public async Task<ExecuteResponseDto> ExecuteAsync(string javaSource)
     {
         var response = await _piston.ExecuteAsync("java", javaSource);
+
+        // Terminal output for debugging piston response
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        string prettyJson = JsonSerializer.Serialize(response, options);
+        Console.WriteLine($"Piston response:\n{prettyJson}");
 
         // compile errors
         if (response.Compile is { Code: not 0})
