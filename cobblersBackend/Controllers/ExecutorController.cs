@@ -1,3 +1,4 @@
+using cobblersBackend.DTOs;
 using cobblersBackend.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,12 +12,13 @@ public class ExecutorController : ControllerBase
     public ExecutorController(ExecutorService executor) => _executor = executor;
 
     [HttpPost]
-    public async Task<IActionResult> Execute([FromBody] ExecuteRequest request)
+    public async Task<IActionResult> Execute([FromBody] ExecuteRequestDto request)
     {
-        var output = await _executor.ExecuteAsync(request.Code);
-        return Ok(new ExecuteResponse(output));
+        //temporyary guard for multi file submissions. TBD.
+        if (string.IsNullOrEmpty(request.Code))
+            return BadRequest("Only single-file `code` requests are supported currently");
+            
+        var result = await _executor.ExecuteAsync(request.Code!);
+        return Ok(result);
     }
 }
-
-public record ExecuteRequest(string Code);
-public record ExecuteResponse(string Output);
