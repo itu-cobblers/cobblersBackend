@@ -1,6 +1,7 @@
 using System.Text.Json;
 using cobblersBackend.Hubs;
 using cobblersBackend.Services;
+using cobblersBackend.Hubs;
 
 
 var builder = WebApplication.CreateBuilder(args);
