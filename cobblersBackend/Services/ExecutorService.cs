@@ -1,7 +1,6 @@
 using System.Text.Json;
 
 using cobblersBackend.DTOs;
-using cobblersBackend.Models;
 
 namespace cobblersBackend.Services;
 
@@ -23,8 +22,6 @@ public class ExecutorService
         string prettyJson = JsonSerializer.Serialize(response, options);
         Console.WriteLine($"Piston response:\n{prettyJson}");
 
-
         return _classifier.Classify(response);
-
     }
 }
