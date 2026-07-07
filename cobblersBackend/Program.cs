@@ -10,7 +10,10 @@ builder.Services.AddHttpClient<IPistonClient, PistonClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["Piston:BaseUrl"] ?? "http://localhost:2000/");
 });
-builder.Services.AddOpenApi();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddOpenApi();
+}
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
