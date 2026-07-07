@@ -19,6 +19,8 @@ dotnet build
 dotnet run --project cobblersBackend
 ```
 
+When running in Development (i.e. `ASPNETCORE_ENVIRONMENT=Development`), the OpenAPI document is available at `http://localhost:5046/openapi/v1.json` (Swagger-compatible).
+
 The Piston base URL can be overridden via the `Piston:BaseUrl` config key (e.g. in `appsettings.json` or as an environment variable).
 
 ## Remote Piston (shared dev droplet)
