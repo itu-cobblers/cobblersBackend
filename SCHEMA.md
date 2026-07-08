@@ -27,13 +27,13 @@ User stories that drove these decisions live in [STORIES.md](STORIES.md).
 ### Session
 | Column | Type | Notes |
 |---|---|---|
-| `SessionId` | surrogate PK | Internal id, distinct from the human-facing `Code`. |
+| `SessionId` | string PK | Server-generated UUID |
 | `Code` | string | The 4-char join code shown to students. |
 | `Year` | int | Set at creation time (`DateTimeOffset.UtcNow.Year`). See [Design decisions](#code-uniqueness-is-scoped-by-year). |
 | `TasksetId` | FK → TaskSet | Which content this session's day uses. |
 | `CreateDatetime` | datetime | |
 
-Constraint: **`UNIQUE (Code, Year)`** — not globally unique.
+Constraint: **`UNIQUE (Code, Year)`** 
 
 ### Attendance
 | Column | Type | Notes |
@@ -49,6 +49,7 @@ One row per (student, session) pair. A `JoinSession` call is what creates a
 | Column | Type | Notes |
 |---|---|---|
 | `TasksetId` | PK | |
+| `DisplayTitle` | string | Human-readable name (e.g. "BootIT Day 1 — 2026"), for the teacher's session-creation picker. See [Design decisions](#taskset-gets-a-human-readable-displaytitle). |
 
 A named collection of tasks, referenced by `Session.TasksetId`. Reused across
 years by pointing multiple `Session` rows at the same `TasksetId` — content
@@ -57,15 +58,19 @@ does not fork per year unless someone deliberately authors a new `TaskSet`.
 ### TaskSetTask
 | Column | Type | Notes |
 |---|---|---|
-| `TasksetId` | FK → TaskSet | ┐ |
-| `TaskId` | FK → Task | ┘ composite PK |
-| `Position` | int | Order within the set. |
+| `Id` | surrogate PK (auto-increment) | Exists only to order rows by creation — ascending `Id` = the order a task was added to the set. Not exposed to the frontend. |
+| `TasksetId` | FK → TaskSet | |
+| `TaskId` | FK → Task | |
 
-Constraint: `UNIQUE (TasksetId, Position)`.
+Constraint: `UNIQUE (TasksetId, TaskId)` — a task can't be added to the same
+set twice.
+
+No `Position` column. See [Design decisions](#tasksettask-drops-position) for
+why, and for a flagged assumption about what "ordering" means here.
 
 A real join table, not an id-list column on `TaskSet` — gives FK integrity
-(can't reference a deleted/nonexistent task) and an explicit ordering column
-instead of relying on array order.
+(can't reference a deleted/nonexistent task) that a JSON/array column
+wouldn't.
 
 ### Task
 | Column | Type | Notes |
@@ -79,9 +84,7 @@ instead of relying on array order.
 | `SampleSolutionJson` | json? | Kind-specific reference solution. **Not** part of `ContentJson` — see [Design decisions](#sample-solution-is-a-separate-column). |
 
 `day` and `difficulty` (present in the frontend's current `TaskBase`) are
-**dropped**. `day` is expressed by `TaskSetTask` membership instead; if
-`difficulty` is still wanted for display, it lives inside `ContentJson` — it
-drives no backend logic, so it doesn't need to be a queryable column.
+**dropped**. `day` is expressed by `TaskSetTask` membership instead.
 
 `ContentJson` shape by kind (mirrors the frontend's `CodeTask` / `PredictTask`
 / `ProjectTask`, minus `check`):
@@ -138,6 +141,36 @@ Keeping it a separate field makes "don't send this yet" an API-layer decision
 (simply omit the field from the response) rather than something that has to
 be filtered out of a shared blob.
 
+### Sample solution reveal uses one rule for both solo and classroom
+Two options were on the table for when a *classroom* student (as opposed to
+solo) can see a task's sample solution:
+
+- **A. Teacher-set delay** — the teacher configures a timeout; the solution
+  stays hidden until it elapses, discouraging students from peeking after one
+  failed attempt.
+- **B. Same rule as solo** — reveal as soon as the student has submitted the
+  task at least once, no timer.
+
+**Decision: B**, for both engineering-cost and pedagogical reasons:
+
+- Students in a room work through tasks at their own pace, not in lockstep —
+  a *single* delay can't be scoped to "a session," it would have to be scoped
+  to *(student, task)*, which means tracking a start time per student per
+  task, teacher-facing controls to set/adjust it, and a second, divergent
+  code path from solo mode. That's real, ongoing complexity for a rule whose
+  main job — stop a student from seeing the answer before trying — is already
+  done by the "at least one submission" gate.
+- It also fits the product's existing tone better. The task copy (a hygge
+  café, a blackmarket-kitchen catering game, a "just try it" grading style)
+  reads as low-pressure and trust-the-student, not surveillance-and-delay.
+  Gating answers behind a teacher-controlled clock is a more controlling
+  mechanic than anything else in the app, for a marginal benefit over "you
+  already had to try."
+
+So: `GET /api/tasks/{taskId}/solution?studentId=...` is available whenever
+any `Submission` exists for that `(studentId, taskId)` pair — solo or in a
+room, no session-specific logic. See [CONTRACT.md](CONTRACT.md#solution).
+
 ### Grading lives in backend code, not the database
 `CodeTask.check()` is a function in the frontend today — functions aren't
 data and can't be stored in a DB column. Rather than inventing a serializable
@@ -178,7 +211,39 @@ the old numbering, and `Task.Id` starts fresh once content moves into the DB.
 This retires the frontend's local completion-tracking hack; it does not need
 to be reproduced.
 
-### Persistence replaces `SessionStore`'s ephemeral-by-design contract
+### `TaskSet` gets a human-readable `DisplayTitle`
+Resolves a previously open question. The teacher's session-creation flow
+(picking which `TaskSet` to run today — see [CONTRACT.md](CONTRACT.md#tasks),
+[STORIES.md](STORIES.md) S6) needs something better than a raw id in a
+dropdown. `DisplayTitle` is authored alongside the content, not derived.
+
+### `TaskSetTask` drops `Position`
+Rather than maintain an explicit ordering integer (renumbering on
+insert/reorder), `TaskSetTask` relies on its own surrogate `Id` — ascending
+`Id` is insertion order, so a set's tasks come back in the order they were
+authored, with no bookkeeping.
+
+> **Flagged assumption:** "newest at top" from the request driving this
+> change is read here as describing the **`TaskSet` picker** (a teacher
+> choosing *which set* to use — most recently authored one is the one
+> they're probably looking for), not as reversing the order of *tasks within
+> a set*. Reversing task order within a set would scramble the intentional
+> Day-1-basics → Day-3-classes progression, which is presumably still wanted
+> for the student-facing task sequence. If "newest task first, within a set"
+> was actually intended, say so and this flips to `ORDER BY Id DESC` for
+> `TaskSetTask` specifically.
+
+### Welcome-back resume suggestion needs no new schema (Frontend only)
+On login, a student who joined a session yesterday can be prompted to
+continue in today's session, without retyping a code. This needs no new
+columns — `Session.CreateDatetime` and `Attendance` already carry what's
+needed. See [CONTRACT.md](CONTRACT.md#resume-suggestion-planned) for the
+full plan (endpoint shape, matching heuristic, edge cases). Noted here only
+so it's clear this is orchestration/query logic, not a schema change —
+deliberately not introducing a course/cohort entity just to answer "is this
+the same class as yesterday" (see [STORIES.md](STORIES.md) S9).
+
+### Persistence replaces `SessionStore`'s ephemeral-by-design contract 
 `SessionStore` (in-memory) is explicitly ephemeral: a server restart loses
 all rooms. That contract no longer holds once `Session` / `Attendance` /
 `Student` move into the DB — that's the point of this document. The live
@@ -190,12 +255,9 @@ record of who attended.
 
 ## Open decisions
 
-- [ ] Should `POST /tasks/{taskId}/submissions` reject a submission that
-      carries a `sessionId` the student never joined (i.e. cross-check
-      `Attendance`), or is that not worth enforcing?
-- [ ] How does a `Project` submission ever get `Passed = true` — manual
-      teacher review needs an endpoint/UI, which doesn't exist yet.
-- [ ] `TaskSet` has no human-readable label today (just an id) — worth adding
-      one for teacher-facing tooling, or is the id enough?
-- [ ] Migration of the 35 existing frontend tasks into `Task` rows — one-time
-      script, not covered by this document.
+- [ ] How does a `Project` submission ever get `Passed = true` — manual teacher review needs an endpoint/UI, which doesn't exist yet.
+- [ ] Migration of the 35 existing frontend tasks into `Task` rows — one-time script, not covered by this document.
+- [ ] Resume-suggestion tie-break: if more than one `Session` was created "today," which one is suggested — most recent
+      `CreateDatetime`? (Single-class-at-a-time assumption makes this unlikely in practice, but not impossible.)
+- [ ] Resume-suggestion + `Year` boundary: does the prompt make sense across a year rollover (student's last `Attendance` was
+      December of last year)? Probably rare enough to ignore, flagging in case it isn't.

@@ -76,9 +76,15 @@ connection open); the historical record of who attended does not depend on it.
 ### `POST /api/sessions` (teacher creates a room)
 
 ```json
+// request
+{ "tasksetId": "day1-2026" }
+
 // → 200 OK
 { "code": "ABCD" }
 ```
+
+`tasksetId` comes from [`GET /api/tasksets`](#tasks) — the teacher picks one
+before creating the room. See [STORIES.md](STORIES.md) S6.
 
 ### `JoinSession` — SignalR hub method (student joins a room)
 
@@ -139,6 +145,26 @@ Two populations need task content (see [Sessions](#sessions-rooms)): the live
 cohort (in a room, `code` resolves to a `tasksetId`) and the solo cohort (the
 frontend already hardcodes which `tasksetId` to use). Both hit the same
 endpoint — there's no session-scoped variant.
+
+### `GET /api/tasksets` (teacher — list available tasksets)
+
+```json
+// → 200 OK
+[
+  { "tasksetId": "day1-2026", "displayTitle": "BootIT Day 1 — 2026" },
+  { "tasksetId": "day2-2026", "displayTitle": "BootIT Day 2 — 2026" }
+]
+```
+
+Feeds the teacher's session-creation picker — pick a `tasksetId`, pass it to
+[`POST /api/sessions`](#sessions-rooms). `displayTitle` is
+`TaskSet.DisplayTitle` (see [SCHEMA.md](SCHEMA.md)).
+
+> **Not yet implemented on the backend.** The frontend currently mocks this
+> locally with one entry wrapping its existing hardcoded task bundle (`@lib/tasksetApi`),
+> so the picker UI can be built and reviewed without waiting on the backend —
+> see [STORIES.md](STORIES.md) S6. Swapping the mock for a real call is a
+> one-function change; the picker component doesn't need to know the difference.
 
 ### `GET /api/sessions/{code}` (room cohort — resolve the room's taskset)
 
@@ -364,6 +390,77 @@ Submission history — used for the resume flow (a student returning across the
 
 ---
 
+## Solution
+
+Reveal a task's sample/reference solution. **One rule for both solo and
+classroom students** — see [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom) for why a teacher-controlled delay was considered and rejected.
+
+### `GET /api/tasks/{taskId}/solution?studentId={studentId}`
+
+```json
+// → 200 OK — at least one Submission exists for (studentId, taskId)
+{ "available": true, "solution": "public class Main {...}" }
+
+// → 200 OK — no Submission yet
+{ "available": false, "solution": null }
+```
+
+| Field       | Type                                     | Notes                                                                                                                                             |
+| ----------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `available` | boolean                                   | `true` once the student has submitted this task at least once — pass or fail, in a room or solo.                                                     |
+| `solution`  | string \| `{name, content}[]` \| null     | Present only when `available`. Shape matches `Task.SampleSolutionJson` for the task's `kind`. Not applicable to `predict` (its `expectedOutput`, from Tasks, already is the answer). |
+
+> **Not yet implemented.** Formalizes the previously-vague "reveal a sample
+> solution" backlog stub now that the gating rule is decided — see
+> [STORIES.md](STORIES.md) S8. Frontend: disable the "Show solution" button
+> until the student has submitted at least once, with a hover explaining why.
+
+---
+
+## Resume suggestion (planned)
+
+**Not yet built.** This section is a design plan, written down so frontend
+and backend agree on the approach before either side builds it — see
+[STORIES.md](STORIES.md) S9.
+
+Goal: a student who attended yesterday's session, and returns today while the
+teacher has already opened a new one, gets prompted to continue in today's
+session instead of manually re-entering a code.
+
+### `GET /api/students/{studentId}/resume-suggestion`
+
+```json
+// → 200 OK — a newer session exists that this student hasn't joined
+{
+  "suggested": {
+    "code": "WXYZ",
+    "tasksetDisplayTitle": "BootIT Day 2 — 2026",
+    "createDatetime": "2026-06-20T08:00:00Z"
+  }
+}
+
+// → 200 OK — nothing to suggest
+{ "suggested": null }
+```
+
+Matching heuristic (see
+[SCHEMA.md](SCHEMA.md#welcome-back-resume-suggestion-needs-no-new-schema)):
+the most recently created `Session` that this `studentId` does not already
+have an `Attendance` row for. No course/cohort concept — the app assumes one
+active class at a time, so "the newest session" is "today's session."
+
+**Frontend flow:** on load, if `suggested` is non-null, show "Welcome back,
+{displayName}! Continue in today's session {code}?" with a one-click join
+(calls the existing `JoinSession` hub method with that `code`) or a dismiss
+that falls through to the normal join bar / Solo Practice choice.
+
+| Open item                                            | |
+| ----------------------------------------------------- | --- |
+| Multiple sessions created the same day                | Most recent `CreateDatetime` wins — see [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions). |
+| Prompt UI / component                                 | Not designed yet — this defines the contract, not the component. |
+
+---
+
 ## Open decisions
 
 Resolve each _in this file_ before the relevant feature is built.
@@ -379,6 +476,10 @@ Resolve each _in this file_ before the relevant feature is built.
       is still open.
 - [x] **Progress persistence** — `Submission` rows, keyed by `studentId` (see
       [SCHEMA.md](SCHEMA.md)). Replaces the in-memory skeleton.
+- [x] **Teacher picks a taskset when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/tasksets`](#tasks). Backend endpoint not implemented yet; frontend built against a mock (STORIES.md S6).
+- [x] **Solo Practice entry point** — join-bar UI decision made and built; no new contract beyond S4's existing `sessionId`-omitted submission (STORIES.md S7).
+- [x] **Sample solution reveal** — see [Solution](#solution). Gating rule decided; endpoint not implemented yet (STORIES.md S8).
+- [ ] **Resume suggestion** — see [Resume suggestion (planned)](#resume-suggestion-planned). Plan only — not built (STORIES.md S9).
 - [ ] **Session lifetime** — when does a room end (teacher ends it / idle timeout)?
 - [ ] **`ProgressUpdated` broadcast** — teacher sees live per-task progress, not just who's online (backlog in STORIES.md).
 
