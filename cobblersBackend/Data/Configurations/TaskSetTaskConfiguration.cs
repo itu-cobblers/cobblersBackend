@@ -13,17 +13,17 @@ public class TaskSetTaskConfiguration : IEntityTypeConfiguration<TaskSetTask>
                .ValueGeneratedOnAdd();
         
         // Unique constraint on (TasksetId, TaskId)
-        builder.HasIndex(tst => new {tst.TasksetId, tst.TaskId})
+        builder.HasIndex(tst => new {tst.TaskSetId, tst.TaskId})
                .IsUnique();
         
         //Foreign Key
         builder.HasOne(tst => tst.TaskSet)
-               .WithMany()
-               .HasForeignKey(tst => tst.TasksetId)
+               .WithMany(tst => tst.Tasks)
+               .HasForeignKey(tst => tst.TaskSetId)
                .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(tst => tst.Task)
-               .WithMany()
+               .WithMany(tst => tst.TaskSets)
                .HasForeignKey(tst => tst.TaskId)
                .OnDelete(DeleteBehavior.Cascade);
     }
