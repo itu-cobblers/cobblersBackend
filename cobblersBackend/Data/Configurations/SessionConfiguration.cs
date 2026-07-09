@@ -18,6 +18,6 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.HasOne(s => s.TaskSet)
                .WithMany(ts => ts.Sessions)
                .HasForeignKey(s => s.TaskSetId)
-               .OnDelete(DeleteBehavior.Cascade);
+               .OnDelete(DeleteBehavior.Restrict);
     }
 }

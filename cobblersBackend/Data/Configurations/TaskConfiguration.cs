@@ -13,13 +13,19 @@ public class TaskConfiguration : IEntityTypeConfiguration<Entities.Task>
                .ValueGeneratedOnAdd();
 
         builder.Property(t => t.ContentJson)
-               .HasColumnName("jsonb");
+               .HasColumnType("jsonb");
         
         builder.Property(t => t.SampleSolutionJson)
-               .HasColumnName("jsonb");
+               .HasColumnType("jsonb");
         
         builder.Property(t => t.Kind)
-               .HasConversion<string>()
+               .HasConversion(
+                     v => v.ToString().ToLowerInvariant(),
+                     v => Enum.Parse<TaskKind>(v, ignoreCase: true))
                .HasColumnType("text");
+
+        builder.ToTable(t => t.HasCheckConstraint(
+              "ck_task_kind",
+              "kind IN ('code', 'predict', 'project')"));
     }
 }

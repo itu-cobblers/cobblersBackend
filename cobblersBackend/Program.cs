@@ -30,7 +30,7 @@ builder.Services.AddControllers()
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSignalR();
 
-builder.Services.AddDbContext<AppDbContext>(OptionsBuilder =>
+builder.Services.AddDbContext<CobblersDbContext>(OptionsBuilder =>
 {
     OptionsBuilder.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
 });

@@ -10,28 +10,29 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
     {
         builder.HasKey(s => s.SubId);
         builder.Property(s => s.SubId)
-               .ValueGeneratedNever();
+               .ValueGeneratedOnAdd()
+               .HasDefaultValueSql("gen_random_uuid()");
         
         builder.Property(s => s.ContentJson)
-               .HasColumnName("jsonb");
+               .HasColumnType("jsonb");
 
         builder.Property(s => s.ResultJson)
-               .HasColumnName("jsonb");
+               .HasColumnType("jsonb");
         
         //Foreign Keys
         builder.HasOne(s => s.Session)
                .WithMany()
                .HasForeignKey(s => s.SessionId)
-               .OnDelete(DeleteBehavior.Cascade);
+               .OnDelete(DeleteBehavior.SetNull);
         
         builder.HasOne(s => s.Student)
                .WithMany()
                .HasForeignKey(s => s.StudentId)
-               .OnDelete(DeleteBehavior.Cascade);
+               .OnDelete(DeleteBehavior.Restrict);
         
         builder.HasOne(s => s.Task)
-               .WithMany()
+               .WithMany(t => t.Submissions)
                .HasForeignKey(s => s.TaskId)
-               .OnDelete(DeleteBehavior.Cascade);
+               .OnDelete(DeleteBehavior.Restrict);
     }
 }

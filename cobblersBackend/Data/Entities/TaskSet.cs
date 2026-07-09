@@ -4,7 +4,6 @@ namespace cobblersBackend.Data.Entities;
 
 public class TaskSet
 {
-    [Key]
     public required string TaskSetId { get; set; }
     public required string DisplayTitle { get; set; }
 

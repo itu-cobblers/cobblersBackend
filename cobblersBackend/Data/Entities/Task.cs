@@ -11,8 +11,7 @@ public enum TaskKind
     }
 public class Task
 {
-    [Key]
-    public required int Id { get; set; }
+    public int Id { get; set; }
     public required TaskKind Kind { get; set; }
     public required string Title { get; set; }
     public required string Description { get; set; }

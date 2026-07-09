@@ -15,7 +15,7 @@ public class Submission
     public bool? Passed { get; set; }
     public DateTimeOffset SubmittedAt { get; set; }
 
-    public required Student Student { get; set; }
-    public required Task Task { get; set; }
+    public Student Student { get; set; } = null!;
+    public Task Task { get; set; } = null!;
     public Session? Session { get; set; }
 }

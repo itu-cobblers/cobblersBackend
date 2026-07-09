@@ -9,7 +9,7 @@ public class Attendance
     public required string SessionId { get; set; }
     public required DateTimeOffset JoinedAt { get; set; }
 
-    public required Student Student { get; set; }
-    public required Session Session { get; set; }
+    public Student Student { get; set; } = null!;
+    public Session Session { get; set; } = null!;
     
 }

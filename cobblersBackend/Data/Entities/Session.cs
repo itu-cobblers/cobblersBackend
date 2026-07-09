@@ -12,6 +12,6 @@ public class Session
     public required string TaskSetId { get; set; }
     public DateTimeOffset CreateDateTime { get; set; }
 
-    public required TaskSet TaskSet { get; set; }
+    public TaskSet TaskSet { get; set; } = null!;
 
 }

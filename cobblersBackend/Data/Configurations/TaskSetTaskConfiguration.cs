@@ -18,12 +18,12 @@ public class TaskSetTaskConfiguration : IEntityTypeConfiguration<TaskSetTask>
         
         //Foreign Key
         builder.HasOne(tst => tst.TaskSet)
-               .WithMany(tst => tst.Tasks)
+               .WithMany(ts => ts.Tasks)
                .HasForeignKey(tst => tst.TaskSetId)
                .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(tst => tst.Task)
-               .WithMany(tst => tst.TaskSets)
+               .WithMany(t => t.TaskSets)
                .HasForeignKey(tst => tst.TaskId)
                .OnDelete(DeleteBehavior.Cascade);
     }
