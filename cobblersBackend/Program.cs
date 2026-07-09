@@ -32,7 +32,7 @@ builder.Services.AddSignalR();
 
 builder.Services.AddDbContext<AppDbContext>(OptionsBuilder =>
 {
-    OptionsBuilder.UseNpgsql(connectionString);
+    OptionsBuilder.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
 });
 
 var app = builder.Build();
