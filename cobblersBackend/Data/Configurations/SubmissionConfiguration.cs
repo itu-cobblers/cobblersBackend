@@ -18,9 +18,6 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
         builder.Property(s => s.ResultJson)
                .HasColumnName("jsonb");
         
-        builder.Property(s => s.SubmittedAt)
-               .HasColumnName("timestamptz");
-        
         //Foreign Keys
         builder.HasOne(s => s.Session)
                .WithMany()

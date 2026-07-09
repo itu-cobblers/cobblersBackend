@@ -12,9 +12,6 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Property(s => s.SessionId)
                .ValueGeneratedNever();
                
-        builder.Property(s => s.CreateDateTime)
-               .HasColumnName("timestamptz");
-        
         builder.HasIndex(s => new { s.Code, s.Year})
                .IsUnique();
 
