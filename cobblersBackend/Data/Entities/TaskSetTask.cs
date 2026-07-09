@@ -7,7 +7,7 @@ public class TaskSetTask
 {
     public int Id { get; set; }
 
-    public required string TasksetId { get; set; }
+    public required string TaskSetId { get; set; }
 
     public required int TaskId { get; set; }
 
