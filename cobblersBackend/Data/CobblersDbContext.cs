@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace cobblersBackend.Data;
 
-public class AppDbContext: DbContext
+public class CobblersDbContext: DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    public CobblersDbContext(DbContextOptions<CobblersDbContext> options) : base(options)
     {
         
     }
@@ -17,5 +17,13 @@ public class AppDbContext: DbContext
     public DbSet<Entities.Task> Task { get; set;}
     public DbSet<TaskSet> TaskSet { get; set;}
     public DbSet<TaskSetTask> TaskSetTask { get; set;}
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        //Apply All Configurations
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(CobblersDbContext).Assembly);
+    }
 
 }
