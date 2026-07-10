@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace cobblersBackend.Data.Entities;
 
 public class TaskSet
