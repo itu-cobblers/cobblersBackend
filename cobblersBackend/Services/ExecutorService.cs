@@ -18,10 +18,6 @@ public class ExecutorService
     {
         var response = await _piston.ExecuteAsync("java", javaSource);
 
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        string prettyJson = JsonSerializer.Serialize(response, options);
-        Console.WriteLine($"Piston response:\n{prettyJson}");
-
         return _classifier.Classify(response);
     }
 }
