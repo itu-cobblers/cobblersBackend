@@ -7,7 +7,7 @@ public class Session
     public required string Code { get; set; }
     public required int Year { get; set; }
     public required string TaskSetId { get; set; }
-    public DateTimeOffset CreateDateTime { get; set; }
+    public DateTimeOffset CreateAt { get; set; }
 
     public TaskSet TaskSet { get; set; } = null!;
 

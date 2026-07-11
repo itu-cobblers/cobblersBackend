@@ -10,6 +10,10 @@ public class AttendanceConfiguration : IEntityTypeConfiguration<Attendance>
     {
         builder.HasKey(a => new { a.StudentId, a.SessionId});
 
+        builder.Property(a => a.JoinedAt)
+               .ValueGeneratedOnAdd()
+               .HasDefaultValueSql("now()");
+
         //Foreign Keys
         builder.HasOne(a => a.Student)
                .WithMany()

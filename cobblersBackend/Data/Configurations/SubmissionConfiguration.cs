@@ -18,7 +18,11 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
 
         builder.Property(s => s.ResultJson)
                .HasColumnType("jsonb");
-        
+
+        builder.Property(s => s.SubmittedAt)
+               .ValueGeneratedOnAdd()
+               .HasDefaultValueSql("now()");
+
         //Foreign Keys
         builder.HasOne(s => s.Session)
                .WithMany()

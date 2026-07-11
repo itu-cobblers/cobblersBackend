@@ -15,6 +15,10 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.HasIndex(s => new { s.Code, s.Year})
                .IsUnique();
 
+        builder.Property(s => s.CreateAt)
+               .ValueGeneratedOnAdd()
+               .HasDefaultValueSql("now()");
+
         builder.HasOne(s => s.TaskSet)
                .WithMany(ts => ts.Sessions)
                .HasForeignKey(s => s.TaskSetId)
