@@ -12,8 +12,12 @@ public class TaskSetTaskConfiguration : IEntityTypeConfiguration<TaskSetTask>
         builder.Property(tst => tst.Id)
                .ValueGeneratedOnAdd();
         
-        // Unique constraint on (TasksetId, TaskId)
+        // A task appears at most once per taskset.
         builder.HasIndex(tst => new {tst.TaskSetId, tst.TaskId})
+               .IsUnique();
+
+        // No two tasks share a position within the same taskset.
+        builder.HasIndex(tst => new {tst.TaskSetId, tst.OrderIndex})
                .IsUnique();
         
         //Foreign Key
