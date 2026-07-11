@@ -17,18 +17,26 @@ public class SessionStore
 
     private readonly ConcurrentDictionary<string, Session> _sessions = new();
 
-    /// <summary>Create a room with a unique code among active sessions.</summary>
-    public string CreateSession()
+    /// <summary>Create a room (running the given taskset) with a unique code among active sessions.</summary>
+    public string CreateSession(string tasksetId)
     {
         string code;
         do
         {
             code = GenerateCode();
-        } while (!_sessions.TryAdd(code, new Session(code)));
+        } while (!_sessions.TryAdd(code, new Session(code) { TasksetId = tasksetId }));
         return code;
     }
 
     public bool Exists(string code) => _sessions.ContainsKey(code);
+
+    /// <summary>
+    /// The taskset a room runs. Null when the room is unknown — or when the
+    /// room was implicitly created by a hub join/timer (GetOrAdd) rather than
+    /// the teacher's POST; check Exists(code) first to tell those apart.
+    /// </summary>
+    public string? GetTasksetId(string code) =>
+        _sessions.TryGetValue(code, out var session) ? session.TasksetId : null;
 
     /// <summary>Add a student to a room. Returns the full roster after the add.</summary>
     public IReadOnlyList<Student> AddStudent(string code, Student student)
@@ -70,6 +78,9 @@ public class SessionStore
     private sealed class Session(string code)
     {
         public string Code { get; } = code;
+        // Nullable: rooms materialized via GetOrAdd (hub join / timer on an
+        // unknown code) have no taskset; teacher-created rooms always do.
+        public string? TasksetId { get; init; }
         public ConcurrentDictionary<string, Student> Students { get; } = new();
         public TimerInfo? ActiveTimer { get; set; }
 

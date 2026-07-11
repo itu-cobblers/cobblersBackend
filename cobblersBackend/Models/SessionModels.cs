@@ -26,8 +26,16 @@ public record JoinArgs(
     [property: JsonPropertyName("displayName")] string DisplayName);
 
 // REST DTOs
+public record CreateSessionRequest(
+    [property: JsonPropertyName("tasksetId")] string TasksetId);
+
 public record CreateSessionResponse(
     [property: JsonPropertyName("code")] string Code);
+
+/// <summary>GET /api/sessions/{code} — how the room cohort resolves its taskset.</summary>
+public record GetSessionResponse(
+    [property: JsonPropertyName("code")] string Code,
+    [property: JsonPropertyName("tasksetId")] string? TasksetId);
 
 public record StartTimerRequest(
     [property: JsonPropertyName("durationMinutes")] int DurationMinutes);

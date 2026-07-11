@@ -17,19 +17,40 @@ public class SessionsController : ControllerBase
 {
     private readonly SessionStore _store;
     private readonly IHubContext<SessionHub> _hub;
+    private readonly ITaskSetService _taskSets;
 
-    public SessionsController(SessionStore store, IHubContext<SessionHub> hub)
+    public SessionsController(SessionStore store, IHubContext<SessionHub> hub, ITaskSetService taskSets)
     {
         _store = store;
         _hub = hub;
+        _taskSets = taskSets;
     }
 
-    /// <summary>POST /api/sessions — create a room, return its join code.</summary>
+    /// <summary>
+    /// POST /api/sessions — create a room running the picked taskset, return
+    /// its join code. tasksetId comes from GET /api/tasksets (CONTRACT.md).
+    /// </summary>
     [HttpPost]
-    public IActionResult Create()
+    public async Task<IActionResult> Create([FromBody] CreateSessionRequest request)
     {
-        var code = _store.CreateSession();
+        if (!await _taskSets.ExistsAsync(request.TasksetId))
+            return BadRequest(new { error = $"Taskset '{request.TasksetId}' not found." });
+
+        var code = _store.CreateSession(request.TasksetId);
         return Ok(new CreateSessionResponse(code));
+    }
+
+    /// <summary>
+    /// GET /api/sessions/{code} — resolve a room's taskset, so a joined
+    /// student can fetch content via GET /api/tasksets/{tasksetId}/tasks.
+    /// </summary>
+    [HttpGet("{code}")]
+    public IActionResult Get(string code)
+    {
+        if (!_store.Exists(code))
+            return NotFound(new { error = $"Session '{code}' not found." });
+
+        return Ok(new GetSessionResponse(code, _store.GetTasksetId(code)));
     }
 
     /// <summary>

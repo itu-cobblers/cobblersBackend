@@ -160,11 +160,13 @@ Feeds the teacher's session-creation picker — pick a `tasksetId`, pass it to
 [`POST /api/sessions`](#sessions-rooms). `displayTitle` is
 `TaskSet.DisplayTitle` (see [SCHEMA.md](SCHEMA.md)).
 
-> **Not yet implemented on the backend.** The frontend currently mocks this
-> locally with one entry wrapping its existing hardcoded task bundle (`@lib/tasksetApi`),
-> so the picker UI can be built and reviewed without waiting on the backend —
-> see [STORIES.md](STORIES.md) S6. Swapping the mock for a real call is a
-> one-function change; the picker component doesn't need to know the difference.
+> **Implemented on the backend** (along with `GET /api/sessions/{code}` and
+> `GET /api/tasksets/{tasksetId}/tasks` below); content is loaded by
+> `scripts/seed-tasks.sql`. The frontend still mocks this locally
+> (`@lib/tasksetApi`) — swapping the mock for the real call is a one-function
+> change; the picker component doesn't need to know the difference
+> (see [STORIES.md](STORIES.md) S6). Note `POST /api/sessions` now **requires**
+> the `tasksetId` body shown above and rejects unknown ids with `400`.
 
 ### `GET /api/sessions/{code}` (room cohort — resolve the room's taskset)
 
@@ -338,7 +340,7 @@ see [SCHEMA.md](SCHEMA.md#sessionid-is-nullable-on-submission)). Built on top
 of `execute` for `code`/`project`; `predict` never touches the executor.
 
 Grading is **server-side now**, not client-reported — see
-[SCHEMA.md](SCHEMA.md#grading-lives-in-backend-code-not-the-database). The
+[SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine). The
 frontend's `check()` no longer decides `passed`.
 
 ### `POST /api/tasks/{taskId}/submissions`
@@ -488,7 +490,7 @@ Resolve each _in this file_ before the relevant feature is built.
       is still open.
 - [x] **Progress persistence** — `Submission` rows, keyed by `studentId` (see
       [SCHEMA.md](SCHEMA.md)). Replaces the in-memory skeleton.
-- [x] **Teacher picks a taskset when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/tasksets`](#tasks). Backend endpoint not implemented yet; frontend built against a mock (STORIES.md S6).
+- [x] **Teacher picks a taskset when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/tasksets`](#tasks). Backend endpoints implemented (`POST /api/sessions` requires `tasksetId`); frontend still on its mock (STORIES.md S6).
 - [x] **Solo Practice entry point** — join-bar UI decision made and built; no new contract beyond S4's existing `sessionId`-omitted submission (STORIES.md S7).
 - [x] **Sample solution reveal** — see [Solution](#solution). Gating rule decided; endpoint not implemented yet (STORIES.md S8).
 - [ ] **Resume suggestion** — see [Resume suggestion (planned)](#resume-suggestion-planned). Plan only — not built (STORIES.md S9).
