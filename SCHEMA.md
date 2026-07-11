@@ -76,12 +76,14 @@ wouldn't.
 | Column | Type | Notes |
 |---|---|---|
 | `Id` | PK (fresh identity) | **Not** the frontend's current 0–34 numbering — see [Design decisions](#taskid-is-a-fresh-identity). |
+| `Slug` | string, UNIQUE | Stable natural key (kebab-case, e.g. `hello-world`). Identical across databases while `Id` is DB-assigned — the seed script upserts on it, and any per-task code hook keys on it. **Internal only**, never exposed on the API. |
 | `Kind` | enum: `Code` \| `Predict` \| `Project` | |
 | `Title` | string | |
 | `Description` | string | |
 | `Hint` | string? | |
 | `ContentJson` | json | Kind-specific payload, always safe to send to the student. Shape per kind below. |
 | `SampleSolutionJson` | json? | Kind-specific reference solution. **Not** part of `ContentJson` — see [Design decisions](#sample-solution-is-a-separate-column). |
+| `GradingJson` | json? | Serializable grading rules for `Code` tasks — see [Design decisions](#grading-rules-are-data-evaluated-by-one-backend-engine). `null` = not auto-gradable (`Project`, NIM) or graded generically (`Predict`). Never sent to the client, same as `SampleSolutionJson`. |
 
 `day` and `difficulty` (present in the frontend's current `TaskBase`) are
 **dropped**. `day` is expressed by `TaskSetTask` membership instead.
@@ -112,7 +114,7 @@ Predict: not used — ContentJson.expectedOutput already is the answer
 | `SessionId` | FK → Session, **nullable** | Null for solo/practice submissions made without ever joining a room. See [Design decisions](#sessionid-is-nullable-on-submission). |
 | `ContentJson` | json | Full submitted payload — a string for Code/Predict, `SourceFile[]` for Project. |
 | `ResultJson` | json? | Full raw execution result (`stdout`/`stderr`/`exitCode`) for Code/Project. Null for Predict (no execution happens). |
-| `Passed` | bool? | Server-computed verdict (see [Design decisions](#grading-lives-in-backend-code-not-the-database)). Null = not automatically gradable (e.g. Project today). |
+| `Passed` | bool? | Server-computed verdict (see [Design decisions](#grading-rules-are-data-evaluated-by-one-backend-engine)). Null = not automatically gradable (e.g. Project today). |
 | `SubmittedAt` | datetime | **DB-owned** — stamped `now()` on insert, not nullable. Needed to order history and to tell submissions apart. See [Value generation](#value-generation--who-owns-each-column). |
 
 ---
@@ -195,18 +197,48 @@ So: `GET /api/tasks/{taskId}/solution?studentId=...` is available whenever
 any `Submission` exists for that `(studentId, taskId)` pair — solo or in a
 room, no session-specific logic. See [CONTRACT.md](CONTRACT.md#solution).
 
-### Grading lives in backend code, not the database
-`CodeTask.check()` is a function in the frontend today — functions aren't
-data and can't be stored in a DB column. Rather than inventing a serializable
-rule format for it, grading logic for `Code` tasks is ported to backend code:
-a lookup keyed by `TaskId` (e.g. `Dictionary<int, Func<CheckResult, Verdict>>`),
-evaluated server-side after the Piston result comes back. This makes
-`Submission.Passed` authoritative — the client no longer self-reports whether
-it passed.
+### Grading rules are data, evaluated by one backend engine
+> **Revises an earlier decision.** The first version of this section ported
+> each `CodeTask.check()` to backend code as a lookup keyed by `TaskId`
+> (`Dictionary<int, Func<CheckResult, Verdict>>`). That broke once `Task.Id`
+> became purely DB-assigned (ids can differ between a local DB and the VM DB,
+> so C# has no stable key), and it meant maintaining task content (SQL) and
+> grading logic (C#) in two places that could drift.
 
-`Predict` tasks don't need a per-task entry in that lookup: their grading is
-one generic algorithm (normalize + compare against `ContentJson.expectedOutput`
-/ `accept[]`), driven entirely by data already in `Task`.
+Instead, grading rules are **data stored with the task** (`Task.GradingJson`,
+jsonb) and the backend has **one generic evaluator** (`ITaskGrader` /
+`TaskGrader` in `Services/`), run server-side after the Piston result comes
+back. This makes `Submission.Passed` authoritative — the client no longer
+self-reports whether it passed — and adding or re-tuning a task touches only
+the seed SQL, no C# deploy.
+
+A rule node is one of:
+
+```jsonc
+{ "all": [ <node>, ... ] }                                      // AND
+{ "any": [ <node>, ... ] }                                      // OR — e.g. accept "Hello World!" or "Hello, World!"
+{ "not": <node> }                                               // e.g. FlightTicket: price must never go negative
+{ "target": "stdout"|"code", "op": "contains",     "value": "2024" }
+{ "target": "stdout",        "op": "containsLine", "value": "50" }        // trimmed-line match
+{ "target": "stdout"|"code", "op": "regex",        "pattern": "c2f\\s*\\(", "flags": "i" }
+{ "op": "nonEmptyStdout" }                                      // café task: any output passes
+{ "op": "custom", "key": "<slug>" }                             // escape hatch — see below
+```
+
+Grading only runs on a successful execution — a non-zero exit code fails
+before any rule is evaluated. All 35 current frontend `check()` functions
+decompose into these primitives (verified against the frontend's `tasks.ts` +
+`lib/grade.ts`); the frontend's `signals` side-channel (the café-name display)
+stays a client-side nicety derived from stdout — the server verdict is just
+`passed`.
+
+- `Predict` tasks don't use `GradingJson`: their grading is one generic
+  algorithm (normalize + compare against `ContentJson.expectedOutput` /
+  `accept[]`), driven entirely by data already in `Task`.
+- `custom` is the escape hatch if a future task outgrows the DSL: it resolves
+  a handler from a small C# registry keyed by **`Slug`** (stable across
+  databases, unlike `Id`). No current task needs it — prefer extending the
+  DSL with a new op over reaching for `custom`.
 
 `Project` tasks have no automated check today (same as the frontend currently
 — they're manually reviewed). `Submission.Passed` stays `null` for them; this
@@ -296,7 +328,8 @@ record of who attended.
 ## Open decisions
 
 - [ ] How does a `Project` submission ever get `Passed = true` — manual teacher review needs an endpoint/UI, which doesn't exist yet.
-- [ ] Migration of the 35 existing frontend tasks into `Task` rows — one-time script, not covered by this document.
+- [x] Migration of the 35 existing frontend tasks into `Task` rows — done via the idempotent
+      [scripts/seed-tasks.sql](scripts/seed-tasks.sql) (upserts keyed on `Slug`; re-runnable against any environment).
 - [ ] Resume-suggestion tie-break: if more than one `Session` was created "today," which one is suggested — most recent
       `CreateAt`? (Single-class-at-a-time assumption makes this unlikely in practice, but not impossible.)
 - [ ] Resume-suggestion across a year rollover (student's last `Attendance` was December of last year): does the prompt still

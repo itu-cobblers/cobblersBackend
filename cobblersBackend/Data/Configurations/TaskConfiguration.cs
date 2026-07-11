@@ -12,10 +12,15 @@ public class TaskConfiguration : IEntityTypeConfiguration<Entities.Task>
         builder.Property(t => t.Id)
                .ValueGeneratedOnAdd();
 
+        builder.HasIndex(t => t.Slug).IsUnique();
+
         builder.Property(t => t.ContentJson)
                .HasColumnType("jsonb");
-        
+
         builder.Property(t => t.SampleSolutionJson)
+               .HasColumnType("jsonb");
+
+        builder.Property(t => t.GradingJson)
                .HasColumnType("jsonb");
         
         builder.Property(t => t.Kind)
