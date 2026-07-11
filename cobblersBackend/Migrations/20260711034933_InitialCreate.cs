@@ -61,9 +61,8 @@ namespace cobblersBackend.Migrations
                 {
                     session_id = table.Column<string>(type: "text", nullable: false),
                     code = table.Column<string>(type: "text", nullable: false),
-                    year = table.Column<int>(type: "integer", nullable: false),
                     task_set_id = table.Column<string>(type: "text", nullable: false),
-                    create_date_time = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    create_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
@@ -83,7 +82,8 @@ namespace cobblersBackend.Migrations
                     id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     task_set_id = table.Column<string>(type: "text", nullable: false),
-                    task_id = table.Column<int>(type: "integer", nullable: false)
+                    task_id = table.Column<int>(type: "integer", nullable: false),
+                    order_index = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -108,7 +108,7 @@ namespace cobblersBackend.Migrations
                 {
                     student_id = table.Column<string>(type: "text", nullable: false),
                     session_id = table.Column<string>(type: "text", nullable: false),
-                    joined_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    joined_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
@@ -131,14 +131,14 @@ namespace cobblersBackend.Migrations
                 name: "submission",
                 columns: table => new
                 {
-                    sub_id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    sub_id = table.Column<Guid>(type: "uuid", nullable: false),
                     student_id = table.Column<string>(type: "text", nullable: false),
                     task_id = table.Column<int>(type: "integer", nullable: false),
                     session_id = table.Column<string>(type: "text", nullable: true),
                     content_json = table.Column<string>(type: "jsonb", nullable: false),
                     result_json = table.Column<string>(type: "jsonb", nullable: true),
                     passed = table.Column<bool>(type: "boolean", nullable: true),
-                    submitted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    submitted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "now()")
                 },
                 constraints: table =>
                 {
@@ -169,9 +169,9 @@ namespace cobblersBackend.Migrations
                 column: "session_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_session_code_year",
+                name: "ix_session_code",
                 table: "session",
-                columns: new[] { "code", "year" },
+                column: "code",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -198,6 +198,12 @@ namespace cobblersBackend.Migrations
                 name: "ix_task_set_task_task_id",
                 table: "task_set_task",
                 column: "task_id");
+
+            migrationBuilder.CreateIndex(
+                name: "ix_task_set_task_task_set_id_order_index",
+                table: "task_set_task",
+                columns: new[] { "task_set_id", "order_index" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_task_set_task_task_set_id_task_id",

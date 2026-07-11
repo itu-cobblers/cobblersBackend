@@ -12,7 +12,7 @@ using cobblersBackend.Data;
 namespace cobblersBackend.Migrations
 {
     [DbContext(typeof(CobblersDbContext))]
-    [Migration("20260709174540_InitialCreate")]
+    [Migration("20260711034933_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -36,8 +36,10 @@ namespace cobblersBackend.Migrations
                         .HasColumnName("session_id");
 
                     b.Property<DateTimeOffset>("JoinedAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("joined_at");
+                        .HasColumnName("joined_at")
+                        .HasDefaultValueSql("now()");
 
                     b.HasKey("StudentId", "SessionId")
                         .HasName("pk_attendance");
@@ -59,28 +61,26 @@ namespace cobblersBackend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("code");
 
-                    b.Property<DateTimeOffset>("CreateDateTime")
+                    b.Property<DateTimeOffset>("CreateAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("create_date_time");
+                        .HasColumnName("create_at")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<string>("TaskSetId")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("task_set_id");
 
-                    b.Property<int>("Year")
-                        .HasColumnType("integer")
-                        .HasColumnName("year");
-
                     b.HasKey("SessionId")
                         .HasName("pk_session");
 
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_session_code");
+
                     b.HasIndex("TaskSetId")
                         .HasDatabaseName("ix_session_task_set_id");
-
-                    b.HasIndex("Code", "Year")
-                        .IsUnique()
-                        .HasDatabaseName("ix_session_code_year");
 
                     b.ToTable("session", (string)null);
                 });
@@ -105,10 +105,8 @@ namespace cobblersBackend.Migrations
             modelBuilder.Entity("cobblersBackend.Data.Entities.Submission", b =>
                 {
                     b.Property<Guid>("SubId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
-                        .HasColumnName("sub_id")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnName("sub_id");
 
                     b.Property<string>("ContentJson")
                         .IsRequired()
@@ -133,8 +131,10 @@ namespace cobblersBackend.Migrations
                         .HasColumnName("student_id");
 
                     b.Property<DateTimeOffset>("SubmittedAt")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("submitted_at");
+                        .HasColumnName("submitted_at")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<int>("TaskId")
                         .HasColumnType("integer")
@@ -227,6 +227,10 @@ namespace cobblersBackend.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_index");
+
                     b.Property<int>("TaskId")
                         .HasColumnType("integer")
                         .HasColumnName("task_id");
@@ -241,6 +245,10 @@ namespace cobblersBackend.Migrations
 
                     b.HasIndex("TaskId")
                         .HasDatabaseName("ix_task_set_task_task_id");
+
+                    b.HasIndex("TaskSetId", "OrderIndex")
+                        .IsUnique()
+                        .HasDatabaseName("ix_task_set_task_task_set_id_order_index");
 
                     b.HasIndex("TaskSetId", "TaskId")
                         .IsUnique()
