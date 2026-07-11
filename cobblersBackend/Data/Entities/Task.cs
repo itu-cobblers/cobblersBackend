@@ -2,11 +2,12 @@ namespace cobblersBackend.Data.Entities;
 
 
 public enum TaskKind
-    {
-        Code,
-        Predict,
-        Project
-    }
+{
+    Code,
+    Predict,
+    Project
+}
+
 public class Task
 {
     public int Id { get; set; }
