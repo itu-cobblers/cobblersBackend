@@ -12,7 +12,7 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Property(s => s.SessionId)
                .ValueGeneratedNever();
                
-        builder.HasIndex(s => new { s.Code, s.Year})
+        builder.HasIndex(s => s.Code)
                .IsUnique();
 
         builder.Property(s => s.CreateAt)

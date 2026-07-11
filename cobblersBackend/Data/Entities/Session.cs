@@ -5,7 +5,6 @@ public class Session
 
     public required string SessionId { get; set; }
     public required string Code { get; set; }
-    public required int Year { get; set; }
     public required string TaskSetId { get; set; }
     public DateTimeOffset CreateAt { get; set; }
 
