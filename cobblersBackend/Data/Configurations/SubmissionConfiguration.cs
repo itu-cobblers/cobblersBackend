@@ -10,8 +10,7 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
     {
         builder.HasKey(s => s.SubId);
         builder.Property(s => s.SubId)
-               .ValueGeneratedOnAdd()
-               .HasDefaultValueSql("gen_random_uuid()");
+               .ValueGeneratedNever();
         
         builder.Property(s => s.ContentJson)
                .HasColumnType("jsonb");
