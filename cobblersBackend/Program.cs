@@ -1,9 +1,11 @@
 using System.Text.Json;
+using cobblersBackend.Data;
 using cobblersBackend.Hubs;
 using cobblersBackend.Services;
-
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 // Add services to the container.
 builder.Services.AddScoped<ExecutorService>();
@@ -28,7 +30,10 @@ builder.Services.AddControllers()
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSignalR();
 
-builder.Services.AddControllers();
+builder.Services.AddDbContext<CobblersDbContext>(OptionsBuilder =>
+{
+    OptionsBuilder.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+});
 
 var app = builder.Build();
 
