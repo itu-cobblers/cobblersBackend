@@ -8,9 +8,11 @@ frontend↔backend wire format; this file governs what's behind it.
 > receives, it belongs in CONTRACT.md too — this file should never be the
 > only place a frontend-visible behavior is documented.
 
-> **Status:** design agreed, not yet implemented. No EF Core / `DbContext`
-> exists in the codebase yet — this is the target schema the ongoing DB work
-> is building toward. `SessionStore` (in-memory) is what it replaces.
+> **Status:** implemented as EF Core entities + configurations under
+> `cobblersBackend/Data/`, with a single `InitialCreate` migration. Session
+> creation still runs through `SessionStore` (in-memory); the DB-backed write
+> paths (persisting `Session` / `Attendance` / `Submission`) are not wired to
+> controllers yet.
 
 User stories that drove these decisions live in [STORIES.md](STORIES.md).
 
@@ -27,20 +29,19 @@ User stories that drove these decisions live in [STORIES.md](STORIES.md).
 ### Session
 | Column | Type | Notes |
 |---|---|---|
-| `SessionId` | string PK | Server-generated UUID |
-| `Code` | string | The 4-char join code shown to students. |
-| `Year` | int | Set at creation time (`DateTimeOffset.UtcNow.Year`). See [Design decisions](#code-uniqueness-is-scoped-by-year). |
+| `SessionId` | string PK | App-generated in C# (`Guid`). `ValueGeneratedNever`. |
+| `Code` | string | The 4-char join code shown to students. App-generated (random). |
 | `TasksetId` | FK → TaskSet | Which content this session's day uses. |
-| `CreateDatetime` | datetime | |
+| `CreateAt` | datetime | **DB-owned** — stamped `now()` on insert, never sent by a caller. See [Value generation](#value-generation--who-owns-each-column). |
 
-Constraint: **`UNIQUE (Code, Year)`** 
+Constraint: **`UNIQUE (Code)`** — see [Design decisions](#code-uniqueness-is-global).
 
 ### Attendance
 | Column | Type | Notes |
 |---|---|---|
 | `StudentId` | FK → Student | ┐ |
 | `SessionId` | FK → Session | ┘ composite PK |
-| `JoinedAt` | datetime | |
+| `JoinedAt` | datetime | **DB-owned** — stamped `now()` on insert. See [Value generation](#value-generation--who-owns-each-column). |
 
 One row per (student, session) pair. A `JoinSession` call is what creates a
 `Student` (if new) and this row (see CONTRACT.md Sessions).
@@ -58,15 +59,14 @@ does not fork per year unless someone deliberately authors a new `TaskSet`.
 ### TaskSetTask
 | Column | Type | Notes |
 |---|---|---|
-| `Id` | surrogate PK (auto-increment) | Exists only to order rows by creation — ascending `Id` = the order a task was added to the set. Not exposed to the frontend. |
+| `Id` | surrogate PK (auto-increment) | DB identity (`ValueGeneratedOnAdd`). Internal surrogate, not exposed to the frontend. |
 | `TasksetId` | FK → TaskSet | |
 | `TaskId` | FK → Task | |
+| `OrderIndex` | int | 0-based position of the task within the set — maps to the frontend's array index. Caller-provided. See [Design decisions](#tasksettask-carries-an-explicit-orderindex). |
 
-Constraint: `UNIQUE (TasksetId, TaskId)` — a task can't be added to the same
-set twice.
-
-No `Position` column. See [Design decisions](#tasksettask-drops-position) for
-why, and for a flagged assumption about what "ordering" means here.
+Constraints:
+- `UNIQUE (TasksetId, TaskId)` — a task can't be added to the same set twice.
+- `UNIQUE (TasksetId, OrderIndex)` — two tasks can't share a position in the same set.
 
 A real join table, not an id-list column on `TaskSet` — gives FK integrity
 (can't reference a deleted/nonexistent task) that a JSON/array column
@@ -106,18 +106,42 @@ Predict: not used — ContentJson.expectedOutput already is the answer
 ### Submission
 | Column | Type | Notes |
 |---|---|---|
-| `SubId` | PK (surrogate) | Not `(StudentId, TaskId)` — a student can submit the same task multiple times, including failing attempts. |
+| `SubId` | Guid PK (surrogate) | App-generated in C# (`Guid.NewGuid()`), `ValueGeneratedNever`. Not `(StudentId, TaskId)` — a student can submit the same task multiple times, including failing attempts. |
 | `StudentId` | FK → Student | |
 | `TaskId` | FK → Task | |
 | `SessionId` | FK → Session, **nullable** | Null for solo/practice submissions made without ever joining a room. See [Design decisions](#sessionid-is-nullable-on-submission). |
 | `ContentJson` | json | Full submitted payload — a string for Code/Predict, `SourceFile[]` for Project. |
 | `ResultJson` | json? | Full raw execution result (`stdout`/`stderr`/`exitCode`) for Code/Project. Null for Predict (no execution happens). |
 | `Passed` | bool? | Server-computed verdict (see [Design decisions](#grading-lives-in-backend-code-not-the-database)). Null = not automatically gradable (e.g. Project today). |
-| `SubmittedAt` | datetime | Not nullable — was missing from the original sketch; needed to order history and to tell submissions across different sessions/years apart. |
+| `SubmittedAt` | datetime | **DB-owned** — stamped `now()` on insert, not nullable. Needed to order history and to tell submissions apart. See [Value generation](#value-generation--who-owns-each-column). |
 
 ---
 
 ## Design decisions
+
+### Value generation — who owns each column
+Every column's value comes from exactly one of three places. Which one it is
+fixes both the entity (`required` or not) and the EF configuration:
+
+| Category | Who produces it | Entity | Configuration | Examples |
+|---|---|---|---|---|
+| **A. Provided** | The caller — client input, a FK reference, or seed data | `required` | `ValueGeneratedNever`, no default | `Student.Id` (client), every FK, `TaskSet.TasksetId`, `TaskSetTask.OrderIndex` |
+| **B. DB-generated** | Postgres, on insert | **not** `required` | `ValueGeneratedOnAdd` (int identity) *or* `HasDefaultValueSql` (uuid / time) | `Task.Id`, `TaskSetTask.Id`, all timestamps |
+| **C. App-generated** | C# at runtime | `required` | `ValueGeneratedNever`, no default | `Session.SessionId`, `Session.Code`, `Submission.SubId` |
+
+Two consequences worth stating outright:
+
+- **Timestamps are DB-owned (category B).** `Session.CreateAt`,
+  `Attendance.JoinedAt`, and `Submission.SubmittedAt` are stamped by the
+  database (`DEFAULT now()`); no request DTO carries them and C# code must not
+  set them. This makes them un-spoofable and gives every row a single clock.
+  That the request shape never includes a timestamp is a CONTRACT.md-relevant
+  fact.
+- **`required` is not a generator.** It only forces the C# object initializer
+  to set a value — it never produces one. So it belongs on A and C (someone
+  has to hand a value in) but never on B (the DB fills it; requiring it would
+  force callers to invent a value, defeating the point). In particular an
+  `int` identity PK is never `required`.
 
 ### `SessionId` is nullable on `Submission`
 Two populations submit work: students who joined a teacher's room (`code`),
@@ -194,13 +218,27 @@ is an existing gap, not a regression introduced by this design.
 > assumption"). Automated grading for `Project` submissions is unblocked by,
 > but separate from, that change.
 
-### `Code` uniqueness is scoped by year
-There is no course/cohort concept — only a year. `Session.Code` was unique
-only among *currently active* in-memory rooms (see CONTRACT.md); once
-sessions persist indefinitely, that scope has to be explicit. `UNIQUE (Code,
-Year)` means the same 4-char code can be reissued in a later year without a
-collision, without introducing an entity for something that doesn't exist in
-practice.
+### `Code` uniqueness is global
+`Session.Code` was originally scoped `UNIQUE (Code, Year)` so a code could be
+reissued in a later year. `Year` has since been dropped — it existed purely to
+widen the uniqueness scope, for a collision that is vanishingly rare at
+bootcamp scale (4 chars over a 32-symbol alphabet ≈ 1M combinations). The
+constraint is now a plain **`UNIQUE (Code)`**.
+
+Collisions are still possible (birthday paradox), so code allocation must
+**insert-and-retry**: generate a code, attempt the insert, and on a unique-key
+violation (Postgres `23505`) regenerate and try again — never check-then-insert
+(that races). `SessionStore` already does this in-memory; the DB write path
+must do the same.
+
+> **Future option — active-only uniqueness.** To make codes *recyclable* once
+> a session ends (so the code space never exhausts), add a nullable `ClosedAt`
+> timestamp and make the index partial: `UNIQUE (Code) WHERE closed_at IS
+> NULL`. A partial-index predicate must be immutable, so it keys off
+> `closed_at IS NULL`, **not** a time comparison like `expires_at > now()`.
+> Deferred — global uniqueness is enough at current scale, and this needs a
+> session lifecycle (something has to mark a session closed) that doesn't
+> exist yet.
 
 ### `TaskId` is a fresh identity
 The frontend's current `id` (0–34) doubles as a `localStorage` key for
@@ -217,26 +255,28 @@ Resolves a previously open question. The teacher's session-creation flow
 [STORIES.md](STORIES.md) S6) needs something better than a raw id in a
 dropdown. `DisplayTitle` is authored alongside the content, not derived.
 
-### `TaskSetTask` drops `Position`
-Rather than maintain an explicit ordering integer (renumbering on
-insert/reorder), `TaskSetTask` relies on its own surrogate `Id` — ascending
-`Id` is insertion order, so a set's tasks come back in the order they were
-authored, with no bookkeeping.
+### `TaskSetTask` carries an explicit `OrderIndex`
+An earlier revision dropped a position column and relied on the surrogate `Id`
+(ascending `Id` = insertion order). That's been **reversed**: task order within
+a set is real, student-facing data — the intentional Day-1-basics →
+Day-3-classes progression, and the frontend's array-index addressing of tasks.
+So it gets its own explicit **`OrderIndex`** (0-based, matching the frontend's
+array index) rather than being implied by an auto-increment key that renumbers
+awkwardly on reorder. `UNIQUE (TasksetId, OrderIndex)` stops two tasks sharing
+a slot.
 
-> **Flagged assumption:** "newest at top" from the request driving this
-> change is read here as describing the **`TaskSet` picker** (a teacher
-> choosing *which set* to use — most recently authored one is the one
-> they're probably looking for), not as reversing the order of *tasks within
-> a set*. Reversing task order within a set would scramble the intentional
-> Day-1-basics → Day-3-classes progression, which is presumably still wanted
-> for the student-facing task sequence. If "newest task first, within a set"
-> was actually intended, say so and this flips to `ORDER BY Id DESC` for
-> `TaskSetTask` specifically.
+The index only prevents *duplicate* positions — it can't enforce a gapless
+`0,1,2,…` sequence. Seed/authoring code is responsible for numbering a set's
+tasks contiguously from 0.
+
+> Because `OrderIndex` is how the frontend addresses tasks within a set, it's
+> a CONTRACT.md-relevant field — the task-list response order (and any
+> index-based addressing) should be defined against it.
 
 ### Welcome-back resume suggestion needs no new schema (Frontend only)
 On login, a student who joined a session yesterday can be prompted to
 continue in today's session, without retyping a code. This needs no new
-columns — `Session.CreateDatetime` and `Attendance` already carry what's
+columns — `Session.CreateAt` and `Attendance` already carry what's
 needed. See [CONTRACT.md](CONTRACT.md#resume-suggestion-planned) for the
 full plan (endpoint shape, matching heuristic, edge cases). Noted here only
 so it's clear this is orchestration/query logic, not a schema change —
@@ -258,6 +298,7 @@ record of who attended.
 - [ ] How does a `Project` submission ever get `Passed = true` — manual teacher review needs an endpoint/UI, which doesn't exist yet.
 - [ ] Migration of the 35 existing frontend tasks into `Task` rows — one-time script, not covered by this document.
 - [ ] Resume-suggestion tie-break: if more than one `Session` was created "today," which one is suggested — most recent
-      `CreateDatetime`? (Single-class-at-a-time assumption makes this unlikely in practice, but not impossible.)
-- [ ] Resume-suggestion + `Year` boundary: does the prompt make sense across a year rollover (student's last `Attendance` was
-      December of last year)? Probably rare enough to ignore, flagging in case it isn't.
+      `CreateAt`? (Single-class-at-a-time assumption makes this unlikely in practice, but not impossible.)
+- [ ] Resume-suggestion across a year rollover (student's last `Attendance` was December of last year): does the prompt still
+      make sense? Probably rare enough to ignore, flagging in case it isn't. (`Year` is no longer a column — this is purely a
+      calendar-date question on `CreateAt` / `JoinedAt` now.)

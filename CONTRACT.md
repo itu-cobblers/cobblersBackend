@@ -63,9 +63,9 @@ timer) go to the group, so solo students never receive them — confusion solved
 construction, not by asking people to ignore things.
 
 ```
-code:   "ABCD"   // 4–6 uppercase chars, skip ambiguous 0/O 1/I
-                 // unique per calendar year (regenerate on collision within a year);
-                 // the same code can be reissued in a later year
+code:   "ABCD"   // 4 uppercase chars, skip ambiguous 0/O 1/I
+                 // globally unique among sessions; regenerate on collision (insert-and-retry)
+                 // see SCHEMA.md "Code uniqueness is global"
 ```
 
 Session, Attendance, and Student are **persisted** (see [SCHEMA.md](SCHEMA.md))
@@ -208,6 +208,12 @@ Feeds the teacher's session-creation picker — pick a `tasksetId`, pass it to
 > This response never includes a sample/reference solution. That's a
 > deliberate omission, not an oversight — see [SCHEMA.md](SCHEMA.md#sample-solution-is-a-separate-column).
 > `check()` logic also does not travel over the wire anymore — grading moved server-side (see [Submission](#submission) below).
+
+> **Order matters.** The array comes back sorted by each task's position within
+> the set (`TaskSetTask.OrderIndex`, 0-based) — so the array index _is_ the
+> task's place in the set, which is how the frontend addresses tasks. `id` (a
+> fresh server identity) is **not** the ordering key. See
+> [SCHEMA.md](SCHEMA.md#tasksettask-carries-an-explicit-orderindex).
 
 This replaces the frontend's hardcoded task bundle as the source of truth for task content going forward.
 
@@ -354,6 +360,12 @@ frontend's `check()` no longer decides `passed`.
 | `sessionId` | string?                       | Omit for solo/practice submissions made without joining a room.                         |
 | `content`   | string \| `{name, content}[]` | A string for `code`/`predict`; a file list for `project` (matches `execute`'s `files`). |
 
+> **`submittedAt` is server-owned** — the client never sends it. The database
+> stamps it on insert and it comes back in the response only. This holds for
+> every timestamp in this contract (`createAt`, `joinedAt` too): timestamps are
+> DB-generated, never request input. See
+> [SCHEMA.md](SCHEMA.md#value-generation--who-owns-each-column).
+
 ### Response — `200 OK`
 
 ```json
@@ -435,7 +447,7 @@ session instead of manually re-entering a code.
   "suggested": {
     "code": "WXYZ",
     "tasksetDisplayTitle": "BootIT Day 2 — 2026",
-    "createDatetime": "2026-06-20T08:00:00Z"
+    "createAt": "2026-06-20T08:00:00Z"
   }
 }
 
@@ -456,7 +468,7 @@ that falls through to the normal join bar / Solo Practice choice.
 
 | Open item                                            | |
 | ----------------------------------------------------- | --- |
-| Multiple sessions created the same day                | Most recent `CreateDatetime` wins — see [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions). |
+| Multiple sessions created the same day                | Most recent `CreateAt` wins — see [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions). |
 | Prompt UI / component                                 | Not designed yet — this defines the contract, not the component. |
 
 ---
