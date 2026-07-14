@@ -60,3 +60,6 @@ app.MapHub<SessionHub>("/hub");
 
 // run
 app.Run();
+
+public partial class Program { }
+

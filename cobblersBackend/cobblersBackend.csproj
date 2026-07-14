@@ -17,6 +17,11 @@
     <!-- Microsoft.OpenApi included for supressing vunerability warnings from v2.0.0 -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.10.0" /> 
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <!-- Explicit pin: keeps Relational aligned with Microsoft.EntityFrameworkCore 10.0.9.
+     Without it, consumers (e.g. the test project) resolve Relational from Npgsql's
+     ">= 10.0.4" floor and get a mixed EF graph (MSB3277). -->
+<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
+
   </ItemGroup>
 
 </Project>
