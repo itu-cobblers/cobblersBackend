@@ -31,12 +31,12 @@ public record JoinArgs(
 public record CreateSessionResponse(
     [property: JsonPropertyName("code")] string Code);
 public record CreateSessionRequest(
-    [property: JsonPropertyName("tasksetId")] string TasksetId);
+    [property: JsonPropertyName("tasksetId")] string TaskSetId);
 
 // GET /api/sessions/{code}
 public record SessionDto(
     [property: JsonPropertyName("code")] string Code, 
-    [property: JsonPropertyName("tasksetId")] string TasksetId);
+    [property: JsonPropertyName("tasksetId")] string TaskSetId);
 
 // POST /api/sessions/{code}/timer
 public record StartTimerRequest(
