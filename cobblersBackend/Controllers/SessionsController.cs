@@ -14,22 +14,43 @@ namespace cobblersBackend.Controllers;
 [ApiController]
 [Route("api/sessions")]
 public class SessionsController : ControllerBase
-{
+{   
+    private readonly ISessionService _session;
     private readonly SessionStore _store;
     private readonly IHubContext<SessionHub> _hub;
 
-    public SessionsController(SessionStore store, IHubContext<SessionHub> hub)
+
+    public SessionsController(SessionStore store, IHubContext<SessionHub> hub, ISessionService session)
     {
         _store = store;
         _hub = hub;
+        _session = session;
     }
 
     /// <summary>POST /api/sessions — create a room, return its join code.</summary>
     [HttpPost]
-    public IActionResult Create()
+    public async Task<ActionResult<CreateSessionResponse>> CreateSession(
+        [FromBody] CreateSessionRequest request)
     {
-        var code = _store.CreateSession();
-        return Ok(new CreateSessionResponse(code));
+        if (string.IsNullOrWhiteSpace(request.TaskSetId))
+            return BadRequest(new { error = "tasksetId is required" });
+
+        try
+        {
+            var code = await _session.CreateSessionAsync(request.TaskSetId);
+            return Ok(new CreateSessionResponse(code));
+        }
+        catch (InvalidOperationException ex)   // unknown taskset
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("{code}")]
+    public async Task<ActionResult<SessionDto>> GetSession(string code)
+    {
+        var session = await _session.GetSessionAsync(code);
+        return session is null ? NotFound() : Ok(session); 
     }
 
     /// <summary>
@@ -39,7 +60,8 @@ public class SessionsController : ControllerBase
     [HttpPost("{code}/timer")]
     public async Task<IActionResult> StartTimer(string code, [FromBody] StartTimerRequest request)
     {
-        if (!_store.Exists(code))
+        code = SessionCode.Normalize(code);
+        if (await _session.GetSessionAsync(code) is null)
             return NotFound(new { error = $"Session '{code}' not found." });
 
         var endsAt = DateTimeOffset.UtcNow.AddMinutes(request.DurationMinutes);
@@ -50,4 +72,6 @@ public class SessionsController : ControllerBase
 
         return Ok(timer);
     }
+
+   
 }
