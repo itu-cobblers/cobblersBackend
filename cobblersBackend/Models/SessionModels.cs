@@ -7,7 +7,7 @@ namespace cobblersBackend.Models;
 // and SignalR (hub), regardless of the default naming policy.
 
 /// <summary>A live room member, keyed by studentId so duplicates merge.</summary>
-public record Student(
+public record StudentDto(
     [property: JsonPropertyName("studentId")] string StudentId,
     [property: JsonPropertyName("displayName")] string DisplayName);
 
@@ -26,8 +26,18 @@ public record JoinArgs(
     [property: JsonPropertyName("displayName")] string DisplayName);
 
 // REST DTOs
+
+// POST /api/sessions
 public record CreateSessionResponse(
     [property: JsonPropertyName("code")] string Code);
+public record CreateSessionRequest(
+    [property: JsonPropertyName("tasksetId")] string TasksetId);
 
+// GET /api/sessions/{code}
+public record SessionDto(
+    [property: JsonPropertyName("code")] string Code, 
+    [property: JsonPropertyName("tasksetId")] string TasksetId);
+
+// POST /api/sessions/{code}/timer
 public record StartTimerRequest(
     [property: JsonPropertyName("durationMinutes")] int DurationMinutes);
