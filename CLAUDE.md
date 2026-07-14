@@ -42,7 +42,36 @@ Key layering decisions:
 - **`IPistonClient` / `PistonClient`** ([Services/PistonClient.cs](cobblersBackend/Services/PistonClient.cs)) is the only component that talks HTTP to Piston. It's registered as a typed `HttpClient` in [Program.cs](cobblersBackend/Program.cs), with `BaseAddress` from config key `Piston:BaseUrl` (default `http://localhost:2000/`).
 - **Models** mirror the Piston v2 API wire format via `[JsonPropertyName]` attributes ([Models/](cobblersBackend/Models/)). `PistonExecuteResponse.Compile` stays nullable in the model (other languages/Piston setups may populate it), even though this deployment never does.
 
+## Persistence (EF Core + Postgres)
+
+A database layer lives under [Data/](cobblersBackend/Data/): `CobblersDbContext`, seven
+entities (`Student`, `Session`, `Attendance`, `TaskSet`, `TaskSetTask`, `Task`,
+`Submission`), and per-entity `IEntityTypeConfiguration<T>` classes in
+`Data/Configurations/`, applied via `ApplyConfigurationsFromAssembly`. A single
+`InitialCreate` migration is on `main`. **[SCHEMA.md](SCHEMA.md) is the source of truth**
+for the model and the reasoning behind every column — read it before touching entities.
+
+- **Provider:** PostgreSQL via `Npgsql.EntityFrameworkCore.PostgreSQL`; connection string
+  from config key `ConnectionStrings:DefaultConnection`.
+- **Naming:** global `snake_case` (`EFCore.NamingConventions`) — all identifiers lowercase.
+- **Value generation** (see SCHEMA.md "Value generation"): timestamps and int identity keys
+  are DB-owned (`now()` / identity, not `required`); client/app-supplied keys are
+  `ValueGeneratedNever` + `required` (`Student.Id`, `Session.SessionId`/`Code`,
+  `Submission.SubId`). `required` is not a generator — never put it on a DB-generated column.
+- **Not wired to controllers yet.** Session creation still runs through the in-memory
+  `SessionStore`; the DB-backed write paths (persisting `Session`/`Attendance`/`Submission`)
+  are groundwork-in-progress, not live endpoints.
+- **`Task` entity vs `System.Threading.Tasks.Task`.** The CLR type collides with the
+  framework `Task`; a planned rename to `Assignment` is deferred to its own commit. Until
+  then, fully-qualify (`Entities.Task`) where async code and the entity meet.
+
 ## In-progress / gotchas
+
+- **Connection string is set via environment variable.** Like the Piston URL, the real
+  Postgres connection string (host/user/password) is **not** committed. Set it at runtime
+  with `export ConnectionStrings__DefaultConnection="Host=...;Database=...;Username=...;Password=..."`
+  (double underscore maps to `ConnectionStrings:DefaultConnection`). `appsettings.json`
+  holds only a localhost placeholder — never the VM host or a real password.
 
 - **Java-only, single-class assumption.** `PistonClient` hardcodes the filename `Main.java`, so it only works for submissions shaped like `public class Main { ... }` (Java requires the filename to match the public class name). The `language` passed from `ExecutorService` is also hardcoded to `"java"`. See the comment in `PistonClient` before generalizing.
 - **Piston URL is set via environment variable.** Do not hardcode the droplet IP in `appsettings.json`. Set it at runtime with `export Piston__BaseUrl=http://<ip>:2000/` (double underscore maps to the `Piston:BaseUrl` config key). The `appsettings.json` placeholder (`http://localhost:2000/`) is intentional — it documents the expected shape without leaking the real address.
