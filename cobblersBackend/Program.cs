@@ -3,9 +3,11 @@ using cobblersBackend.Data;
 using cobblersBackend.Hubs;
 using cobblersBackend.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+                       ?? throw new InvalidOperationException("ConnectionStrings__DefaultConnection not set");
 
 // Add services to the container.
 builder.Services.AddScoped<ExecutorService>();
@@ -30,10 +32,19 @@ builder.Services.AddControllers()
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSignalR();
 
-builder.Services.AddDbContext<CobblersDbContext>(OptionsBuilder =>
+builder.Services.AddDbContext<CobblersDbContext>(options =>
 {
-    OptionsBuilder.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+    options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention();
+
+    // SQL logging for debugging — Development only; too noisy for production.
+    if (builder.Environment.IsDevelopment())
+    {
+        options.LogTo(Console.WriteLine, LogLevel.Information)
+               .EnableSensitiveDataLogging();
+    }
 });
+builder.Services.AddScoped<ISessionService, SessionService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 var app = builder.Build();
 
