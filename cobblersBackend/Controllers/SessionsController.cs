@@ -47,7 +47,7 @@ public class SessionsController : ControllerBase
     }
 
     [HttpGet("{code}")]
-    public async Task<ActionResult<SessionDto>> GetSession(string code)
+    public async Task<ActionResult<GetSessionResponse>> GetSession(string code)
     {
         var session = await _session.GetSessionAsync(code);
         return session is null ? NotFound() : Ok(session); 

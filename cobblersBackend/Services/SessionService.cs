@@ -53,13 +53,13 @@ public class SessionService : ISessionService
         }
     }
 
-    public async Task<SessionDto?> GetSessionAsync(string code)
+    public async Task<GetSessionResponse?> GetSessionAsync(string code)
     {
         code = SessionCode.Normalize(code);
         return await _db.Session
             .AsNoTracking()
             .Where(s => s.Code == code)
-            .Select(s => new SessionDto(s.Code, s.TaskSetId))
+            .Select(s => new GetSessionResponse(s.Code, s.TaskSetId))
             .FirstOrDefaultAsync();
     }
 
