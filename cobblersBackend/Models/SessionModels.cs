@@ -33,11 +33,10 @@ public record CreateSessionResponse(
 public record CreateSessionRequest(
     [property: JsonPropertyName("tasksetId")] string TaskSetId);
 
-// GET /api/sessions/{code}
-public record SessionDto(
-    [property: JsonPropertyName("code")] string Code, 
+/// <summary>GET /api/sessions/{code} — how the room cohort resolves its taskset.</summary>
+public record GetSessionResponse(
+    [property: JsonPropertyName("code")] string Code,
     [property: JsonPropertyName("tasksetId")] string TaskSetId);
 
-// POST /api/sessions/{code}/timer
 public record StartTimerRequest(
     [property: JsonPropertyName("durationMinutes")] int DurationMinutes);

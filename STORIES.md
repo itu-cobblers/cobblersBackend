@@ -41,7 +41,7 @@ Ordered by dependency and risk: build top-down.
   - Payload is `{ studentId, sessionId?, content }` → returns `{ subId, passed, result, submittedAt }`.
   - "Completed" is decided server-side (`Task.Id` → a backend-owned grading
     lookup for `code`, a generic compare for `predict`), not self-reported by
-    the client. See [SCHEMA.md](SCHEMA.md#grading-lives-in-backend-code-not-the-database).
+    the client. See [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine).
   - Progress is stored in a `Submission` table, keyed by `studentId` — see [SCHEMA.md](SCHEMA.md).
 - **Open questions:**
   - [ ] `project` submissions have no automated grader yet (`passed` stays `null`) — manual review path is undecided.

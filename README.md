@@ -47,6 +47,26 @@ curl -X POST http://localhost:5046/api/execute \
   -d '{"code": "public class Main { public static void main(String[] args) { System.out.println(\"Hello, World!\"); } }"}'
 ```
 
+## Database setup & task seed
+
+The API uses PostgreSQL (connection string via the `ConnectionStrings__DefaultConnection`
+environment variable — `appsettings.json` only holds a placeholder template).
+
+```bash
+# 1. Apply the schema migrations
+dotnet tool restore
+dotnet ef database update --project cobblersBackend
+
+# 2. Load the 35 BootIT tasks + tasksets
+psql "$CONNECTION_STRING" -f scripts/seed-tasks.sql
+```
+
+The seed script is **idempotent** — safe to re-run any time (locally or against
+the shared VM database). Re-running updates task content in place, rebuilds the
+taskset memberships, and never overwrites `sample_solution_json` values that
+were authored directly in the database. See the header of
+[scripts/seed-tasks.sql](scripts/seed-tasks.sql) for details.
+
 ## Testing
 
 ```bash
