@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace cobblersBackend.Data.Configurations;
 
-public class TaskConfiguration : IEntityTypeConfiguration<Entities.Task>
+public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
 {
-    public void Configure(EntityTypeBuilder<Entities.Task> builder)
+    public void Configure(EntityTypeBuilder<Assignment> builder)
     {
         builder.HasKey(t => t.Id);
         builder.Property(t => t.Id)
@@ -29,7 +29,9 @@ public class TaskConfiguration : IEntityTypeConfiguration<Entities.Task>
                      v => Enum.Parse<TaskKind>(v, ignoreCase: true))
                .HasColumnType("text");
 
-        builder.ToTable(t => t.HasCheckConstraint(
+        // Pin the table name: the CLR type/DbSet renamed to Assignment, but the
+        // schema keeps `task` (no migration needed — the rename is C#-only).
+        builder.ToTable("task", t => t.HasCheckConstraint(
               "ck_task_kind",
               "kind IN ('code', 'predict', 'project')"));
     }

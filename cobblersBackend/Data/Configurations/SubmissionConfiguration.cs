@@ -36,6 +36,9 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
         builder.HasOne(s => s.Task)
                .WithMany(t => t.Submissions)
                .HasForeignKey(s => s.TaskId)
+               // Pinned: EF derives FK names from the principal CLR type, which is
+               // now Assignment — keep the original name so the rename stays C#-only.
+               .HasConstraintName("fk_submission_task_task_id")
                .OnDelete(DeleteBehavior.Restrict);
     }
 }

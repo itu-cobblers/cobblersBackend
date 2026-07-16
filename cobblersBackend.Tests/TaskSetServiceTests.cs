@@ -5,7 +5,6 @@ using cobblersBackend.DTOs;
 using cobblersBackend.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using TaskEntity = cobblersBackend.Data.Entities.Task;
 
 namespace cobblersBackend.Tests;
 
@@ -35,9 +34,9 @@ public class TaskSetServiceTests : IDisposable
         _connection.Dispose();
     }
 
-    private TaskEntity AddTask(string slug, string contentJson = """{"starter": "public class Main {}"}""")
+    private Assignment AddTask(string slug, string contentJson = """{"starter": "public class Main {}"}""")
     {
-        var task = new TaskEntity
+        var task = new Assignment
         {
             Slug = slug,
             Kind = TaskKind.Code,
@@ -48,11 +47,11 @@ public class TaskSetServiceTests : IDisposable
             SampleSolutionJson = "\"the secret answer\"",
             GradingJson = """{"op": "nonEmptyStdout"}""",
         };
-        _db.Task.Add(task);
+        _db.Assignment.Add(task);
         return task;
     }
 
-    private void AddSet(string tasksetId, params (TaskEntity task, int order)[] members)
+    private void AddSet(string tasksetId, params (Assignment task, int order)[] members)
     {
         _db.TaskSet.Add(new TaskSet { TaskSetId = tasksetId, DisplayTitle = $"Title of {tasksetId}" });
         _db.SaveChanges(); // assign task ids before wiring memberships

@@ -61,9 +61,12 @@ for the model and the reasoning behind every column — read it before touching 
 - **Not wired to controllers yet.** Session creation still runs through the in-memory
   `SessionStore`; the DB-backed write paths (persisting `Session`/`Attendance`/`Submission`)
   are groundwork-in-progress, not live endpoints.
-- **`Task` entity vs `System.Threading.Tasks.Task`.** The CLR type collides with the
-  framework `Task`; a planned rename to `Assignment` is deferred to its own commit. Until
-  then, fully-qualify (`Entities.Task`) where async code and the entity meet.
+- **The task entity's CLR name is `Assignment`** (renamed from `Task` to avoid the
+  `System.Threading.Tasks.Task` collision). The DB and wire keep "task": table `task`,
+  wire `taskId`, FK constraint names pinned via `HasConstraintName` in the configurations.
+  The `RenameTaskEntityToAssignment` migration is intentionally **empty** — it only
+  refreshes the model snapshot's CLR type names. Don't "fix" the pinned constraint
+  names to match the entity; that would be a real schema change.
 
 ## In-progress / gotchas
 

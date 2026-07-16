@@ -8,7 +8,9 @@ public enum TaskKind
     Project
 }
 
-public class Task
+// CLR name is Assignment purely to stop colliding with System.Threading.Tasks.Task
+// (the domain/wire/DB term is still "task": table `task`, wire `taskId` — see SCHEMA.md).
+public class Assignment
 {
     public int Id { get; set; }
     // Stable natural key (kebab-case, e.g. "hello-world"). Identical across

@@ -14,7 +14,7 @@ public class CobblersDbContext: DbContext
     public DbSet<Session> Session { get; set;}
     public DbSet<Student> Student { get; set;}
     public DbSet<Submission> Submission { get; set;}
-    public DbSet<Entities.Task> Task { get; set;}
+    public DbSet<Assignment> Assignment { get; set;}
     public DbSet<TaskSet> TaskSet { get; set;}
     public DbSet<TaskSetTask> TaskSetTask { get; set;}
 

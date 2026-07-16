@@ -29,6 +29,9 @@ public class TaskSetTaskConfiguration : IEntityTypeConfiguration<TaskSetTask>
         builder.HasOne(tst => tst.Task)
                .WithMany(t => t.TaskSets)
                .HasForeignKey(tst => tst.TaskId)
+               // Pinned: same reason as SubmissionConfiguration — CLR rename to
+               // Assignment must not rename the existing DB constraint.
+               .HasConstraintName("fk_task_set_task_task_task_id")
                .OnDelete(DeleteBehavior.Cascade);
     }
 }

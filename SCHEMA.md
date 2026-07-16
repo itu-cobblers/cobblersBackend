@@ -73,6 +73,14 @@ A real join table, not an id-list column on `TaskSet` — gives FK integrity
 wouldn't.
 
 ### Task
+
+> **CLR name:** the entity class is **`Assignment`** (renamed 2026-07-16 to stop
+> colliding with `System.Threading.Tasks.Task`). Everything persistence- and
+> wire-facing keeps the "task" name: table `task`, columns `task_id`, wire term
+> `taskId`, and the FK constraint names (pinned via `HasConstraintName` so the
+> rename stayed C#-only — see `AssignmentConfiguration`). `TaskSet`/`TaskSetTask`
+> deliberately not cascaded.
+
 | Column | Type | Notes |
 |---|---|---|
 | `Id` | PK (fresh identity) | **Not** the frontend's current 0–34 numbering — see [Design decisions](#taskid-is-a-fresh-identity). |

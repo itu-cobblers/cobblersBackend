@@ -10,5 +10,5 @@ public class TaskSetTask
     public required int OrderIndex { get; set; }
 
     public TaskSet TaskSet { get; set; } = null!;
-    public Task Task { get; set; } = null!;
+    public Assignment Task { get; set; } = null!;
 }

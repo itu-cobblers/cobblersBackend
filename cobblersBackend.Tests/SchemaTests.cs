@@ -15,11 +15,12 @@ public sealed class SchemaTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task MigrationS_ApplyToEmptyDatabase()
+    public async Task Migrations_ApplyToEmptyDatabase()
     {
         await using var ctx = _fixture.CreateContext();
-        var applied = await ctx.Database.GetAppliedMigrationsAsync();
-        Assert.Equal(2, applied.Count());
+        // "None pending" = every defined migration applied — unlike an exact
+        // count, this never goes stale when a new migration is added.
+        Assert.Empty(await ctx.Database.GetPendingMigrationsAsync());
     }
 
     [Fact]

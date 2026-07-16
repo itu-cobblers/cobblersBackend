@@ -12,6 +12,6 @@ public class Submission
     public DateTimeOffset SubmittedAt { get; set; }
 
     public Student Student { get; set; } = null!;
-    public Task Task { get; set; } = null!;
+    public Assignment Task { get; set; } = null!;
     public Session? Session { get; set; }
 }
