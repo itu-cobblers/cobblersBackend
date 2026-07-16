@@ -3,7 +3,7 @@ using cobblersBackend.Services;
 
 namespace cobblersBackend.Tests;
 
-public class TaskGraderTest
+public class TaskGraderTests
 {
     private static readonly TaskGrader Grader = new();
 

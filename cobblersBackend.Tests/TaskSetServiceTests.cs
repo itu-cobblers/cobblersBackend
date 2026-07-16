@@ -13,13 +13,13 @@ namespace cobblersBackend.Tests;
 /// Query-shape tests for TaskSetService against SQLite in-memory (the real
 /// DB is Postgres; ordering/projection logic is what's under test here).
 /// </summary>
-public class TaskSetServiceTest : IDisposable
+public class TaskSetServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly CobblersDbContext _db;
     private readonly TaskSetService _service;
 
-    public TaskSetServiceTest()
+    public TaskSetServiceTests()
     {
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();

@@ -4,7 +4,7 @@ using cobblersBackend.Models;
 using cobblersBackend.DTOs;
 namespace cobblersBackend.Tests;
 
-public class ExecutorServiceTest
+public class ExecutorServiceTests
 {
     [Fact]
     public async Task ExecuteAsync_WhenRunSucceeds_ReturnSuccess()
