@@ -43,4 +43,29 @@ public sealed class SchemaTests : IAsyncLifetime
         var student = await read.Student.SingleAsync(s => s.Id == "s-1");
         Assert.Equal("Maria", student.DisplayName);
     }
+
+    [Fact]
+    public async Task FullGraph_InsertCleanly()
+    {
+        await using (var write = _fixture.CreateContext())
+        {
+            var student = TestData.MakeStudent();
+            var taskSet = TestData.MakeTaskSet();
+            var task    = TestData.MakeTask();
+            write.Student.Add(student);
+            write.TaskSet.Add(taskSet);
+            write.Assignment.Add(task);
+            await write.SaveChangesAsync(); // task.Id now assigned by the DB
+
+            write.TaskSetTask.Add(TestData.MakeTaskSetTask(taskSet.TaskSetId, task.Id, 0));
+            var session = TestData.MakeSession(taskSet.TaskSetId);
+            write.Session.Add(session);
+            write.Submission.Add(TestData.MakeSubmission(student.Id, task.Id, session.SessionId)); // room submission
+            write.Submission.Add(TestData.MakeSubmission(student.Id, task.Id));
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = _fixture.CreateContext();
+        Assert.Equal(2, await read.Submission.CountAsync());
+    }
 }
