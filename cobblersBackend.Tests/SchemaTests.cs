@@ -50,18 +50,18 @@ public sealed class SchemaTests : IAsyncLifetime
         await using (var write = _fixture.CreateContext())
         {
             var student = TestData.MakeStudent();
-            var taskSet = TestData.MakeTaskSet();
-            var task    = TestData.MakeTask();
+            var assignmentSet = TestData.MakeAssignmentSet();
+            var assignment = TestData.MakeAssignment();
             write.Student.Add(student);
-            write.TaskSet.Add(taskSet);
-            write.Assignment.Add(task);
-            await write.SaveChangesAsync(); // task.Id now assigned by the DB
+            write.AssignmentSet.Add(assignmentSet);
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync(); // assignment.Id now assigned by the DB
 
-            write.TaskSetTask.Add(TestData.MakeTaskSetTask(taskSet.TaskSetId, task.Id, 0));
-            var session = TestData.MakeSession(taskSet.TaskSetId);
+            write.AssignmentSetAssignment.Add(TestData.MakeAssignmentSetAssignment(assignmentSet.AssignmentSetId, assignment.Id, 0));
+            var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
             write.Session.Add(session);
-            write.Submission.Add(TestData.MakeSubmission(student.Id, task.Id, session.SessionId)); // room submission
-            write.Submission.Add(TestData.MakeSubmission(student.Id, task.Id));
+            write.Submission.Add(TestData.MakeSubmission(student.Id, assignment.Id, session.SessionId)); // room submission
+            write.Submission.Add(TestData.MakeSubmission(student.Id, assignment.Id));
             await write.SaveChangesAsync();
         }
 

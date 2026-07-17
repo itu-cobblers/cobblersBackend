@@ -19,20 +19,20 @@ public class SessionService : ISessionService
 
     public SessionService(CobblersDbContext db) => _db = db;
 
-    public async Task<string> CreateSessionAsync(string taskSetId)
+    public async Task<string> CreateSessionAsync(string assignmentSetId)
     {
-        
-        var tasksetExists = await _db.TaskSet
+
+        var assignmentSetExists = await _db.AssignmentSet
             .AsNoTracking()
-            .AnyAsync(t => t.TaskSetId == taskSetId);
-        if (!tasksetExists)
-            throw new InvalidOperationException($"Taskset '{taskSetId}' not found");
+            .AnyAsync(t => t.AssignmentSetId == assignmentSetId);
+        if (!assignmentSetExists)
+            throw new InvalidOperationException($"Assignment set '{assignmentSetId}' not found");
 
         var session = new Session
         {
             SessionId = Guid.NewGuid().ToString(),
             Code = GenerateCode(),
-            TaskSetId = taskSetId
+            AssignmentSetId = assignmentSetId
             // CreateAt: DB-owned (DEFAULT now()), never set here
         };
         _db.Session.Add(session);
@@ -59,7 +59,7 @@ public class SessionService : ISessionService
         return await _db.Session
             .AsNoTracking()
             .Where(s => s.Code == code)
-            .Select(s => new GetSessionResponse(s.Code, s.TaskSetId))
+            .Select(s => new GetSessionResponse(s.Code, s.AssignmentSetId))
             .FirstOrDefaultAsync();
     }
 

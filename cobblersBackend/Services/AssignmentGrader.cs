@@ -5,7 +5,7 @@ using cobblersBackend.Models;
 namespace cobblersBackend.Services;
 
 /// <summary>
-/// The one generic evaluator for Task.GradingJson rule trees (see SCHEMA.md
+/// The one generic evaluator for Assignment.GradingJson rule trees (see SCHEMA.md
 /// "Grading rules are data, evaluated by one backend engine"). A node is one of:
 ///
 ///   { "all": [node, ...] }   { "any": [node, ...] }   { "not": node }
@@ -23,11 +23,11 @@ namespace cobblersBackend.Services;
 /// Malformed rules throw ArgumentException — a broken seed should fail loudly,
 /// not silently pass/fail students.
 /// </summary>
-public class TaskGrader : ITaskGrader
+public class AssignmentGrader : IAssignmentGrader
 {
     private readonly IReadOnlyDictionary<string, Func<CheckResult, bool>> _customChecks;
 
-    public TaskGrader(IReadOnlyDictionary<string, Func<CheckResult, bool>>? customChecks = null)
+    public AssignmentGrader(IReadOnlyDictionary<string, Func<CheckResult, bool>>? customChecks = null)
     {
         _customChecks = customChecks ?? new Dictionary<string, Func<CheckResult, bool>>();
     }

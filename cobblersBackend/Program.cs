@@ -12,10 +12,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // Add services to the container.
 builder.Services.AddScoped<ExecutorService>();
 builder.Services.AddScoped<IExecuteResultClassifier,JavaExecuteResultClassifier>();
-// Stateless rule evaluator for Task.GradingJson; the no-arg construction means
-// no custom (slug-keyed) checks are registered — none are needed today.
-builder.Services.AddSingleton<ITaskGrader>(_ => new TaskGrader());
-builder.Services.AddScoped<ITaskSetService, TaskSetService>();
+// Stateless rule evaluator for Assignment.GradingJson; the no-arg construction
+// means no custom (slug-keyed) checks are registered — none are needed today.
+builder.Services.AddSingleton<IAssignmentGrader>(_ => new AssignmentGrader());
+builder.Services.AddScoped<IAssignmentSetService, AssignmentSetService>();
 
 builder.Services.AddHttpClient<IPistonClient, PistonClient>(client =>
 {

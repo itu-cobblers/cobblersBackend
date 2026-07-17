@@ -5,9 +5,9 @@ public class Session
 
     public required string SessionId { get; set; }
     public required string Code { get; set; }
-    public required string TaskSetId { get; set; }
+    public required string AssignmentSetId { get; set; }
     public DateTimeOffset CreateAt { get; set; }
 
-    public TaskSet TaskSet { get; set; } = null!;
+    public AssignmentSet AssignmentSet { get; set; } = null!;
 
 }

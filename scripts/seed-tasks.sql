@@ -1,24 +1,24 @@
 -- ============================================================================
--- seed-tasks.sql — the 35 BootIT tasks + tasksets, migrated from the
--- frontend's hardcoded bundle (cobblersFrontend/src/lib/tasks.ts).
+-- seed-tasks.sql — the 35 BootIT assignments + assignment sets, migrated from
+-- the frontend's hardcoded bundle (cobblersFrontend/src/lib/tasks.ts).
 --
 -- Usage (local or VM — schema must already exist via `dotnet ef database update`):
 --
 --     psql "$CONNECTION_STRING" -f scripts/seed-tasks.sql
 --
 -- Safe to re-run (idempotent):
---   * task_set / task rows are UPSERTed — content edits here overwrite the DB.
---   * task.sample_solution_json is only set on FIRST insert and never
+--   * assignment_set / assignment rows are UPSERTed — content edits here overwrite the DB.
+--   * assignment.sample_solution_json is only set on FIRST insert and never
 --     overwritten on re-run, so solutions authored directly in the DB survive.
---   * task_set_task memberships are rebuilt from scratch each run.
+--   * assignment_set_assignment memberships are rebuilt from scratch each run.
 --
 -- Conventions (see SCHEMA.md):
---   * task.id is DB-assigned — never written here. All references go through
---     task.slug (stable natural key, unique).
+--   * assignment.id is DB-assigned — never written here. All references go through
+--     assignment.slug (stable natural key, unique).
 --   * kind is lowercase text: 'code' | 'predict' | 'project'.
 --   * content_json holds the kind-specific payload (camelCase keys), safe to
 --     send to students. Grading rules live in grading_json (never sent).
---   * grading_json is the rule DSL evaluated by the backend's TaskGrader:
+--   * grading_json is the rule DSL evaluated by the backend's AssignmentGrader:
 --       {"all":[...]} / {"any":[...]} / {"not":...} /
 --       {"target":"stdout"|"code","op":"contains"|"containsLine","value":...} /
 --       {"target":...,"op":"regex","pattern":...,"flags":"i"?} /
@@ -28,18 +28,18 @@
 
 BEGIN;
 
--- ──────────────────────────────── tasksets ─────────────────────────────────
+-- ────────────────────────────── assignment sets ────────────────────────────
 
-INSERT INTO task_set (task_set_id, display_title) VALUES
-  ('day1-2026',               'BootIT Day 1 — 2026'),
-  ('day2-2026',               'BootIT Day 2 — 2026'),
-  ('day3-2026',               'BootIT Day 3 — 2026'),
-  ('all-tasks-for-solo-2026', 'BootIT — All Tasks (Solo) 2026')
-ON CONFLICT (task_set_id) DO UPDATE SET display_title = EXCLUDED.display_title;
+INSERT INTO assignment_set (assignment_set_id, display_title) VALUES
+  ('day1-2026',                     'BootIT Day 1 — 2026'),
+  ('day2-2026',                     'BootIT Day 2 — 2026'),
+  ('day3-2026',                     'BootIT Day 3 — 2026'),
+  ('all-assignments-for-solo-2026', 'BootIT — All Tasks (Solo) 2026')
+ON CONFLICT (assignment_set_id) DO UPDATE SET display_title = EXCLUDED.display_title;
 
--- ────────────────────────────────── tasks ──────────────────────────────────
+-- ──────────────────────────────── assignments ──────────────────────────────
 
-INSERT INTO task (slug, kind, title, description, hint, content_json, sample_solution_json, grading_json) VALUES
+INSERT INTO assignment (slug, kind, title, description, hint, content_json, sample_solution_json, grading_json) VALUES
 
 -- ─────────────────────────── DAY 1 — basics ───────────────────────────
 (
@@ -705,8 +705,8 @@ ON CONFLICT (slug) DO UPDATE SET
 -- Rebuilt from scratch every run. One canonical ordered list (the frontend's
 -- original 0–34 order); the per-day sets are slices of it, re-numbered from 0.
 
-DELETE FROM task_set_task
-WHERE task_set_id IN ('day1-2026', 'day2-2026', 'day3-2026', 'all-tasks-for-solo-2026');
+DELETE FROM assignment_set_assignment
+WHERE assignment_set_id IN ('day1-2026', 'day2-2026', 'day3-2026', 'all-assignments-for-solo-2026');
 
 WITH ordered(slug, ord) AS (VALUES
   ('name-your-cafe',                0),
@@ -746,28 +746,28 @@ WITH ordered(slug, ord) AS (VALUES
   ('grandmas-blackmarket-kitchen', 34)
 ),
 resolved AS (
-  SELECT t.id AS task_id, o.ord
+  SELECT t.id AS assignment_id, o.ord
   FROM ordered o
-  JOIN task t ON t.slug = o.slug
+  JOIN assignment t ON t.slug = o.slug
 )
-INSERT INTO task_set_task (task_set_id, task_id, order_index)
-SELECT 'day1-2026', task_id, ord        FROM resolved WHERE ord BETWEEN 0 AND 9
+INSERT INTO assignment_set_assignment (assignment_set_id, assignment_id, order_index)
+SELECT 'day1-2026', assignment_id, ord        FROM resolved WHERE ord BETWEEN 0 AND 9
 UNION ALL
-SELECT 'day2-2026', task_id, ord - 10   FROM resolved WHERE ord BETWEEN 10 AND 28
+SELECT 'day2-2026', assignment_id, ord - 10   FROM resolved WHERE ord BETWEEN 10 AND 28
 UNION ALL
-SELECT 'day3-2026', task_id, ord - 29   FROM resolved WHERE ord BETWEEN 29 AND 34
+SELECT 'day3-2026', assignment_id, ord - 29   FROM resolved WHERE ord BETWEEN 29 AND 34
 UNION ALL
-SELECT 'all-tasks-for-solo-2026', task_id, ord FROM resolved;
+SELECT 'all-assignments-for-solo-2026', assignment_id, ord FROM resolved;
 
 -- Fail loudly (rolling back the whole transaction) if any slug in the ordered
--- list above didn't resolve to a task row — a silent JOIN drop would otherwise
--- leave a gap in order_index.
+-- list above didn't resolve to an assignment row — a silent JOIN drop would
+-- otherwise leave a gap in order_index.
 DO $check$
 DECLARE n int;
 BEGIN
-  SELECT count(*) INTO n FROM task_set_task WHERE task_set_id = 'all-tasks-for-solo-2026';
+  SELECT count(*) INTO n FROM assignment_set_assignment WHERE assignment_set_id = 'all-assignments-for-solo-2026';
   IF n <> 35 THEN
-    RAISE EXCEPTION 'seed error: expected 35 tasks in all-tasks-for-solo-2026, got % (typo in a slug?)', n;
+    RAISE EXCEPTION 'seed error: expected 35 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
   END IF;
 END
 $check$;

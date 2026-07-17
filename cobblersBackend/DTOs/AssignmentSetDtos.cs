@@ -3,19 +3,19 @@ using System.Text.Json.Serialization;
 
 namespace cobblersBackend.DTOs;
 
-// CONTRACT.md's Tasks section uses camelCase, but the app-wide serializer
+// CONTRACT.md's Assignments section uses camelCase, but the app-wide serializer
 // policy is snake_case — so every property carries an explicit name.
 
-public record TaskSetSummaryDto(
-    [property: JsonPropertyName("tasksetId")] string TasksetId,
+public record AssignmentSetSummaryDto(
+    [property: JsonPropertyName("assignmentSetId")] string AssignmentSetId,
     [property: JsonPropertyName("displayTitle")] string DisplayTitle);
 
 /// <summary>
-/// One task as served to students. Deliberately excludes the sample solution,
-/// grading rules, and slug (see SCHEMA.md) — Content is the stored jsonb
-/// passed through verbatim, so its camelCase keys survive the serializer policy.
+/// One assignment as served to students. Deliberately excludes the sample
+/// solution, grading rules, and slug (see SCHEMA.md) — Content is the stored
+/// jsonb passed through verbatim, so its camelCase keys survive the serializer policy.
 /// </summary>
-public record TaskDto(
+public record AssignmentDto(
     [property: JsonPropertyName("id")] int Id,
     [property: JsonPropertyName("kind")] string Kind,
     [property: JsonPropertyName("title")] string Title,

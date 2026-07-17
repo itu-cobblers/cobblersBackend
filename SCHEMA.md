@@ -9,15 +9,20 @@ frontend↔backend wire format; this file governs what's behind it.
 > only place a frontend-visible behavior is documented.
 
 > **Status:** implemented as EF Core entities + configurations under
-> `cobblersBackend/Data/`, with a single `InitialCreate` migration. Session
-> creation still runs through `SessionStore` (in-memory); the DB-backed write
-> paths (persisting `Session` / `Attendance` / `Submission`) are not wired to
-> controllers yet.
+> `cobblersBackend/Data/`, across several migrations. `Session`/`Attendance`
+> persist via `SessionService`/`AttendanceService`; `SessionStore` (in-memory)
+> now holds only the live SignalR roster + active timer, not the persisted
+> record. `Submission` isn't wired to a controller yet (S2, not built).
 
-> **Naming:** this file uses the **Assignment** naming (see CONTRACT.md's
-> Naming note). The entities/columns/classes in code are still named
-> `Task`/`TaskSet`/`TaskGrader` etc. — the code rename (and its migration) is
-> pending; this document describes the target names.
+> **Naming:** fully renamed to **Assignment** as of 2026-07-17 — code, tables,
+> columns, and the wire contract (CONTRACT.md) all agree. `Assignment` (was
+> `Task`), `AssignmentSet` (was `TaskSet`), `AssignmentSetAssignment` (was
+> `TaskSetTask`), `AssignmentGrader` (was `TaskGrader`). The rename landed as
+> two migrations (`RenameAssignmentPhysicalNames`, `RenameTaskSetTablesToAssignmentSet`)
+> that only rename tables/columns/constraints — no data loss, verified against
+> a fresh Postgres via the test suite. See CLAUDE.md for the C#-side history
+> (the CLR type was renamed once already, back on 2026-07-16, before this
+> wider wire/DB sweep).
 
 User stories that drove these decisions live in [STORIES.md](STORIES.md).
 
@@ -79,12 +84,13 @@ wouldn't.
 
 ### Assignment
 
-> **CLR name:** the entity class is **`Assignment`** (renamed 2026-07-16 to stop
-> colliding with `System.Threading.Tasks.Task`). Everything persistence- and
-> wire-facing keeps the "task" name: table `task`, columns `task_id`, wire term
-> `taskId`, and the FK constraint names (pinned via `HasConstraintName` so the
-> rename stayed C#-only — see `AssignmentConfiguration`). `TaskSet`/`TaskSetTask`
-> deliberately not cascaded.
+> **History:** the entity class was renamed `Task` → `Assignment` on 2026-07-16
+> to stop colliding with `System.Threading.Tasks.Task` — at that point the DB
+> and wire deliberately stayed "task" (table `task`, wire `taskId`), a
+> CLR-only rename. That scope was **superseded on 2026-07-17**: CONTRACT.md's
+> frontend now speaks Assignment vocabulary end to end
+> (`/api/assignmentsets`, `assignmentId`), so the DB followed — table is now
+> `assignment`, FK column `assignment_id`, check constraint `ck_assignment_kind`.
 
 | Column | Type | Notes |
 |---|---|---|

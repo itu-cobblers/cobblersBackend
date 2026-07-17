@@ -11,7 +11,7 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.HasKey(s => s.SessionId);
         builder.Property(s => s.SessionId)
                .ValueGeneratedNever();
-               
+
         builder.HasIndex(s => s.Code)
                .IsUnique();
 
@@ -19,9 +19,9 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
                .ValueGeneratedOnAdd()
                .HasDefaultValueSql("now()");
 
-        builder.HasOne(s => s.TaskSet)
+        builder.HasOne(s => s.AssignmentSet)
                .WithMany(ts => ts.Sessions)
-               .HasForeignKey(s => s.TaskSetId)
+               .HasForeignKey(s => s.AssignmentSetId)
                .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -3,9 +3,9 @@ using cobblersBackend.Services;
 
 namespace cobblersBackend.Tests;
 
-public class TaskGraderTests
+public class AssignmentGraderTests
 {
-    private static readonly TaskGrader Grader = new();
+    private static readonly AssignmentGrader Grader = new();
 
     private static CheckResult WithStdout(string stdout, int? exitCode = 0) =>
         new(Code: "", Stdout: stdout, Stderr: "", ExitCode: exitCode);
@@ -123,7 +123,7 @@ public class TaskGraderTests
     [Fact]
     public void Custom_ResolvesRegisteredCheckBySlug()
     {
-        var grader = new TaskGrader(new Dictionary<string, Func<CheckResult, bool>>
+        var grader = new AssignmentGrader(new Dictionary<string, Func<CheckResult, bool>>
         {
             ["some-task"] = r => r.Stdout.StartsWith("ok"),
         });

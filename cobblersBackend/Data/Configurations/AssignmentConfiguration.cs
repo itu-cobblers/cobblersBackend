@@ -22,17 +22,15 @@ public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
 
         builder.Property(t => t.GradingJson)
                .HasColumnType("jsonb");
-        
+
         builder.Property(t => t.Kind)
                .HasConversion(
                      v => v.ToString().ToLowerInvariant(),
-                     v => Enum.Parse<TaskKind>(v, ignoreCase: true))
+                     v => Enum.Parse<AssignmentKind>(v, ignoreCase: true))
                .HasColumnType("text");
 
-        // Pin the table name: the CLR type/DbSet renamed to Assignment, but the
-        // schema keeps `task` (no migration needed — the rename is C#-only).
-        builder.ToTable("task", t => t.HasCheckConstraint(
-              "ck_task_kind",
+        builder.ToTable("assignment", t => t.HasCheckConstraint(
+              "ck_assignment_kind",
               "kind IN ('code', 'predict', 'project')"));
     }
 }

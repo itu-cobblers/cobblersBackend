@@ -14,46 +14,46 @@ public static class TestData
         DisplayName = displayName,
     };
 
-    public static TaskSet MakeTaskSet(string? id = null, string? displayTitle = null)
+    public static AssignmentSet MakeAssignmentSet(string? id = null, string? displayTitle = null)
     {
-        id ??= $"taskset-{Next()}";
-        return new TaskSet
+        id ??= $"assignmentset-{Next()}";
+        return new AssignmentSet
         {
-            TaskSetId = id,
+            AssignmentSetId = id,
             DisplayTitle = displayTitle ?? $"Title of {id}",
         };
     }
 
-    public static Assignment MakeTask(TaskKind kind = TaskKind.Code, string? slug = null) => new()
+    public static Assignment MakeAssignment(AssignmentKind kind = AssignmentKind.Code, string? slug = null) => new()
     {
-        Slug = slug ?? $"task-{Next()}",
+        Slug = slug ?? $"assignment-{Next()}",
         Kind = kind,
-        Title = "Test task",
-        Description = "A task for testing",
+        Title = "Test assignment",
+        Description = "An assignment for testing",
         ContentJson = """{"starter": ""}""",
         // SampleSolutionJson, GradingJson left null
     };
 
-    public static TaskSetTask MakeTaskSetTask(string taskSetId, int taskId, int orderIndex) => new()
+    public static AssignmentSetAssignment MakeAssignmentSetAssignment(string assignmentSetId, int assignmentId, int orderIndex) => new()
     {
-        TaskSetId = taskSetId,
-        TaskId = taskId,
+        AssignmentSetId = assignmentSetId,
+        AssignmentId = assignmentId,
         OrderIndex = orderIndex,
     };
 
-    public static Session MakeSession(string taskSetId, string? code = null) => new()
+    public static Session MakeSession(string assignmentSetId, string? code = null) => new()
     {
         SessionId = Guid.NewGuid().ToString(),
         Code = code ?? $"CODE{Next()}",
-        TaskSetId = taskSetId,
+        AssignmentSetId = assignmentSetId,
         // CreateAt: not set because DB owns the parameter
     };
 
-    public static Submission MakeSubmission(string studentId, int taskId, string? SessionId = null) => new()
+    public static Submission MakeSubmission(string studentId, int assignmentId, string? SessionId = null) => new()
     {
         SubId = Guid.NewGuid(),
         StudentId = studentId,
-        TaskId = taskId,
+        AssignmentId = assignmentId,
         SessionId = SessionId,
         ContentJson = """{"code": "class Main {}"}""",
         // ResultJson, Passed left null

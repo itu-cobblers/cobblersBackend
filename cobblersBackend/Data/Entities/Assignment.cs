@@ -1,23 +1,24 @@
 namespace cobblersBackend.Data.Entities;
 
 
-public enum TaskKind
+public enum AssignmentKind
 {
     Code,
     Predict,
     Project
 }
 
-// CLR name is Assignment purely to stop colliding with System.Threading.Tasks.Task
-// (the domain/wire/DB term is still "task": table `task`, wire `taskId` — see SCHEMA.md).
+// Renamed from Task 2026-07-16 to stop colliding with System.Threading.Tasks.Task.
+// The rename now covers domain/wire/DB too (CONTRACT.md, SCHEMA.md) — table is
+// `assignment`, wire term `assignmentId`. See SCHEMA.md's Assignment section.
 public class Assignment
 {
     public int Id { get; set; }
     // Stable natural key (kebab-case, e.g. "hello-world"). Identical across
-    // databases while Id is DB-assigned — seed upserts and any per-task code
-    // hooks key on this, never on Id. Internal only, not exposed on the API.
+    // databases while Id is DB-assigned — seed upserts and any per-assignment
+    // code hooks key on this, never on Id. Internal only, not exposed on the API.
     public required string Slug { get; set; }
-    public required TaskKind Kind { get; set; }
+    public required AssignmentKind Kind { get; set; }
     public required string Title { get; set; }
     public required string Description { get; set; }
     public string? Hint { get; set; }
@@ -27,7 +28,7 @@ public class Assignment
     // Null = not auto-gradable (projects, NIM) or graded generically (predict).
     public string? GradingJson { get; set; }
 
-    public ICollection<TaskSetTask> TaskSets { get; set; } = [];
+    public ICollection<AssignmentSetAssignment> AssignmentSets { get; set; } = [];
     public ICollection<Submission> Submissions { get; set; } = [];
-    
+
 }

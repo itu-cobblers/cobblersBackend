@@ -32,15 +32,15 @@ public class SessionsController : ControllerBase
     public async Task<ActionResult<CreateSessionResponse>> CreateSession(
         [FromBody] CreateSessionRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.TaskSetId))
-            return BadRequest(new { error = "tasksetId is required" });
+        if (string.IsNullOrWhiteSpace(request.AssignmentSetId))
+            return BadRequest(new { error = "assignmentSetId is required" });
 
         try
         {
-            var code = await _session.CreateSessionAsync(request.TaskSetId);
+            var code = await _session.CreateSessionAsync(request.AssignmentSetId);
             return Ok(new CreateSessionResponse(code));
         }
-        catch (InvalidOperationException ex)   // unknown taskset
+        catch (InvalidOperationException ex)   // unknown assignment set
         {
             return BadRequest(new { error = ex.Message });
         }

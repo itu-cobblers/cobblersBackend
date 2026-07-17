@@ -31,12 +31,12 @@ public record JoinArgs(
 public record CreateSessionResponse(
     [property: JsonPropertyName("code")] string Code);
 public record CreateSessionRequest(
-    [property: JsonPropertyName("tasksetId")] string TaskSetId);
+    [property: JsonPropertyName("assignmentSetId")] string AssignmentSetId);
 
-/// <summary>GET /api/sessions/{code} — how the room cohort resolves its taskset.</summary>
+/// <summary>GET /api/sessions/{code} — how the room cohort resolves its assignment set.</summary>
 public record GetSessionResponse(
     [property: JsonPropertyName("code")] string Code,
-    [property: JsonPropertyName("tasksetId")] string TaskSetId);
+    [property: JsonPropertyName("assignmentSetId")] string AssignmentSetId);
 
 public record StartTimerRequest(
     [property: JsonPropertyName("durationMinutes")] int DurationMinutes);

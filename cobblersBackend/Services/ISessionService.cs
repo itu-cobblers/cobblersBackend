@@ -4,6 +4,6 @@ namespace cobblersBackend.Services;
 
 public interface ISessionService
 {
-    Task<string> CreateSessionAsync(string taskSetid); //-> code
-    Task<GetSessionResponse?> GetSessionAsync(string code); //-> { code, tasksetid } or null
+    Task<string> CreateSessionAsync(string assignmentSetId); //-> code
+    Task<GetSessionResponse?> GetSessionAsync(string code); //-> { code, assignmentSetId } or null
 }
