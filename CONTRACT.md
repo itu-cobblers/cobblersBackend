@@ -211,7 +211,7 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 
 | Field     | Type                                   | Notes                                                                                                                    |
 | --------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–34 numbering — see [SCHEMA.md](SCHEMA.md#taskid-is-a-fresh-identity).  |
+| `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–34 numbering — see [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).  |
 | `kind`    | `"code"` \| `"predict"` \| `"project"` |                                                                                                                          |
 | `content` | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeAssignment` / `PredictAssignment` / `ProjectAssignment` fields, minus grading logic. |
 
@@ -223,7 +223,7 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 > the set (`AssignmentSetAssignment.OrderIndex`, 0-based) — so the array index _is_ the
 > assignment's place in the set, which is how the frontend addresses assignments. `id` (a
 > fresh server identity) is **not** the ordering key. See
-> [SCHEMA.md](SCHEMA.md#tasksettask-carries-an-explicit-orderindex).
+> [SCHEMA.md](SCHEMA.md#assignmentsetassignment-carries-an-explicit-orderindex).
 
 This replaces the frontend's hardcoded assignment bundle as the source of truth for assignment content going forward.
 
