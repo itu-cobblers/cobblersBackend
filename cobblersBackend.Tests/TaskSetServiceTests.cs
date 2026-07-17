@@ -1,37 +1,31 @@
 using System.Text.Json;
 using cobblersBackend.Data;
 using cobblersBackend.Data.Entities;
-using cobblersBackend.DTOs;
 using cobblersBackend.Services;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
+using cobblersBackend.Tests.Infrastructure;
 
 namespace cobblersBackend.Tests;
 
-/// <summary>
-/// Query-shape tests for TaskSetService against SQLite in-memory (the real
-/// DB is Postgres; ordering/projection logic is what's under test here).
-/// </summary>
-public class TaskSetServiceTests : IDisposable
+[Collection("db")]
+public class TaskSetServiceTests : IAsyncLifetime
 {
-    private readonly SqliteConnection _connection;
-    private readonly CobblersDbContext _db;
-    private readonly TaskSetService _service;
+    private readonly PostgresFixture _fixture;
+    private CobblersDbContext _db = null!;
+    private TaskSetService _service = null!;
 
-    public TaskSetServiceTests()
+    public TaskSetServiceTests(PostgresFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync()
     {
-        _connection = new SqliteConnection("DataSource=:memory:");
-        _connection.Open();
-        _db = new CobblersDbContext(
-            new DbContextOptionsBuilder<CobblersDbContext>().UseSqlite(_connection).Options);
-        _db.Database.EnsureCreated();
+        await _fixture.ResetAsync();
+        _db = _fixture.CreateContext();
         _service = new TaskSetService(_db);
     }
 
-    public void Dispose()
+    public Task DisposeAsync()
     {
         _db.Dispose();
-        _connection.Dispose();
+        return Task.CompletedTask;
     }
 
     private Assignment AddTask(string slug, string contentJson = """{"starter": "public class Main {}"}""")
@@ -61,7 +55,7 @@ public class TaskSetServiceTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetTasks_SortsByOrderIndex_NotByIdOrInsertOrder()
+    public async Task GetTasks_SortsByOrderIndex_NotByIdOrInsertOrder()
     {
         var third = AddTask("third");
         var first = AddTask("first");
@@ -77,7 +71,7 @@ public class TaskSetServiceTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetTasks_TaskInTwoSets_AppearsInBoth()
+    public async Task GetTasks_TaskInTwoSets_AppearsInBoth()
     {
         var shared = AddTask("shared");
         AddSet("day1", (shared, 0));
@@ -91,7 +85,7 @@ public class TaskSetServiceTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetTasks_UnknownTaskset_ReturnsNull_ButEmptySetReturnsEmpty()
+    public async Task GetTasks_UnknownTaskset_ReturnsNull_ButEmptySetReturnsEmpty()
     {
         AddSet("empty-set");
 
@@ -100,7 +94,7 @@ public class TaskSetServiceTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetTasks_ContentIsParsedJson_AndKindIsLowercase()
+    public async Task GetTasks_ContentIsParsedJson_AndKindIsLowercase()
     {
         var task = AddTask("with-content", """{"starter": "code here", "stdin": "50\n"}""");
         AddSet("day1", (task, 0));
@@ -113,7 +107,7 @@ public class TaskSetServiceTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetTasks_SerializedDto_LeaksNothing_AndUsesCamelCase()
+    public async Task GetTasks_SerializedDto_LeaksNothing_AndUsesCamelCase()
     {
         var task = AddTask("sensitive");
         AddSet("day1", (task, 0));
@@ -132,7 +126,7 @@ public class TaskSetServiceTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task ListTaskSets_ReturnsSummaries()
+    public async Task ListTaskSets_ReturnsSummaries()
     {
         AddSet("day2");
         AddSet("day1");
