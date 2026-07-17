@@ -27,25 +27,25 @@ Ordered by dependency and risk: build top-down.
 
 ---
 
-## S2 — Submit a finished task ✅ contract defined
+## S2 — Submit a finished assignment ✅ contract defined
 
-**As a** student, **I want** to submit my code when I've finished a task,
+**As a** student, **I want** to submit my code when I've finished an assignment,
 **so that** my progress is recorded.
 
 - **Transport:** REST
-- **Contract:** [`POST /api/tasks/{taskId}/submissions`](CONTRACT.md#submission)
+- **Contract:** [`POST /api/assignments/{assignmentId}/submissions`](CONTRACT.md#submission)
 - **Introduces:** identity (`studentId`) + persisted progress. Built on top of `execute`.
 - **Frontend:** not built yet — Submit button needs to call the new endpoint and render `passed`/`result` instead of relying on the client-side `check()`.
-- **Backend:** not built yet — needs `Task`/`Submission` persistence (see [SCHEMA.md](SCHEMA.md)) and the grading dispatch (`code` lookup / `predict` compare).
+- **Backend:** not built yet — needs `Assignment`/`Submission` persistence (see [SCHEMA.md](SCHEMA.md)) and the grading dispatch (`code` lookup / `predict` compare).
 - **Decisions already made:**
   - Payload is `{ studentId, sessionId?, content }` → returns `{ subId, passed, result, submittedAt }`.
-  - "Completed" is decided server-side (`Task.Id` → a backend-owned grading
+  - "Completed" is decided server-side (`Assignment.Id` → a backend-owned grading
     lookup for `code`, a generic compare for `predict`), not self-reported by
     the client. See [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine).
   - Progress is stored in a `Submission` table, keyed by `studentId` — see [SCHEMA.md](SCHEMA.md).
 - **Open questions:**
   - [ ] `project` submissions have no automated grader yet (`passed` stays `null`) — manual review path is undecided.
-- **Done when:** a submission records the student as having completed that task, and it survives a reload.
+- **Done when:** a submission records the student as having completed that assignment, and it survives a reload.
 
 ---
 
@@ -70,20 +70,20 @@ Ordered by dependency and risk: build top-down.
 
 ## S4 — Solo student practices without a room
 
-**As a** solo student (never in a teacher's room), **I want** to fetch a task
+**As a** solo student (never in a teacher's room), **I want** to fetch an assignment
 set and submit my work anyway, **so that** I can keep practicing on my own
 after the workshop, or if I'm not attending live.
 
 - **Transport:** REST
-- **Contract:** [`GET /api/tasksets/{tasksetId}/tasks`](CONTRACT.md#tasks),
-  [`POST /api/tasks/{taskId}/submissions`](CONTRACT.md#submission) with `sessionId` omitted
-- **Frontend:** the entry point (join-bar UI) is built — see S7. Actually loading a real taskset's tasks and submitting from solo mode is **not** wired up yet (today, starting Solo Practice only flips UI state; the workspace still reads the local hardcoded `TASKS`).
-- **Backend:** not built yet — neither endpoint exists.
+- **Contract:** [`GET /api/assignmentsets/{assignmentSetId}/assignments`](CONTRACT.md#assignments),
+  [`POST /api/assignments/{assignmentId}/submissions`](CONTRACT.md#submission) with `sessionId` omitted
+- **Frontend:** the entry point (join-bar UI) is built — see S7. ✅ Solo Practice now loads the real solo set (`all-assignments-for-solo-2026`) from `GET /api/assignmentsets/{id}/assignments` (branch `feat/taskAPI`). Submitting from solo mode is still **not** wired up.
+- **Backend:** the assignment-fetch endpoint is built (under the old task naming — rename pending); the submissions endpoint doesn't exist yet.
 - **Depends on:** S2, but skips [Sessions / rooms](CONTRACT.md#sessions-rooms)
   entirely — no `Attendance` row is ever created for this population.
 - **Decisions already made:**
   - `Submission.sessionId` is nullable — one endpoint serves both populations.
-  - The frontend hardcodes which `tasksetId` "practice mode" points at; the
+  - The frontend hardcodes which `assignmentSetId` "practice mode" points at; the
     backend doesn't need to know a student is "solo" beyond the missing `sessionId`.
 - **Done when:** a submission with no `sessionId` is accepted, graded the same
   way as a room submission, and shows up in the student's history (S5).
@@ -94,37 +94,37 @@ after the workshop, or if I'm not attending live.
 
 **As a** student, **I want** my past submissions to still be there when I come
 back the next day (or reload), **so that** I don't lose progress or redo
-finished tasks.
+finished assignments.
 
 - **Transport:** REST
 - **Contract:** [`GET /api/students/{studentId}/submissions`](CONTRACT.md#submission)
-- **Frontend:** not built yet — fetch history on load, mark completed tasks in the sidebar (replaces the old local active/completed-key logic).
+- **Frontend:** not built yet — fetch history on load, mark completed assignments in the sidebar (replaces the old local active/completed-key logic).
 - **Backend:** not built yet — the query itself is straightforward once `Submission` exists.
 - **Depends on:** S2 (persisted submissions); [Identity](CONTRACT.md#identity-no-registration) (`studentId` survives in `localStorage` across days).
 - **Decisions already made:**
   - Completion is derived from `Submission.passed` server-side, not a
     client-side id list — this retires the frontend's old
-    active/completed-key hack. See [SCHEMA.md](SCHEMA.md#taskid-is-a-fresh-identity).
+    active/completed-key hack. See [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).
 - **Open questions:**
   - [ ] A student who loses their `studentId` (new browser/device) has no
     recovery path today — treated as a brand-new student. Accepted risk, not solved.
-- **Done when:** a student who reloads, or returns the next day, sees which tasks they already passed.
+- **Done when:** a student who reloads, or returns the next day, sees which assignments they already passed.
 
 ---
 
-## S6 — Teacher picks a taskset when creating a session
+## S6 — Teacher picks an assignment set when creating a session
 
-**As a** teacher, **I want** to choose which taskset a new session uses,
+**As a** teacher, **I want** to choose which assignment set a new session uses,
 **so that** I control what content today's room serves instead of it being implicit.
 
 - **Transport:** REST
-- **Contract:** [`GET /api/tasksets`](CONTRACT.md#tasks) (list), [`POST /api/sessions`](CONTRACT.md#sessions-rooms) (now takes `tasksetId`)
-- **Frontend:** ✅ built now — `TeacherDashboard` shows a "Task set" `<select>` above "Create session"; Create is disabled until a taskset is chosen. Backed by a **local mock** (`@lib/tasksetApi.fetchTasksets`) that wraps the current hardcoded task bundle as a single entry, so the picker's style and interaction can be reviewed without waiting on the backend.
-- **Backend:** doc-only for now (per instruction — no backend code changed). `GET /api/tasksets` doesn't exist yet; `POST /api/sessions` already ignores its request body today, so sending `{ tasksetId }` against the real backend is harmless (non-breaking) until the backend actually reads and persists it.
-- **Depends on:** [SCHEMA.md](SCHEMA.md) `TaskSet.DisplayTitle`.
+- **Contract:** [`GET /api/assignmentsets`](CONTRACT.md#assignments) (list), [`POST /api/sessions`](CONTRACT.md#sessions-rooms) (now takes `assignmentSetId`)
+- **Frontend:** ✅ built now — `TeacherDashboard` shows an "Assignment set" `<select>` above "Create session"; Create is disabled until an assignment set is chosen. The picker calls the **real API** (`@lib/assignmentSetApi.fetchAssignmentSets`, branch `feat/taskAPI`) — the local mock is gone.
+- **Backend:** ✅ built under the old task naming (route/field rename pending). `POST /api/sessions` **requires** `{ assignmentSetId }` and rejects unknown ids with `400` (see CONTRACT.md).
+- **Depends on:** [SCHEMA.md](SCHEMA.md) `AssignmentSet.DisplayTitle`.
 - **Open questions:**
-  - [ ] Real `GET /api/tasksets` endpoint + seeding more than one taskset (today, real or mock, there's effectively only one).
-- **Done when:** *(frontend, done)* a teacher can see and pick a taskset before creating a session. *(backend, pending)* the choice is actually persisted as `Session.TasksetId`.
+  - [ ] Seeding more than one assignment set (today there's effectively only one plus the solo set).
+- **Done when:** ✅ a teacher can see and pick an assignment set before creating a session, and the choice is persisted as `Session.AssignmentSetId`. Remaining: the naming rename on routes/DTOs.
 
 ---
 
@@ -135,35 +135,35 @@ labeled way to start practicing on my own from the same screen I'd use to
 join a room, **so that** I'm not blocked by needing a room code.
 
 - **Transport:** none for this story (pure UI); reuses S4's REST contract once the student actually submits work.
-- **Contract:** no new endpoint — S4's `POST /api/tasks/{taskId}/submissions` with `sessionId` omitted.
+- **Contract:** no new endpoint — S4's `POST /api/assignments/{assignmentId}/submissions` with `sessionId` omitted.
 - **Frontend:** ✅ built now — `JoinRoomBar` gains a `mode: 'join' | 'solo'` toggle. Default view adds a "Solo Practice" link + hover-info icon (native `title`, tooltip: *"This mode is for students who can't join BootIT on site, and want to practice at their own pace."*); switches to a name-only form with a "Start practicing" button and a "← Join a class instead" link back. Existing name+code join flow is unchanged.
 - **Backend:** none — no contract change.
 - **Depends on:** S4 (the underlying submission contract).
 - **Open questions:**
-  - [ ] `handleStartSolo` currently only flips UI state (shows "Practicing solo as {name}"). Wiring it to actually load a taskset's tasks (S4) is separate follow-on work.
+  - [x] `handleStartSolo` now loads the real solo assignment set from the API (see S4) instead of only flipping UI state.
 - **Done when:** a student can reach a working state without a room code, using a name only, without disrupting the existing join-by-code flow.
 
 ---
 
-## S8 — Student reveals a task's sample solution
+## S8 — Student reveals an assignment's sample solution
 
-**As a** student, **I want** to see a reference solution for a task after
+**As a** student, **I want** to see a reference solution for an assignment after
 I've attempted it, **so that** I can learn from it if I'm stuck or want to
 compare approaches.
 
 - **Transport:** REST
-- **Contract:** [`GET /api/tasks/{taskId}/solution?studentId=...`](CONTRACT.md#solution)
+- **Contract:** [`GET /api/assignments/{assignmentId}/solution?studentId=...`](CONTRACT.md#solution)
 - **Decisions already made:** the gate is identical for solo and classroom —
   available once **at least one `Submission` exists** for `(studentId,
-  taskId)`, pass or fail. A teacher-configurable reveal delay was considered
-  and rejected: it would need per-student-per-task timers (students in a room
+  assignmentId)`, pass or fail. A teacher-configurable reveal delay was considered
+  and rejected: it would need per-student-per-assignment timers (students in a room
   don't progress in lockstep), plus teacher-facing controls, for marginal
   benefit over the gate that already exists. See
   [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom).
 - **Frontend:** not built yet — "Show solution" button should be disabled
-  until the open task has ≥1 submission, with a hover explaining why (same
+  until the open assignment has ≥1 submission, with a hover explaining why (same
   pattern as S7's info icon).
-- **Backend:** not built yet — endpoint doesn't exist; `Task.SampleSolutionJson` doesn't exist either (see SCHEMA.md).
+- **Backend:** not built yet — endpoint doesn't exist; `Assignment.SampleSolutionJson` doesn't exist either (see SCHEMA.md).
 - **Done when:** not built — this story's contract is decided, nothing is implemented.
 
 ---
@@ -202,10 +202,10 @@ the class's state just because a connection dropped.
 - **Depends on:** S2 (persisted submissions); persisted Sessions / Attendance (SCHEMA.md).
 - **Decisions already made:**
   - Live roster (`ObserveSession`) and persisted attendance are **different reads** — the first is who's connected now, the second is who attended. Don't conflate them; the teacher side needs a REST hydration layer mirroring the student side's `SessionState`.
-  - "passed" is per-(student, task) EXISTS a passing submission, **not** a row average; `project` tasks (`passed = null`) are excluded from pass lists. See [CONTRACT.md](CONTRACT.md#teacher-dashboard-hydration-attendance--progress).
+  - "passed" is per-(student, assignment) EXISTS a passing submission, **not** a row average; `project` assignments (`passed = null`) are excluded from pass lists. See [CONTRACT.md](CONTRACT.md#teacher-dashboard-hydration-attendance--progress).
 - **Open questions:**
-  - [ ] Live per-task progress push (`ProgressUpdated`) so the dashboard updates without re-fetching — still backlog.
-- **Done when:** a teacher who reloads mid-class sees the full roster of everyone who joined **and** each student's passed tasks, not just who's currently connected.
+  - [ ] Live per-assignment progress push (`ProgressUpdated`) so the dashboard updates without re-fetching — still backlog.
+- **Done when:** a teacher who reloads mid-class sees the full roster of everyone who joined **and** each student's passed assignments, not just who's currently connected.
 
 ---
 
@@ -214,5 +214,5 @@ the class's state just because a connection dropped.
 Stub stories — flesh out before building.
 
 - Teacher sees live student progress via a `ProgressUpdated` broadcast (the live-delta half of S10 — hydration is defined; the push is not).
-- Student picks a task from the sidebar.
+- Student picks an assignment from the sidebar.
 - Teacher manually marks a `project` submission as passed/failed (no automated grader exists).
