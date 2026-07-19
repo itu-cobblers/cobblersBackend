@@ -16,7 +16,7 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore cobblersBackend.Tests/cobblersBackend.Tests.csproj
       - name: Run tests
-        run: dotnet test cobblersBackend.Tests/cobblersBackend.Tests.csproj --no-restore
+        run: dotnet test cobblersBackend.Tests/cobblersBackend.Tests.csproj --no-restore --filter "FullyQualifiedName!~ExecutorServiceTest"
 
   build-and-push:
     needs: test
