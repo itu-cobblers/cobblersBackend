@@ -1,4 +1,7 @@
 name: Build and Deploy Backend
+permissions:
+  contents: read
+  packages: write
 
 permissions:
   contents: read
