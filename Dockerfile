@@ -1,7 +1,5 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-RUN dotnet tool install --global dotnet-ef
-ENV PATH="$PATH:/root/.dotnet/tools"
 
 # Restore as distinct layers for better caching
 COPY cobblersBackend/cobblersBackend.csproj cobblersBackend/
@@ -9,6 +7,7 @@ RUN dotnet restore cobblersBackend/cobblersBackend.csproj
 
 # Copy everything else and publish
 COPY . .
+RUN dotnet tool restore
 RUN dotnet publish cobblersBackend/cobblersBackend.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
