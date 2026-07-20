@@ -7,6 +7,7 @@ RUN dotnet restore cobblersBackend/cobblersBackend.csproj
 
 # Copy everything else and publish
 COPY . .
+RUN dotnet tool restore
 RUN dotnet publish cobblersBackend/cobblersBackend.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
