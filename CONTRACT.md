@@ -6,6 +6,13 @@ The agreement between the **frontend** (React + Monaco) and the **backend** (ASP
 > As long as both sides honor what's written here, frontend and backend can be
 > developed in parallel — each mocking the other against this contract.
 
+> **Naming:** the entity is **Assignment** everywhere — code on both sides, and
+> this wire contract (`/api/assignmentsets`, `assignmentId`, `assignmentSetId`).
+> It was previously called _Task_/_taskset_; the rename happened because the
+> backend entity clashed with `System.Threading.Tasks.Task`. The frontend
+> (branch `feat/taskAPI`) already calls the new routes; backend routes/DTOs and
+> the seed data id still carry the old naming and need to be renamed to match.
+
 ---
 
 ## Design decision: `execute` vs `submission`
@@ -13,13 +20,13 @@ The agreement between the **frontend** (React + Monaco) and the **backend** (ASP
 There are **two separate concerns**, and they get **two separate endpoints**:
 
 - **`execute`** — "What does this code do?" Stateless: code in, output out.
-  Knows nothing about students or tasks. Called constantly (every "Run" click).
-- **`submission`** — "Did this student complete this task?" Stateful: tied to a
-  student + task + progress. Called once, when the student thinks they're done.
+  Knows nothing about students or assignments. Called constantly (every "Run" click).
+- **`submission`** — "Did this student complete this assignment?" Stateful: tied to a
+  student + assignment + progress. Called once, when the student thinks they're done.
   **Built on top of `execute`** (it runs the code, then records the result).
 
 `execute` is fully defined. `submission` is deferred until we build the
-tasks/progress feature — see [Open decisions](#open-decisions).
+assignments/progress feature — see [Open decisions](#open-decisions).
 
 User stories that drive these features live in [STORIES.md](STORIES.md).
 Persistence/DB design for what's behind these endpoints lives in [SCHEMA.md](SCHEMA.md).
@@ -77,13 +84,13 @@ connection open); the historical record of who attended does not depend on it.
 
 ```json
 // request
-{ "tasksetId": "day1-2026" }
+{ "assignmentSetId": "day1-2026" }
 
 // → 200 OK
 { "code": "ABCD" }
 ```
 
-`tasksetId` comes from [`GET /api/tasksets`](#tasks) — the teacher picks one
+`assignmentSetId` comes from [`GET /api/assignmentsets`](#assignments) — the teacher picks one
 before creating the room. See [STORIES.md](STORIES.md) S6.
 
 ### `JoinSession` — SignalR hub method (student joins a room)
@@ -139,41 +146,44 @@ renders `displayName`s; `studentId` keys them so duplicates merge.
 
 ---
 
-## Tasks
+## Assignments
 
-Two populations need task content (see [Sessions](#sessions-rooms)): the live
-cohort (in a room, `code` resolves to a `tasksetId`) and the solo cohort (the
-frontend already hardcodes which `tasksetId` to use). Both hit the same
-endpoint — there's no session-scoped variant.
+Two populations need assignment content (see [Sessions](#sessions-rooms)): the live
+cohort (in a room, `code` resolves to an `assignmentSetId`) and the solo cohort (the
+frontend hardcodes `assignmentSetId: "all-assignments-for-solo-2026"`). Both hit
+the same endpoint — there's no session-scoped variant.
 
-### `GET /api/tasksets` (teacher — list available tasksets)
+### `GET /api/assignmentsets` (teacher — list available assignment sets)
 
 ```json
 // → 200 OK
 [
-  { "tasksetId": "day1-2026", "displayTitle": "BootIT Day 1 — 2026" },
-  { "tasksetId": "day2-2026", "displayTitle": "BootIT Day 2 — 2026" }
+  { "assignmentSetId": "day1-2026", "displayTitle": "BootIT Day 1 — 2026" },
+  { "assignmentSetId": "day2-2026", "displayTitle": "BootIT Day 2 — 2026" }
 ]
 ```
 
-Feeds the teacher's session-creation picker — pick a `tasksetId`, pass it to
+Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass it to
 [`POST /api/sessions`](#sessions-rooms). `displayTitle` is
-`TaskSet.DisplayTitle` (see [SCHEMA.md](SCHEMA.md)).
+`AssignmentSet.DisplayTitle` (see [SCHEMA.md](SCHEMA.md)).
 
-> **Not yet implemented on the backend.** The frontend currently mocks this
-> locally with one entry wrapping its existing hardcoded task bundle (`@lib/tasksetApi`),
-> so the picker UI can be built and reviewed without waiting on the backend —
-> see [STORIES.md](STORIES.md) S6. Swapping the mock for a real call is a
-> one-function change; the picker component doesn't need to know the difference.
+> **Implemented on the backend under the old task naming** (along with
+> `GET /api/sessions/{code}` and `GET /api/assignmentsets/{assignmentSetId}/assignments`
+> below); content is loaded by `scripts/seed-tasks.sql`. Routes, DTO fields, and
+> the seed data id must be renamed to match this contract. The frontend already
+> calls the real endpoints (`@lib/assignmentSetApi`, branch `feat/taskAPI`) —
+> no mock remains (see [STORIES.md](STORIES.md) S6). Note `POST /api/sessions`
+> **requires** the `assignmentSetId` body shown above and rejects unknown ids
+> with `400`.
 
-### `GET /api/sessions/{code}` (room cohort — resolve the room's taskset)
+### `GET /api/sessions/{code}` (room cohort — resolve the room's assignment set)
 
 ```json
 // → 200 OK
-{ "code": "ABCD", "tasksetId": "day1-2026" }
+{ "code": "ABCD", "assignmentSetId": "day1-2026" }
 ```
 
-### `GET /api/tasksets/{tasksetId}/tasks` (both cohorts — fetch content)
+### `GET /api/assignmentsets/{assignmentSetId}/assignments` (both cohorts — fetch content)
 
 ```json
 // → 200 OK
@@ -201,21 +211,21 @@ Feeds the teacher's session-creation picker — pick a `tasksetId`, pass it to
 
 | Field     | Type                                   | Notes                                                                                                                    |
 | --------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–34 numbering — see [SCHEMA.md](SCHEMA.md#taskid-is-a-fresh-identity).  |
+| `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–34 numbering — see [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).  |
 | `kind`    | `"code"` \| `"predict"` \| `"project"` |                                                                                                                          |
-| `content` | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeTask` / `PredictTask` / `ProjectTask` fields, minus grading logic. |
+| `content` | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeAssignment` / `PredictAssignment` / `ProjectAssignment` fields, minus grading logic. |
 
 > This response never includes a sample/reference solution. That's a
 > deliberate omission, not an oversight — see [SCHEMA.md](SCHEMA.md#sample-solution-is-a-separate-column).
 > `check()` logic also does not travel over the wire anymore — grading moved server-side (see [Submission](#submission) below).
 
-> **Order matters.** The array comes back sorted by each task's position within
-> the set (`TaskSetTask.OrderIndex`, 0-based) — so the array index _is_ the
-> task's place in the set, which is how the frontend addresses tasks. `id` (a
+> **Order matters.** The array comes back sorted by each assignment's position within
+> the set (`AssignmentSetAssignment.OrderIndex`, 0-based) — so the array index _is_ the
+> assignment's place in the set, which is how the frontend addresses assignments. `id` (a
 > fresh server identity) is **not** the ordering key. See
-> [SCHEMA.md](SCHEMA.md#tasksettask-carries-an-explicit-orderindex).
+> [SCHEMA.md](SCHEMA.md#assignmentsetassignment-carries-an-explicit-orderindex).
 
-This replaces the frontend's hardcoded task bundle as the source of truth for task content going forward.
+This replaces the frontend's hardcoded assignment bundle as the source of truth for assignment content going forward.
 
 ---
 
@@ -235,7 +245,7 @@ the payload.
 | Field        | Type                 | Notes                                                                                                                                                                                  |
 | ------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `code`       | string?              | Single-file sugar: the full contents of one `Main.java`. Use this for the common case (most Day 1–2 exercises).                                                                        |
-| `files`      | `{name, content}[]`? | Multi-file run. Each item is one source file. Used for Day-3 class tasks (student class + a hidden grader `Main`) and the Day-3 mini-projects (student uploads several `.java` files). |
+| `files`      | `{name, content}[]`? | Multi-file run. Each item is one source file. Used for Day-3 class assignments (student class + a hidden grader `Main`) and the Day-3 mini-projects (student uploads several `.java` files). |
 | `entryClass` | string?              | When `files` is given, the class whose `main` to run (e.g. `"Main"`).                                                                                                                  |
 | `stdin`      | string?              | Standard input piped to the program — for interactive programs (e.g. the guess-the-number game). Omit/`""` when none.                                                                  |
 
@@ -245,7 +255,7 @@ the payload.
 > If more languages are ever needed, add a `language` field rather than reusing `code`;
 > that's a deliberate future change, not a silent one.
 
-The **response** shape is unchanged (`status` / `stdout` / `stderr`) regardless of single- or multi-file input. The frontend grades by inspecting `stdout` (its task `check()` runs client-side); the executor only compiles + runs.
+The **response** shape is unchanged (`status` / `stdout` / `stderr`) regardless of single- or multi-file input. The executor only compiles + runs — it never grades. Grading happens server-side via [Submission](#submission).
 
 ### Response — `200 OK`
 
@@ -332,16 +342,16 @@ The timer is a **non-coercive reminder** — nothing is forced if it elapses.
 
 ## Submission
 
-"Did this student complete this task?" One endpoint for all three task kinds,
+"Did this student complete this assignment?" One endpoint for all three assignment kinds,
 and for both the room cohort and the solo cohort (`sessionId` is optional —
 see [SCHEMA.md](SCHEMA.md#sessionid-is-nullable-on-submission)). Built on top
 of `execute` for `code`/`project`; `predict` never touches the executor.
 
 Grading is **server-side now**, not client-reported — see
-[SCHEMA.md](SCHEMA.md#grading-lives-in-backend-code-not-the-database). The
+[SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine). The
 frontend's `check()` no longer decides `passed`.
 
-### `POST /api/tasks/{taskId}/submissions`
+### `POST /api/assignments/{assignmentId}/submissions`
 
 ```json
 // request — code / project
@@ -379,7 +389,7 @@ frontend's `check()` no longer decides `passed`.
 
 | Field    | Type     | Notes                                                                                                          |
 | -------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `passed` | boolean? | Server-computed. `null` for `project` today (no automated grader yet) or any task without one.                 |
+| `passed` | boolean? | Server-computed. `null` for `project` today (no automated grader yet) or any assignment without one.                 |
 | `result` | object?  | Present for `code`/`project` (same shape as `execute`'s response). `null` for `predict` — nothing is executed. |
 
 Submission history — used for the resume flow (a student returning across the
@@ -392,7 +402,7 @@ Submission history — used for the resume flow (a student returning across the
 [
   {
     "subId": "uuid",
-    "taskId": 101,
+    "assignmentId": 101,
     "sessionId": "ABCD",
     "passed": true,
     "submittedAt": "2026-06-19T14:30:00Z"
@@ -404,13 +414,13 @@ Submission history — used for the resume flow (a student returning across the
 
 ## Solution
 
-Reveal a task's sample/reference solution. **One rule for both solo and
+Reveal an assignment's sample/reference solution. **One rule for both solo and
 classroom students** — see [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom) for why a teacher-controlled delay was considered and rejected.
 
-### `GET /api/tasks/{taskId}/solution?studentId={studentId}`
+### `GET /api/assignments/{assignmentId}/solution?studentId={studentId}`
 
 ```json
-// → 200 OK — at least one Submission exists for (studentId, taskId)
+// → 200 OK — at least one Submission exists for (studentId, assignmentId)
 { "available": true, "solution": "public class Main {...}" }
 
 // → 200 OK — no Submission yet
@@ -419,8 +429,8 @@ classroom students** — see [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-o
 
 | Field       | Type                                     | Notes                                                                                                                                             |
 | ----------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `available` | boolean                                   | `true` once the student has submitted this task at least once — pass or fail, in a room or solo.                                                     |
-| `solution`  | string \| `{name, content}[]` \| null     | Present only when `available`. Shape matches `Task.SampleSolutionJson` for the task's `kind`. Not applicable to `predict` (its `expectedOutput`, from Tasks, already is the answer). |
+| `available` | boolean                                   | `true` once the student has submitted this assignment at least once — pass or fail, in a room or solo.                                                     |
+| `solution`  | string \| `{name, content}[]` \| null     | Present only when `available`. Shape matches `Assignment.SampleSolutionJson` for the assignment's `kind`. Not applicable to `predict` (its `expectedOutput`, from Assignments, already is the answer). |
 
 > **Not yet implemented.** Formalizes the previously-vague "reveal a sample
 > solution" backlog stub now that the gating rule is decided — see
@@ -446,7 +456,7 @@ session instead of manually re-entering a code.
 {
   "suggested": {
     "code": "WXYZ",
-    "tasksetDisplayTitle": "BootIT Day 2 — 2026",
+    "assignmentSetDisplayTitle": "BootIT Day 2 — 2026",
     "createAt": "2026-06-20T08:00:00Z"
   }
 }
@@ -480,21 +490,21 @@ Resolve each _in this file_ before the relevant feature is built.
 - [x] **`POST /api/submission`** — see [Submission](#submission). Payload,
       grading ownership, and persistence are decided; schema detail in
       [SCHEMA.md](SCHEMA.md).
-- [x] **Tasks** — see [Tasks](#tasks). `GET /api/tasksets/{tasksetId}/tasks`
+- [x] **Assignments** — see [Assignments](#assignments). `GET /api/assignmentsets/{assignmentSetId}/assignments`
       replaces the frontend's static bundle.
 - [x] **SignalR hub path** — `/hub` (see Sessions).
 - [x] **Roster → teacher** — `ObserveSession` + `StudentJoined` / `RosterUpdated`
-      (see Sessions). A richer `ProgressUpdated` (per-task progress, not just names)
+      (see Sessions). A richer `ProgressUpdated` (per-assignment progress, not just names)
       is still open.
 - [x] **Progress persistence** — `Submission` rows, keyed by `studentId` (see
       [SCHEMA.md](SCHEMA.md)). Replaces the in-memory skeleton.
-- [x] **Teacher picks a taskset when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/tasksets`](#tasks). Backend endpoint not implemented yet; frontend built against a mock (STORIES.md S6).
+- [x] **Teacher picks an assignment set when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/assignmentsets`](#assignments). Backend endpoints implemented (under the old task naming — rename pending); frontend calls the real API (STORIES.md S6).
 - [x] **Solo Practice entry point** — join-bar UI decision made and built; no new contract beyond S4's existing `sessionId`-omitted submission (STORIES.md S7).
 - [x] **Sample solution reveal** — see [Solution](#solution). Gating rule decided; endpoint not implemented yet (STORIES.md S8).
 - [ ] **Resume suggestion** — see [Resume suggestion (planned)](#resume-suggestion-planned). Plan only — not built (STORIES.md S9).
 - [ ] **Session lifetime** — when does a room end (teacher ends it / idle timeout)?
-- [ ] **`ProgressUpdated` broadcast** — teacher sees live per-task progress, not just who's online (backlog in STORIES.md).
+- [ ] **`ProgressUpdated` broadcast** — teacher sees live per-assignment progress, not just who's online (backlog in STORIES.md).
 
 See [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions) for persistence-layer
 items that don't affect the wire format (e.g. manual review for `project`
-submissions, `TaskSet` labeling).
+submissions, `AssignmentSet` labeling).

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using cobblersBackend.Data;
@@ -11,9 +12,11 @@ using cobblersBackend.Data;
 namespace cobblersBackend.Migrations
 {
     [DbContext(typeof(CobblersDbContext))]
-    partial class CobblersDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260717151919_RenameAssignmentPhysicalNames")]
+    partial class RenameAssignmentPhysicalNames
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -85,7 +88,7 @@ namespace cobblersBackend.Migrations
                 {
                     b.Property<string>("AssignmentSetId")
                         .HasColumnType("text")
-                        .HasColumnName("assignment_set_id");
+                        .HasColumnName("task_set_id");
 
                     b.Property<string>("DisplayTitle")
                         .IsRequired()
@@ -93,9 +96,9 @@ namespace cobblersBackend.Migrations
                         .HasColumnName("display_title");
 
                     b.HasKey("AssignmentSetId")
-                        .HasName("pk_assignment_set");
+                        .HasName("pk_task_set");
 
-                    b.ToTable("assignment_set", (string)null);
+                    b.ToTable("task_set", (string)null);
                 });
 
             modelBuilder.Entity("cobblersBackend.Data.Entities.AssignmentSetAssignment", b =>
@@ -109,32 +112,32 @@ namespace cobblersBackend.Migrations
 
                     b.Property<int>("AssignmentId")
                         .HasColumnType("integer")
-                        .HasColumnName("assignment_id");
+                        .HasColumnName("task_id");
 
                     b.Property<string>("AssignmentSetId")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("assignment_set_id");
+                        .HasColumnName("task_set_id");
 
                     b.Property<int>("OrderIndex")
                         .HasColumnType("integer")
                         .HasColumnName("order_index");
 
                     b.HasKey("Id")
-                        .HasName("pk_assignment_set_assignment");
+                        .HasName("pk_task_set_task");
 
                     b.HasIndex("AssignmentId")
-                        .HasDatabaseName("ix_assignment_set_assignment_assignment_id");
+                        .HasDatabaseName("ix_task_set_task_assignment_id");
 
                     b.HasIndex("AssignmentSetId", "AssignmentId")
                         .IsUnique()
-                        .HasDatabaseName("ix_assignment_set_assignment_assignment_set_id_assignment_id");
+                        .HasDatabaseName("ix_task_set_task_task_set_id_task_id");
 
                     b.HasIndex("AssignmentSetId", "OrderIndex")
                         .IsUnique()
-                        .HasDatabaseName("ix_assignment_set_assignment_assignment_set_id_order_index");
+                        .HasDatabaseName("ix_task_set_task_task_set_id_order_index");
 
-                    b.ToTable("assignment_set_assignment", (string)null);
+                    b.ToTable("task_set_task", (string)null);
                 });
 
             modelBuilder.Entity("cobblersBackend.Data.Entities.Attendance", b =>
@@ -274,14 +277,14 @@ namespace cobblersBackend.Migrations
                         .HasForeignKey("AssignmentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_assignment_set_assignment_assignment_assignment_id");
+                        .HasConstraintName("fk_task_set_task_task_task_id");
 
                     b.HasOne("cobblersBackend.Data.Entities.AssignmentSet", "AssignmentSet")
                         .WithMany("Assignments")
                         .HasForeignKey("AssignmentSetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_assignment_set_assignment_assignment_set_assignment_set_id");
+                        .HasConstraintName("fk_task_set_task_task_set_task_set_id");
 
                     b.Navigation("Assignment");
 

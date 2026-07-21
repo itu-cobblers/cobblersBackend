@@ -4,28 +4,33 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace cobblersBackend.Data.Configurations;
 
-public class TaskConfiguration : IEntityTypeConfiguration<Entities.Task>
+public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
 {
-    public void Configure(EntityTypeBuilder<Entities.Task> builder)
+    public void Configure(EntityTypeBuilder<Assignment> builder)
     {
         builder.HasKey(t => t.Id);
         builder.Property(t => t.Id)
                .ValueGeneratedOnAdd();
 
+        builder.HasIndex(t => t.Slug).IsUnique();
+
         builder.Property(t => t.ContentJson)
                .HasColumnType("jsonb");
-        
+
         builder.Property(t => t.SampleSolutionJson)
                .HasColumnType("jsonb");
-        
+
+        builder.Property(t => t.GradingJson)
+               .HasColumnType("jsonb");
+
         builder.Property(t => t.Kind)
                .HasConversion(
                      v => v.ToString().ToLowerInvariant(),
-                     v => Enum.Parse<TaskKind>(v, ignoreCase: true))
+                     v => Enum.Parse<AssignmentKind>(v, ignoreCase: true))
                .HasColumnType("text");
 
-        builder.ToTable(t => t.HasCheckConstraint(
-              "ck_task_kind",
+        builder.ToTable("assignment", t => t.HasCheckConstraint(
+              "ck_assignment_kind",
               "kind IN ('code', 'predict', 'project')"));
     }
 }

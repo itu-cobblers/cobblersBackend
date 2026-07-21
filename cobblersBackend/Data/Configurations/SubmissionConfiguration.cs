@@ -11,7 +11,7 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
         builder.HasKey(s => s.SubId);
         builder.Property(s => s.SubId)
                .ValueGeneratedNever();
-        
+
         builder.Property(s => s.ContentJson)
                .HasColumnType("jsonb");
 
@@ -27,15 +27,15 @@ public class SubmissionConfiguration : IEntityTypeConfiguration<Submission>
                .WithMany()
                .HasForeignKey(s => s.SessionId)
                .OnDelete(DeleteBehavior.SetNull);
-        
+
         builder.HasOne(s => s.Student)
                .WithMany()
                .HasForeignKey(s => s.StudentId)
                .OnDelete(DeleteBehavior.Restrict);
-        
-        builder.HasOne(s => s.Task)
+
+        builder.HasOne(s => s.Assignment)
                .WithMany(t => t.Submissions)
-               .HasForeignKey(s => s.TaskId)
+               .HasForeignKey(s => s.AssignmentId)
                .OnDelete(DeleteBehavior.Restrict);
     }
 }

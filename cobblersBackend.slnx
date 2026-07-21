@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="cobblersBackend.Tests/cobblersBackend.Tests.csproj" />
+  <Project Path="cobblersBackend/cobblersBackend.csproj" />
+</Solution>

@@ -12,30 +12,53 @@ namespace cobblersBackend.Hubs;
 public class SessionHub : Hub
 {
     private readonly SessionStore _store;
-    public SessionHub(SessionStore store) => _store = store;
+    private readonly IAttendanceService _attendanceService;
+    public SessionHub(SessionStore store, IAttendanceService attendanceService)  
+    {
+        _store = store;
+        _attendanceService = attendanceService;
+    }
 
     /// <summary>Student joins a room. Replies with current state; tells observers.</summary>
     public async Task<SessionState> JoinSession(JoinArgs args)
     {
-        await Groups.AddToGroupAsync(Context.ConnectionId, args.Code);
+        var code = SessionCode.Normalize(args.Code);
+
+        // Persistence is authoritative: an unknown code must fail the join
+        // loudly, *before* any live room state is touched — no half-joined
+        // ghosts in the roster.
+        try
+        {
+            await _attendanceService.RecordAttendanceAsync(code, args.StudentId, args.DisplayName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // HubException messages are sent to the caller even when detailed
+            // errors are disabled — the client sees *why* the join failed.
+            throw new HubException(ex.Message);
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, code);
 
         // Remember who/where this connection is, so OnDisconnected can clean up.
-        Context.Items["code"] = args.Code;
+        // Stored normalized, so every later read matches the store/group keys.
+        Context.Items["code"] = code;
         Context.Items["studentId"] = args.StudentId;
 
-        var student = new Student(args.StudentId, args.DisplayName);
-        var roster = _store.AddStudent(args.Code, student);
+        var student = new StudentDto(args.StudentId, args.DisplayName);
+        var roster = _store.AddStudent(code, student);
 
         // Tell observers (teacher) live: the one who joined, then the full list.
-        await Clients.Group(args.Code).SendAsync("StudentJoined", student);
-        await Clients.Group(args.Code).SendAsync("RosterUpdated", roster);
+        await Clients.Group(code).SendAsync("StudentJoined", student);
+        await Clients.Group(code).SendAsync("RosterUpdated", roster);
 
-        return new SessionState(_store.GetTimer(args.Code));
+        return new SessionState(_store.GetTimer(code));
     }
 
     /// <summary>Teacher observes a room. Returns the current roster to the caller.</summary>
-    public async Task<IReadOnlyList<Student>> ObserveSession(string code)
+    public async Task<IReadOnlyList<StudentDto>> ObserveSession(string code)
     {
+        code = SessionCode.Normalize(code);
         await Groups.AddToGroupAsync(Context.ConnectionId, code);
         return _store.GetRoster(code);
     }

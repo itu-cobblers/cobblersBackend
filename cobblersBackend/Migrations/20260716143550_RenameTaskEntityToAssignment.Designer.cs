@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using cobblersBackend.Data;
@@ -11,9 +12,11 @@ using cobblersBackend.Data;
 namespace cobblersBackend.Migrations
 {
     [DbContext(typeof(CobblersDbContext))]
-    partial class CobblersDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260716143550_RenameTaskEntityToAssignment")]
+    partial class RenameTaskEntityToAssignment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -69,72 +72,16 @@ namespace cobblersBackend.Migrations
                         .HasColumnName("title");
 
                     b.HasKey("Id")
-                        .HasName("pk_assignment");
+                        .HasName("pk_task");
 
                     b.HasIndex("Slug")
                         .IsUnique()
-                        .HasDatabaseName("ix_assignment_slug");
+                        .HasDatabaseName("ix_task_slug");
 
-                    b.ToTable("assignment", null, t =>
+                    b.ToTable("task", null, t =>
                         {
-                            t.HasCheckConstraint("ck_assignment_kind", "kind IN ('code', 'predict', 'project')");
+                            t.HasCheckConstraint("ck_task_kind", "kind IN ('code', 'predict', 'project')");
                         });
-                });
-
-            modelBuilder.Entity("cobblersBackend.Data.Entities.AssignmentSet", b =>
-                {
-                    b.Property<string>("AssignmentSetId")
-                        .HasColumnType("text")
-                        .HasColumnName("assignment_set_id");
-
-                    b.Property<string>("DisplayTitle")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("display_title");
-
-                    b.HasKey("AssignmentSetId")
-                        .HasName("pk_assignment_set");
-
-                    b.ToTable("assignment_set", (string)null);
-                });
-
-            modelBuilder.Entity("cobblersBackend.Data.Entities.AssignmentSetAssignment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AssignmentId")
-                        .HasColumnType("integer")
-                        .HasColumnName("assignment_id");
-
-                    b.Property<string>("AssignmentSetId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("assignment_set_id");
-
-                    b.Property<int>("OrderIndex")
-                        .HasColumnType("integer")
-                        .HasColumnName("order_index");
-
-                    b.HasKey("Id")
-                        .HasName("pk_assignment_set_assignment");
-
-                    b.HasIndex("AssignmentId")
-                        .HasDatabaseName("ix_assignment_set_assignment_assignment_id");
-
-                    b.HasIndex("AssignmentSetId", "AssignmentId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_assignment_set_assignment_assignment_set_id_assignment_id");
-
-                    b.HasIndex("AssignmentSetId", "OrderIndex")
-                        .IsUnique()
-                        .HasDatabaseName("ix_assignment_set_assignment_assignment_set_id_order_index");
-
-                    b.ToTable("assignment_set_assignment", (string)null);
                 });
 
             modelBuilder.Entity("cobblersBackend.Data.Entities.Attendance", b =>
@@ -168,11 +115,6 @@ namespace cobblersBackend.Migrations
                         .HasColumnType("text")
                         .HasColumnName("session_id");
 
-                    b.Property<string>("AssignmentSetId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("assignment_set_id");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasColumnType("text")
@@ -184,15 +126,20 @@ namespace cobblersBackend.Migrations
                         .HasColumnName("create_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("TaskSetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("task_set_id");
+
                     b.HasKey("SessionId")
                         .HasName("pk_session");
-
-                    b.HasIndex("AssignmentSetId")
-                        .HasDatabaseName("ix_session_assignment_set_id");
 
                     b.HasIndex("Code")
                         .IsUnique()
                         .HasDatabaseName("ix_session_code");
+
+                    b.HasIndex("TaskSetId")
+                        .HasDatabaseName("ix_session_task_set_id");
 
                     b.ToTable("session", (string)null);
                 });
@@ -219,10 +166,6 @@ namespace cobblersBackend.Migrations
                     b.Property<Guid>("SubId")
                         .HasColumnType("uuid")
                         .HasColumnName("sub_id");
-
-                    b.Property<int>("AssignmentId")
-                        .HasColumnType("integer")
-                        .HasColumnName("assignment_id");
 
                     b.Property<string>("ContentJson")
                         .IsRequired()
@@ -252,11 +195,12 @@ namespace cobblersBackend.Migrations
                         .HasColumnName("submitted_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<int>("TaskId")
+                        .HasColumnType("integer")
+                        .HasColumnName("task_id");
+
                     b.HasKey("SubId")
                         .HasName("pk_submission");
-
-                    b.HasIndex("AssignmentId")
-                        .HasDatabaseName("ix_submission_assignment_id");
 
                     b.HasIndex("SessionId")
                         .HasDatabaseName("ix_submission_session_id");
@@ -264,28 +208,66 @@ namespace cobblersBackend.Migrations
                     b.HasIndex("StudentId")
                         .HasDatabaseName("ix_submission_student_id");
 
+                    b.HasIndex("TaskId")
+                        .HasDatabaseName("ix_submission_task_id");
+
                     b.ToTable("submission", (string)null);
                 });
 
-            modelBuilder.Entity("cobblersBackend.Data.Entities.AssignmentSetAssignment", b =>
+            modelBuilder.Entity("cobblersBackend.Data.Entities.TaskSet", b =>
                 {
-                    b.HasOne("cobblersBackend.Data.Entities.Assignment", "Assignment")
-                        .WithMany("AssignmentSets")
-                        .HasForeignKey("AssignmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                    b.Property<string>("TaskSetId")
+                        .HasColumnType("text")
+                        .HasColumnName("task_set_id");
+
+                    b.Property<string>("DisplayTitle")
                         .IsRequired()
-                        .HasConstraintName("fk_assignment_set_assignment_assignment_assignment_id");
+                        .HasColumnType("text")
+                        .HasColumnName("display_title");
 
-                    b.HasOne("cobblersBackend.Data.Entities.AssignmentSet", "AssignmentSet")
-                        .WithMany("Assignments")
-                        .HasForeignKey("AssignmentSetId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                    b.HasKey("TaskSetId")
+                        .HasName("pk_task_set");
+
+                    b.ToTable("task_set", (string)null);
+                });
+
+            modelBuilder.Entity("cobblersBackend.Data.Entities.TaskSetTask", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_index");
+
+                    b.Property<int>("TaskId")
+                        .HasColumnType("integer")
+                        .HasColumnName("task_id");
+
+                    b.Property<string>("TaskSetId")
                         .IsRequired()
-                        .HasConstraintName("fk_assignment_set_assignment_assignment_set_assignment_set_id");
+                        .HasColumnType("text")
+                        .HasColumnName("task_set_id");
 
-                    b.Navigation("Assignment");
+                    b.HasKey("Id")
+                        .HasName("pk_task_set_task");
 
-                    b.Navigation("AssignmentSet");
+                    b.HasIndex("TaskId")
+                        .HasDatabaseName("ix_task_set_task_task_id");
+
+                    b.HasIndex("TaskSetId", "OrderIndex")
+                        .IsUnique()
+                        .HasDatabaseName("ix_task_set_task_task_set_id_order_index");
+
+                    b.HasIndex("TaskSetId", "TaskId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_task_set_task_task_set_id_task_id");
+
+                    b.ToTable("task_set_task", (string)null);
                 });
 
             modelBuilder.Entity("cobblersBackend.Data.Entities.Attendance", b =>
@@ -311,25 +293,18 @@ namespace cobblersBackend.Migrations
 
             modelBuilder.Entity("cobblersBackend.Data.Entities.Session", b =>
                 {
-                    b.HasOne("cobblersBackend.Data.Entities.AssignmentSet", "AssignmentSet")
+                    b.HasOne("cobblersBackend.Data.Entities.TaskSet", "TaskSet")
                         .WithMany("Sessions")
-                        .HasForeignKey("AssignmentSetId")
+                        .HasForeignKey("TaskSetId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_session_assignment_set_assignment_set_id");
+                        .HasConstraintName("fk_session_task_set_task_set_id");
 
-                    b.Navigation("AssignmentSet");
+                    b.Navigation("TaskSet");
                 });
 
             modelBuilder.Entity("cobblersBackend.Data.Entities.Submission", b =>
                 {
-                    b.HasOne("cobblersBackend.Data.Entities.Assignment", "Assignment")
-                        .WithMany("Submissions")
-                        .HasForeignKey("AssignmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_submission_assignment_assignment_id");
-
                     b.HasOne("cobblersBackend.Data.Entities.Session", "Session")
                         .WithMany()
                         .HasForeignKey("SessionId")
@@ -343,25 +318,53 @@ namespace cobblersBackend.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_submission_student_student_id");
 
-                    b.Navigation("Assignment");
+                    b.HasOne("cobblersBackend.Data.Entities.Assignment", "Task")
+                        .WithMany("Submissions")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_submission_task_task_id");
 
                     b.Navigation("Session");
 
                     b.Navigation("Student");
+
+                    b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("cobblersBackend.Data.Entities.TaskSetTask", b =>
+                {
+                    b.HasOne("cobblersBackend.Data.Entities.Assignment", "Task")
+                        .WithMany("TaskSets")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_task_set_task_task_task_id");
+
+                    b.HasOne("cobblersBackend.Data.Entities.TaskSet", "TaskSet")
+                        .WithMany("Tasks")
+                        .HasForeignKey("TaskSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_task_set_task_task_set_task_set_id");
+
+                    b.Navigation("Task");
+
+                    b.Navigation("TaskSet");
                 });
 
             modelBuilder.Entity("cobblersBackend.Data.Entities.Assignment", b =>
                 {
-                    b.Navigation("AssignmentSets");
-
                     b.Navigation("Submissions");
+
+                    b.Navigation("TaskSets");
                 });
 
-            modelBuilder.Entity("cobblersBackend.Data.Entities.AssignmentSet", b =>
+            modelBuilder.Entity("cobblersBackend.Data.Entities.TaskSet", b =>
                 {
-                    b.Navigation("Assignments");
-
                     b.Navigation("Sessions");
+
+                    b.Navigation("Tasks");
                 });
 #pragma warning restore 612, 618
         }
