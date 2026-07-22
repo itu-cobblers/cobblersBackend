@@ -4,6 +4,7 @@ using cobblersBackend.Hubs;
 using cobblersBackend.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -18,6 +19,7 @@ builder.Services.AddSingleton<IAssignmentGrader>(_ => new AssignmentGrader());
 builder.Services.AddScoped<IAssignmentSetService, AssignmentSetService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 
+builder.Services.AddSingleton<IExecutionMetrics, ExecutionMetrics>();
 
 builder.Services.AddHttpClient<IPistonClient, PistonClient>(client =>
 {
@@ -61,8 +63,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseHttpMetrics();
 app.MapControllers();
 app.MapHub<SessionHub>("/hub");
+app.MapMetrics("/metrics");
 
 // run
 app.Run();
