@@ -101,7 +101,8 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
         await service.RecordAttendanceAsync(sessionCode, "student-1", "Marianne");
 
         // Then
-        Assert.Equal("Marianne", ctx.Student.Single().DisplayName);
+        await using var read = _fixture.CreateContext();
+        Assert.Equal("Marianne", (await read.Student.SingleAsync()).DisplayName);
         Assert.Equal(1, await ctx.Attendance.CountAsync());
 
     }
