@@ -17,6 +17,7 @@
     <!-- Microsoft.OpenApi included for supressing vunerability warnings from v2.0.0 -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.10.0" /> 
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
   </ItemGroup>
 
 </Project>

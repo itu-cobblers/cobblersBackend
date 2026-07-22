@@ -3,6 +3,7 @@ using cobblersBackend.Data;
 using cobblersBackend.Hubs;
 using cobblersBackend.Services;
 using Microsoft.EntityFrameworkCore;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -10,6 +11,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // Add services to the container.
 builder.Services.AddScoped<ExecutorService>();
 builder.Services.AddScoped<IExecuteResultClassifier,JavaExecuteResultClassifier>();
+builder.Services.AddSingleton<IExecutionMetrics, ExecutionMetrics>();
 
 builder.Services.AddHttpClient<IPistonClient, PistonClient>(client =>
 {
@@ -44,8 +46,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseHttpMetrics();
 app.MapControllers();
 app.MapHub<SessionHub>("/hub");
+app.MapMetrics("/metrics");
 
 // run
 app.Run();

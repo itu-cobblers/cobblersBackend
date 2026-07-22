@@ -1,24 +1,38 @@
 ﻿using Moq;
-using cobblersBackend.Services;
+using cobblersBackend.DTOs;
 using cobblersBackend.Models;
+using cobblersBackend.Services;
+
 namespace cobblersBackend.Tests;
 
 public class ExecutorServiceTest
-{  
+{
     [Fact]
-    public async Task ExecuteAsync_WhenCompileFails_ReturnCompileError()
+    public async Task ExecuteAsync_ReturnsClassifierResult_AndRecordsMetrics()
     {
         var fakePiston = new Mock<IPistonClient>();
-        fakePiston.Setup(p => p.ExecuteAsync("java", It.IsAny<string>()))
+        fakePiston
+            .Setup(p => p.ExecuteAsync("java", It.IsAny<string>()))
             .ReturnsAsync(new PistonExecuteResponse
             {
-                Compile = new PistonStage { Code = 1, Stderr = "error: ';' expected" },
-                Run = new PistonStage()
+                Run = new PistonStage { Code = 0, Stdout = "ok", Stderr = string.Empty }
             });
 
-        var result = await new ExecutorService(fakePiston.Object).ExecuteAsync("not java");
+        var fakeClassifier = new Mock<IExecuteResultClassifier>();
+        fakeClassifier
+            .Setup(c => c.Classify(It.IsAny<PistonExecuteResponse>()))
+            .Returns(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "ok", string.Empty));
 
-        Assert.Contains("error", result);
-        
+        var fakeMetrics = new Mock<IExecutionMetrics>();
+        var service = new ExecutorService(fakePiston.Object, fakeClassifier.Object, fakeMetrics.Object);
+
+        var result = await service.ExecuteAsync("public class Main {}");
+
+        Assert.Equal(ExecuteStatus.SUCCESS, result.Status);
+        fakeMetrics.Verify(
+            metrics => metrics.ObserveExecutionResult(
+                ExecuteStatus.SUCCESS,
+                It.Is<double>(duration => duration >= 0)),
+            Times.Once);
     }
 }
