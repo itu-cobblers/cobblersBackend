@@ -29,7 +29,7 @@ public class SessionHub : Hub
         // ghosts in the roster.
         try
         {
-            await _attendanceService.RecordAttendanceAsync(code, args.StudentId, args.DisplayName);
+            await _attendanceService.RecordAttendanceAsync(code, args.StudentId);
         }
         catch (InvalidOperationException ex)
         {
