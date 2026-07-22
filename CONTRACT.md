@@ -191,9 +191,13 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
   {
     "id": 101,
     "kind": "code",
-    "title": "Hello, World!",
-    "description": "Make the program print exactly: Hello World!",
-    "hint": "System.out.println(\"Hello World!\");",
+    "title": "Hello ITU",
+    "description": "Print exactly: Hello ITU!",
+    "lesson": [
+      { "kind": "text", "text": "Printing a message is the most basic thing…" },
+      { "kind": "code", "code": "class Hello {\n    public static void main(String[] args) {\n        System.out.println(\"Hello World!\");\n    }\n}" }
+    ],
+    "hint": "System.out.println(\"Hello ITU!\");",
     "content": { "starter": "public class Main {\n...\n}" }
   },
   {
@@ -211,9 +215,10 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 
 | Field     | Type                                   | Notes                                                                                                                    |
 | --------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–34 numbering — see [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).  |
+| `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–33 numbering — see [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).  |
 | `kind`    | `"code"` \| `"predict"` \| `"project"` |                                                                                                                          |
-| `content` | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeAssignment` / `PredictAssignment` / `ProjectAssignment` fields, minus grading logic. |
+| `lesson`  | `({kind:"text",text}\| {kind:"code",code})[]`? | Optional teaching blocks shown above the task. Omit when absent. Sibling of `hint`/`content` — not inside `content`. See [SCHEMA.md](SCHEMA.md). |
+| `content` | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeAssignment` / `PredictAssignment` / `ProjectAssignment` fields, minus grading logic / `lesson` / `check`. |
 
 > This response never includes a sample/reference solution. That's a
 > deliberate omission, not an oversight — see [SCHEMA.md](SCHEMA.md#sample-solution-is-a-separate-column).

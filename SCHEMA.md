@@ -94,11 +94,12 @@ wouldn't.
 
 | Column | Type | Notes |
 |---|---|---|
-| `Id` | PK (fresh identity) | **Not** the frontend's current 0–34 numbering — see [Design decisions](#assignmentid-is-a-fresh-identity). |
-| `Slug` | string, UNIQUE | Stable natural key (kebab-case, e.g. `hello-world`). Identical across databases while `Id` is DB-assigned — the seed script upserts on it, and any per-assignment code hook keys on it. **Internal only**, never exposed on the API. |
+| `Id` | PK (fresh identity) | **Not** the frontend's current 0–33 numbering — see [Design decisions](#assignmentid-is-a-fresh-identity). |
+| `Slug` | string, UNIQUE | Stable natural key (kebab-case, e.g. `hello-itu`). Identical across databases while `Id` is DB-assigned — the seed script upserts on it, and any per-assignment code hook keys on it. **Internal only**, never exposed on the API. |
 | `Kind` | enum: `Code` \| `Predict` \| `Project` | |
 | `Title` | string | |
 | `Description` | string | |
+| `LessonJson` | json? | Optional teaching blocks shown above the task. Shape: `[{ kind: "text", text } \| { kind: "code", code }, ...]`. Null = no lesson. Wire field `lesson` — a sibling of `hint`/`content`, **not** folded into `ContentJson` (mirrors the frontend's `AssignmentBase.lesson`). |
 | `Hint` | string? | |
 | `ContentJson` | json | Kind-specific payload, always safe to send to the student. Shape per kind below. |
 | `SampleSolutionJson` | json? | Kind-specific reference solution. **Not** part of `ContentJson` — see [Design decisions](#sample-solution-is-a-separate-column). |
@@ -245,11 +246,11 @@ A rule node is one of:
 ```
 
 Grading only runs on a successful execution — a non-zero exit code fails
-before any rule is evaluated. All 35 current frontend `check()` functions
-decompose into these primitives (verified against the frontend's `assignments.ts` +
-`lib/grade.ts`); the frontend's `signals` side-channel (the café-name display)
-stays a client-side nicety derived from stdout — the server verdict is just
-`passed`.
+before any rule is evaluated. The current frontend `check()` functions
+decompose into these primitives (or a close approximation stored in
+`scripts/seed-tasks.sql`, verified against the frontend's `assignments.ts` +
+`lib/grade.ts`); the frontend's `signals` side-channel stays a client-side
+nicety derived from stdout — the server verdict is just `passed`.
 
 - `Predict` assignments don't use `GradingJson`: their grading is one generic
   algorithm (normalize + compare against `ContentJson.expectedOutput` /
@@ -292,7 +293,7 @@ must do the same.
 > exist yet.
 
 ### `AssignmentId` is a fresh identity
-The frontend's current `id` (0–34) doubles as a `localStorage` key for
+The frontend's current `id` (0–33) doubles as a `localStorage` key for
 tracking which assignments are done. Once `Submission` persists server-side,
 "has this student completed this assignment" is answered by querying for a passing
 `Submission`, not by a client-side id list — so there's no reason to preserve
@@ -347,7 +348,7 @@ record of who attended.
 ## Open decisions
 
 - [ ] How does a `Project` submission ever get `Passed = true` — manual teacher review needs an endpoint/UI, which doesn't exist yet.
-- [x] Migration of the 35 existing frontend assignments into `Assignment` rows — done via the idempotent
+- [x] Migration of the 34 existing frontend assignments into `Assignment` rows — done via the idempotent
       [scripts/seed-tasks.sql](scripts/seed-tasks.sql) (upserts keyed on `Slug`; re-runnable against any environment).
 - [ ] Resume-suggestion tie-break: if more than one `Session` was created "today," which one is suggested — most recent
       `CreateAt`? (Single-class-at-a-time assumption makes this unlikely in practice, but not impossible.)

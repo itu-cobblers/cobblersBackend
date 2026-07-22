@@ -107,9 +107,28 @@ public class AssignmentSetServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetAssignments_LessonIsParsedJson_WhenPresent_AndOmittedWhenNull()
+    {
+        var withLesson = AddAssignment("with-lesson");
+        withLesson.LessonJson = """[{"kind":"text","text":"Printing…"},{"kind":"code","code":"System.out.println(1);"}]""";
+        var withoutLesson = AddAssignment("no-lesson");
+        AddSet("day1", (withLesson, 0), (withoutLesson, 1));
+
+        var assignments = await _service.GetAssignmentsAsync("day1");
+
+        Assert.NotNull(assignments);
+        Assert.Equal(2, assignments.Count);
+        Assert.Equal("text", assignments[0].Lesson!.Value[0].GetProperty("kind").GetString());
+        Assert.Equal("Printing…", assignments[0].Lesson!.Value[0].GetProperty("text").GetString());
+        Assert.Equal("System.out.println(1);", assignments[0].Lesson!.Value[1].GetProperty("code").GetString());
+        Assert.Null(assignments[1].Lesson);
+    }
+
+    [Fact]
     public async Task GetAssignments_SerializedDto_LeaksNothing_AndUsesCamelCase()
     {
         var assignment = AddAssignment("sensitive");
+        assignment.LessonJson = """[{"kind":"text","text":"hi"}]""";
         AddSet("day1", (assignment, 0));
 
         // Serialize with the app's global snake_case policy (Program.cs) to
@@ -122,6 +141,7 @@ public class AssignmentSetServiceTests : IAsyncLifetime
         Assert.DoesNotContain("nonEmptyStdout", json);  // GradingJson
         Assert.DoesNotContain("hint", json);            // null hint omitted entirely
         Assert.Contains("\"content\":", json);
+        Assert.Contains("\"lesson\":", json);
         Assert.Contains("\"kind\":\"code\"", json);
     }
 

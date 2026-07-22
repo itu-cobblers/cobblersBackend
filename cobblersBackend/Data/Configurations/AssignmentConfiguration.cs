@@ -14,6 +14,9 @@ public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
 
         builder.HasIndex(t => t.Slug).IsUnique();
 
+        builder.Property(t => t.LessonJson)
+               .HasColumnType("jsonb");
+
         builder.Property(t => t.ContentJson)
                .HasColumnType("jsonb");
 
