@@ -13,7 +13,7 @@ public sealed class SessionServiceTest : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task CreateSessionAsync_UnkownAssignmentSet_Throws()
+    public async Task CreateSessionAsync_UnknownAssignmentSet_Throws()
     {
         await using var ctx = _fixture.CreateContext();
         var service = new SessionService(ctx);
@@ -91,7 +91,7 @@ public sealed class SessionServiceTest : IAsyncLifetime
         await ctx.SaveChangesAsync();
 
         var service = new SessionService(ctx);
-        var result = await service.GetSessionAsync(""); // null input
+        var result = await service.GetSessionAsync(""); // empty string input
 
         Assert.Null(result);
     }
