@@ -17,7 +17,7 @@ public class AttendanceService : IAttendanceService
     /// (reconnects, refreshes) are the common case, not the exception.
     /// One SaveChanges = one transaction: student + attendance commit together.
     /// </summary>
-    public async System.Threading.Tasks.Task RecordAttendanceAsync(string code, string studentId, string displayName)
+    public async Task RecordAttendanceAsync(string code, string studentId)
     {
         code = SessionCode.Normalize(code);
 
@@ -25,27 +25,22 @@ public class AttendanceService : IAttendanceService
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Code == code)
             ?? throw new InvalidOperationException($"No session with code '{code}'");
+        
 
-        // Upsert the student. FindAsync checks the change tracker before
-        // querying, so it's the natural "get by PK" here.
-        var student = await _db.Student.FindAsync(studentId);
-        if (student is null)
-        {
-            _db.Student.Add(new Student {Id = studentId, DisplayName = displayName});
-        } else if(student.DisplayName != displayName)
-        {
-            student.DisplayName = displayName; // latest name wins (tracked → UPDATE on save)
-        }
+        var student = await _db.Student
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == studentId)
+            ?? throw new InvalidOperationException($"No student '{studentId}'");
 
         // Insert attendance only on first join. JoinedAt is DB-owned (DEFAULT now())
         // and never touched on rejoin — so it means "first joined", by design.
         var attended = await _db.Attendance.AnyAsync(
-            a => a.StudentId == studentId && a.SessionId == session.SessionId);
+            a => a.StudentId == student.Id && a.SessionId == session.SessionId);
         if(!attended)
         {
             _db.Attendance.Add(new Attendance
             {
-                StudentId = studentId,
+                StudentId = student.Id,
                 SessionId = session.SessionId
             });
         }

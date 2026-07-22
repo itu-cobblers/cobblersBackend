@@ -20,11 +20,11 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
         var service = new AttendanceService(ctx);
 
         // Then
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RecordAttendanceAsync("nope","wrong","dupe"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RecordAttendanceAsync("nope","wrong"));
     }
 
     [Fact]
-    public async Task RecordAttendanceAsync_FirstJoin_CreateStudentAndAttendance()
+    public async Task RecordAttendanceAsync_UnknownStudent_Throws()
     {
         // Given
         string sessionCode;
@@ -42,10 +42,35 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
         // When
         await using var ctx = _fixture.CreateContext();
         var service = new AttendanceService(ctx);
-        await service.RecordAttendanceAsync(sessionCode, "student-1", "Maria");
 
         // Then
-        Assert.Equal(1, await ctx.Student.CountAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RecordAttendanceAsync(sessionCode,"student-1"));
+    }
+
+    [Fact]
+    public async Task RecordAttendanceAsync_KnownStudent_CreatesAttendance()
+    {
+        // Given
+        string sessionCode;
+        await using (var setup = _fixture.CreateContext())
+        {
+            var assignmentSet = TestData.MakeAssignmentSet();
+            setup.AssignmentSet.Add(assignmentSet);
+            await setup.SaveChangesAsync();
+            var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
+            setup.Session.Add(session);
+            await setup.SaveChangesAsync();
+            setup.Student.Add(TestData.MakeStudent("student-1", "Maria"));
+            await setup.SaveChangesAsync();
+            sessionCode = session.Code;
+        }
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new AttendanceService(ctx);
+        await service.RecordAttendanceAsync(sessionCode, "student-1");
+
+        // Then
         Assert.Equal(1, await ctx.Attendance.CountAsync());
 
     }
@@ -63,46 +88,19 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
             var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
             setup.Session.Add(session);
             await setup.SaveChangesAsync();
+            setup.Student.Add(TestData.MakeStudent("student-1", "Maria"));
+            await setup.SaveChangesAsync();
             sessionCode = session.Code;
         }
 
         // When
         await using var ctx = _fixture.CreateContext();
         var service = new AttendanceService(ctx);
-        await service.RecordAttendanceAsync(sessionCode, "student-1", "Maria");
-        await service.RecordAttendanceAsync(sessionCode, "student-1", "Maria");
+        await service.RecordAttendanceAsync(sessionCode, "student-1");
+        await service.RecordAttendanceAsync(sessionCode, "student-1");
 
         // Then
         Assert.Equal(1, await ctx.Student.CountAsync());
-        Assert.Equal(1, await ctx.Attendance.CountAsync());
-
-    }
-
-    [Fact]
-    public async Task RecordAttendanceAsync_RejoinWithNewDisplayName_UpdatesStudent()
-    {
-        // Given
-        string sessionCode;
-        await using (var setup = _fixture.CreateContext())
-        {
-            var assignmentSet = TestData.MakeAssignmentSet();
-            setup.AssignmentSet.Add(assignmentSet);
-            await setup.SaveChangesAsync();
-            var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
-            setup.Session.Add(session);
-            await setup.SaveChangesAsync();
-            sessionCode = session.Code;
-        }
-
-        // When
-        await using var ctx = _fixture.CreateContext();
-        var service = new AttendanceService(ctx);
-        await service.RecordAttendanceAsync(sessionCode, "student-1", "Maria");
-        await service.RecordAttendanceAsync(sessionCode, "student-1", "Marianne");
-
-        // Then
-        await using var read = _fixture.CreateContext();
-        Assert.Equal("Marianne", (await read.Student.SingleAsync()).DisplayName);
         Assert.Equal(1, await ctx.Attendance.CountAsync());
 
     }
@@ -124,6 +122,8 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
             var session2 = TestData.MakeSession(assignmentSet.AssignmentSetId);
             setup.Session.Add(session2);
             await setup.SaveChangesAsync();
+            setup.Student.Add(TestData.MakeStudent("student-1", "Maria"));
+            await setup.SaveChangesAsync();
             sessionCode1 = session1.Code;
             sessionCode2 = session2.Code;
         }
@@ -131,8 +131,8 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
         // When
         await using var ctx = _fixture.CreateContext();
         var service = new AttendanceService(ctx);
-        await service.RecordAttendanceAsync(sessionCode1, "student-1", "Maria");
-        await service.RecordAttendanceAsync(sessionCode2, "student-1", "Maria");
+        await service.RecordAttendanceAsync(sessionCode1, "student-1");
+        await service.RecordAttendanceAsync(sessionCode2, "student-1");
 
         // Then
         Assert.Equal(1, await ctx.Student.CountAsync());
@@ -153,15 +153,19 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
             var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
             setup.Session.Add(session);
             await setup.SaveChangesAsync();
+            setup.Student.Add(TestData.MakeStudent("student-1", "Maria"));
+            setup.Student.Add(TestData.MakeStudent("student-2", "Joe"));
+            setup.Student.Add(TestData.MakeStudent("student-3", "Valarie"));
+            await setup.SaveChangesAsync();
             sessionCode = session.Code;
         }
 
         // When
         await using var ctx = _fixture.CreateContext();
         var service = new AttendanceService(ctx);
-        await service.RecordAttendanceAsync(sessionCode, "student-1", "Maria");
-        await service.RecordAttendanceAsync(sessionCode, "student-2", "Joe");
-        await service.RecordAttendanceAsync(sessionCode, "student-3", "Valarie");
+        await service.RecordAttendanceAsync(sessionCode, "student-1");
+        await service.RecordAttendanceAsync(sessionCode, "student-2");
+        await service.RecordAttendanceAsync(sessionCode, "student-3");
 
         // Then
         var roster = await service.GetAttendanceAsync(sessionCode);
