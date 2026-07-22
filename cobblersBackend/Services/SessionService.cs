@@ -16,8 +16,13 @@ public class SessionService : ISessionService
     private const int MaxCodeRetries = 5;
 
     private readonly CobblersDbContext _db;
+    private readonly Func<string> _generateCode;
 
-    public SessionService(CobblersDbContext db) => _db = db;
+    public SessionService(CobblersDbContext db, Func<string>? generateCode = null)  
+    {
+        _db = db;
+        _generateCode = generateCode ?? GenerateCode;
+    }
 
     public async Task<string> CreateSessionAsync(string assignmentSetId)
     {
@@ -31,7 +36,7 @@ public class SessionService : ISessionService
         var session = new Session
         {
             SessionId = Guid.NewGuid().ToString(),
-            Code = GenerateCode(),
+            Code = _generateCode(),
             AssignmentSetId = assignmentSetId
             // CreateAt: DB-owned (DEFAULT now()), never set here
         };
@@ -48,7 +53,7 @@ public class SessionService : ISessionService
                 when (ex.InnerException is PostgresException { SqlState: "23505" }
                       && attempt < MaxCodeRetries)
             {
-                session.Code = GenerateCode(); // same tracked entity, retry
+                session.Code = _generateCode(); // same tracked entity, retry
             }
         }
     }
