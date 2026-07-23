@@ -39,6 +39,7 @@ public class AssignmentSetService : IAssignmentSetService
                 m.Assignment.Kind,
                 m.Assignment.Title,
                 m.Assignment.Description,
+                m.Assignment.LessonJson,
                 m.Assignment.Hint,
                 m.Assignment.ContentJson,
             })
@@ -50,6 +51,7 @@ public class AssignmentSetService : IAssignmentSetService
                 r.Kind.ToString().ToLowerInvariant(),
                 r.Title,
                 r.Description,
+                r.LessonJson is null ? null : JsonSerializer.Deserialize<JsonElement>(r.LessonJson),
                 r.Hint,
                 JsonSerializer.Deserialize<JsonElement>(r.ContentJson)))
             .ToList();

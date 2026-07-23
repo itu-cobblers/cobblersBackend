@@ -12,13 +12,15 @@ public record AssignmentSetSummaryDto(
 
 /// <summary>
 /// One assignment as served to students. Deliberately excludes the sample
-/// solution, grading rules, and slug (see SCHEMA.md) — Content is the stored
-/// jsonb passed through verbatim, so its camelCase keys survive the serializer policy.
+/// solution, grading rules, and slug (see SCHEMA.md) — Lesson and Content are
+/// the stored jsonb passed through verbatim, so their camelCase keys survive
+/// the serializer policy.
 /// </summary>
 public record AssignmentDto(
     [property: JsonPropertyName("id")] int Id,
     [property: JsonPropertyName("kind")] string Kind,
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("description")] string Description,
+    [property: JsonPropertyName("lesson"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? Lesson,
     [property: JsonPropertyName("hint"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Hint,
     [property: JsonPropertyName("content")] JsonElement Content);

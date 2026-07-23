@@ -89,7 +89,7 @@ public class AssignmentGraderTests
     [Fact]
     public void Any_AcceptsEitherSpelling()
     {
-        // hello-world's real seeded rule
+        // any-combinator example (accept either spelling)
         var rule = """
             {"any": [
               {"target": "stdout", "op": "containsLine", "value": "Hello World!"},
