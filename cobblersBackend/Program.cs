@@ -17,7 +17,7 @@ builder.Services.AddScoped<IExecuteResultClassifier,JavaExecuteResultClassifier>
 builder.Services.AddSingleton<IAssignmentGrader>(_ => new AssignmentGrader());
 builder.Services.AddScoped<IAssignmentSetService, AssignmentSetService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
-
+builder.Services.AddScoped<ISubmissionService, SubmissionService>();
 
 builder.Services.AddHttpClient<IPistonClient, PistonClient>(client =>
 {
