@@ -28,7 +28,7 @@ public class SubmissionService : ISubmissionService
             return null;
         
         if (!await _db.Student.AnyAsync(s => s.Id == request.StudentId))
-            throw new InvalidOperationException($" No student '{request.StudentId}'");
+            throw new InvalidOperationException($"No student '{request.StudentId}'");
         
 
         string? sessionId = null;
