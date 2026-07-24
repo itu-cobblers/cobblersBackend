@@ -4,6 +4,10 @@ permissions:
   contents: read
   packages: write
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches: [main]

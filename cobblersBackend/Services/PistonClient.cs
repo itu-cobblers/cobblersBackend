@@ -1,4 +1,5 @@
 // Services/PistonClient.cs
+using System.Diagnostics;
 using System.Net.Http.Json;
 using cobblersBackend.Models;
 
@@ -7,14 +8,17 @@ namespace cobblersBackend.Services;
 public class PistonClient : IPistonClient
 {
     private readonly HttpClient _httpClient;
+    private readonly IExecutionMetrics _metrics;
 
-    public PistonClient(HttpClient httpClient)
+    public PistonClient(HttpClient httpClient, IExecutionMetrics metrics)
     {
         _httpClient = httpClient;
+        _metrics = metrics;
     }
 
     public async Task<PistonExecuteResponse> ExecuteAsync(string language, string code)
     {
+        var stopwatch = Stopwatch.StartNew();
         var request = new PistonExecuteRequest
         {
             Language = language,
@@ -28,10 +32,30 @@ public class PistonClient : IPistonClient
             }
         };
 
-        var httpResponse = await _httpClient.PostAsJsonAsync("api/v2/execute", request);
-        httpResponse.EnsureSuccessStatusCode();
+        try
+        {
+            var httpResponse = await _httpClient.PostAsJsonAsync("api/v2/execute", request);
+            stopwatch.Stop();
+            _metrics.ObservePistonDuration(
+                httpResponse.IsSuccessStatusCode ? "success" : "http_error",
+                stopwatch.Elapsed.TotalSeconds);
 
-        var result = await httpResponse.Content.ReadFromJsonAsync<PistonExecuteResponse>();
-        return result ?? throw new InvalidOperationException("Piston returned an empty response body.");
+            httpResponse.EnsureSuccessStatusCode();
+
+            var result = await httpResponse.Content.ReadFromJsonAsync<PistonExecuteResponse>();
+            return result ?? throw new InvalidOperationException("Piston returned an empty response body.");
+        }
+        catch (HttpRequestException)
+        {
+            stopwatch.Stop();
+            _metrics.ObservePistonDuration("http_error", stopwatch.Elapsed.TotalSeconds);
+            throw;
+        }
+        catch (TaskCanceledException)
+        {
+            stopwatch.Stop();
+            _metrics.ObservePistonDuration("timeout", stopwatch.Elapsed.TotalSeconds);
+            throw;
+        }
     }
 }
