@@ -28,7 +28,7 @@ public class SubmissionService : ISubmissionService
             return null;
         
         if (!await _db.Student.AnyAsync(s => s.Id == request.StudentId))
-            throw new InvalidOperationException($" No student '{request.StudentId}");
+            throw new InvalidOperationException($" No student '{request.StudentId}'");
         
 
         string? sessionId = null;
@@ -37,7 +37,7 @@ public class SubmissionService : ISubmissionService
             var code = SessionCode.Normalize(request.SessionId);
             var session = await _db.Session.AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Code == code)
-                ?? throw new InvalidOperationException($"No session with code '{request.SessionId}");
+                ?? throw new InvalidOperationException($"No session with code '{request.SessionId}'");
             sessionId = session.SessionId;
         }
 
@@ -70,7 +70,7 @@ public class SubmissionService : ISubmissionService
 
         bool? passed = assignment.GradingJson is null
             ? null
-            : _grader.Grade(assignment.ContentJson, new CheckResult(
+            : _grader.Grade(assignment.GradingJson, new CheckResult(
                 content.GetString()!,
                 executed.Stdout,
                 executed.Stderr,
