@@ -10,10 +10,10 @@ namespace cobblersBackend.Services;
 public class SubmissionService : ISubmissionService
 {
     private readonly CobblersDbContext _db;
-    private readonly ExecutorService _executor;
+    private readonly IExecutorService _executor;
     private readonly IAssignmentGrader _grader;
 
-    public SubmissionService(CobblersDbContext db, ExecutorService executor, IAssignmentGrader grader)
+    public SubmissionService(CobblersDbContext db, IExecutorService executor, IAssignmentGrader grader)
     {
         _db = db;
         _executor = executor;

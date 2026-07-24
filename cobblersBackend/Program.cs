@@ -10,7 +10,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
                        ?? throw new InvalidOperationException("ConnectionStrings__DefaultConnection not set");
 
 // Add services to the container.
-builder.Services.AddScoped<ExecutorService>();
+builder.Services.AddScoped<IExecutorService, ExecutorService>();
 builder.Services.AddScoped<IExecuteResultClassifier,JavaExecuteResultClassifier>();
 // Stateless rule evaluator for Assignment.GradingJson; the no-arg construction
 // means no custom (slug-keyed) checks are registered — none are needed today.
