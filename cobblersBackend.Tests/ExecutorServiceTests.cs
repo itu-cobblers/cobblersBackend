@@ -16,8 +16,9 @@ public sealed class ExecutorServiceTests
             {
                 Run = new PistonStage("42\n", "", "42\n", 0, null)
             });
-        
-        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier());
+
+        var fakeMetrics = new Mock<IExecutionMetrics>();
+        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier(), fakeMetrics.Object);
 
         // Act
         var result = await service.ExecuteAsync("public class Main { ... }");
@@ -37,8 +38,9 @@ public sealed class ExecutorServiceTests
             {
                 Run = new PistonStage("", "Main.java:3: error: ';' expected", "", 1, null)
             });
-        
-        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier());
+
+        var fakeMetrics = new Mock<IExecutionMetrics>();
+        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier(), fakeMetrics.Object);
 
         // Act
         var result = await service.ExecuteAsync("public class Main { ... }");
@@ -58,8 +60,9 @@ public sealed class ExecutorServiceTests
             {
                 Run = new PistonStage("", "Exception in thread \"main\" java.lang.ArithmeticException: / by zero", "", 1, null)
             });
-        
-        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier());
+
+        var fakeMetrics = new Mock<IExecutionMetrics>();
+        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier(), fakeMetrics.Object);
 
         // Act
         var result = await service.ExecuteAsync("public class Main { ... }");
@@ -79,8 +82,9 @@ public sealed class ExecutorServiceTests
             {
                 Run = new PistonStage("", "killed", "", 137, null)
             });
-        
-        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier());
+
+        var fakeMetrics = new Mock<IExecutionMetrics>();
+        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier(), fakeMetrics.Object);
 
         // Act
         var result = await service.ExecuteAsync("public class Main { ... }");
