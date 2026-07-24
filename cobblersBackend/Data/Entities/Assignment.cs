@@ -29,7 +29,8 @@ public class Assignment
     public required string ContentJson { get; set; }
     public string? SampleSolutionJson { get; set; }
     // Serializable grading rules (see SCHEMA.md "Grading rules are data").
-    // Null = not auto-gradable (projects, NIM) or graded generically (predict).
+    // Null = not auto-gradable (e.g. projects). Predict uses
+    // { "predict": { compare, expectedOutput, accept? } }.
     public string? GradingJson { get; set; }
 
     public ICollection<AssignmentSetAssignment> AssignmentSets { get; set; } = [];

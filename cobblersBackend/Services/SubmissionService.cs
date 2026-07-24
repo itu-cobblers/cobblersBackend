@@ -63,9 +63,17 @@ public class SubmissionService : ISubmissionService
 
     private async Task<(ExecuteResponseDto? Result, bool? Passed)> RunAndGradeAsync(Assignment assignment, JsonElement content)
     {
-        if (assignment.Kind != AssignmentKind.Code)
-            return (null, null);
-        
+        return assignment.Kind switch
+        {
+            AssignmentKind.Code => await GradeCodeAsync(assignment, content),
+            AssignmentKind.Predict => (null, GradePredict(assignment, content)),
+            // Project: no automated grader yet (CONTRACT.md / SCHEMA.md).
+            _ => (null, null),
+        };
+    }
+
+    private async Task<(ExecuteResponseDto? Result, bool? Passed)> GradeCodeAsync(Assignment assignment, JsonElement content)
+    {
         var executed = await _executor.ExecuteAsync(content.GetString()!);
 
         bool? passed = assignment.GradingJson is null
@@ -77,6 +85,25 @@ public class SubmissionService : ISubmissionService
                 executed.Status == ExecuteStatus.SUCCESS ? 0 : 1)).Passed;
 
         return (executed, passed);
+    }
+
+    /// <summary>
+    /// Grade a predict answer from GradingJson `{ "predict": { compare, expectedOutput, accept? } }`.
+    /// Nothing is executed — result stays null.
+    /// </summary>
+    private bool? GradePredict(Assignment assignment, JsonElement content)
+    {
+        if (assignment.GradingJson is null) return null;
+
+        var answer = content.ValueKind == JsonValueKind.String
+            ? content.GetString() ?? ""
+            : content.GetRawText();
+
+        return _grader.Grade(assignment.GradingJson, new CheckResult(
+            answer,
+            Stdout: "",
+            Stderr: "",
+            ExitCode: 0)).Passed;
     }
 
 }

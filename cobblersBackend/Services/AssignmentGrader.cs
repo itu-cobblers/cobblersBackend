@@ -14,11 +14,13 @@ namespace cobblersBackend.Services;
 ///   { "target": "stdout"|"code", "op": "regex", "pattern": "...", "flags": "i"? }
 ///   { "op": "nonEmptyStdout" }
 ///   { "op": "custom", "key": "&lt;slug&gt;" }   // escape hatch, C# registry keyed by slug
+///   { "predict": { "compare": "normalized"|"exact", "expectedOutput": "...", "accept"?: [...] } }
 ///
-/// Grading only runs on a successful execution — non-zero (or missing) exit
-/// code fails before any rule is evaluated. Output matching mirrors the
-/// frontend's old grade.ts semantics: lenient about surrounding whitespace,
-/// otherwise faithful.
+/// For code rules, grading only runs on a successful execution — non-zero (or
+/// missing) exit code fails before any rule is evaluated. Predict documents
+/// skip execution and compare CheckResult.Code to expectedOutput. Output
+/// matching mirrors the frontend's old grade.ts / predict.ts semantics:
+/// lenient about surrounding whitespace, otherwise faithful.
 ///
 /// Malformed rules throw ArgumentException — a broken seed should fail loudly,
 /// not silently pass/fail students.
@@ -34,11 +36,53 @@ public class AssignmentGrader : IAssignmentGrader
 
     public Verdict Grade(string gradingJson, CheckResult result)
     {
+        using var doc = JsonDocument.Parse(gradingJson);
+
+        // Predict quizzes use a dedicated document shape (see seed grading_json):
+        //   { "predict": { "compare": "normalized", "expectedOutput": "...", "accept"?: [...] } }
+        // No Piston run — the student's typed answer is in CheckResult.Code.
+        if (doc.RootElement.TryGetProperty("predict", out var predict))
+            return new Verdict(EvaluatePredict(predict, result.Code));
+
         if (result.ExitCode is not 0)
             return new Verdict(false);
 
-        using var doc = JsonDocument.Parse(gradingJson);
         return new Verdict(Evaluate(doc.RootElement, result));
+    }
+
+    /// <summary>
+    /// Compare a predict-quiz answer to expectedOutput (+ optional accept phrases),
+    /// mirroring the frontend's old predict.ts semantics.
+    /// </summary>
+    private static bool EvaluatePredict(JsonElement predict, string answer)
+    {
+        if (predict.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException($"Predict grading rule must be an object, got {predict.ValueKind}.");
+
+        var compare = predict.TryGetProperty("compare", out var compareElement)
+            ? compareElement.GetString() ?? "normalized"
+            : "normalized";
+        var expected = RequiredString(predict, "expectedOutput");
+
+        var matches = compare switch
+        {
+            "normalized" => NormalizeOutput(answer) == NormalizeOutput(expected),
+            "exact" => answer == expected,
+            _ => throw new ArgumentException($"Unknown predict compare mode '{compare}'."),
+        };
+        if (matches) return true;
+
+        if (!predict.TryGetProperty("accept", out var accept) || accept.ValueKind != JsonValueKind.Array)
+            return false;
+
+        var lower = NormalizeOutput(answer).ToLowerInvariant();
+        foreach (var phrase in accept.EnumerateArray())
+        {
+            if (phrase.ValueKind != JsonValueKind.String) continue;
+            var needle = (phrase.GetString() ?? "").Trim().ToLowerInvariant();
+            if (needle.Length > 0 && lower.Contains(needle)) return true;
+        }
+        return false;
     }
 
     private bool Evaluate(JsonElement node, CheckResult result)

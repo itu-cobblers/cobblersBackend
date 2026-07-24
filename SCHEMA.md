@@ -252,9 +252,11 @@ decompose into these primitives (or a close approximation stored in
 `lib/grade.ts`); the frontend's `signals` side-channel stays a client-side
 nicety derived from stdout — the server verdict is just `passed`.
 
-- `Predict` assignments don't use `GradingJson`: their grading is one generic
-  algorithm (normalize + compare against `ContentJson.expectedOutput` /
-  `accept[]`), driven entirely by data already in `Assignment`.
+- `Predict` assignments use a dedicated `GradingJson` document (not the code
+  rule tree):
+  `{ "predict": { "compare": "normalized"|"exact", "expectedOutput": "...", "accept"?: string[] } }`.
+  `ContentJson.expectedOutput` / `accept` stay on the wire for the post-submit
+  reveal UI; the authoritative grade reads `GradingJson` only.
 - `custom` is the escape hatch if a future assignment outgrows the DSL: it resolves
   a handler from a small C# registry keyed by **`Slug`** (stable across
   databases, unlike `Id`). No current assignment needs it — prefer extending the
