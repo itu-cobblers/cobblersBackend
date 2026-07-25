@@ -112,16 +112,24 @@ wouldn't.
 / `ProjectAssignment`, minus `check`):
 
 ```
-Code:    { starter?, stdin?, harness?: { files: [{name, content}], entryClass }, solutionFile? }
+Code:    { starter?, starterFiles?: [{name, content}], entryClass?, stdin?, harness?: { files: [{name, content}], entryClass }, solutionFile? }
 Predict: { snippet, expectedOutput, accept?: string[] }
-Project: { brief, requiredClasses?: string[], entryClass? }
+Project: { brief, requiredClasses?: string[], entryClass? }   // display-only — see below
 ```
+
+For multi-file `Code` assignments (e.g. `person-class`, `flight-ticket-class`, `container-class`), `ContentJson.starterFiles` provides initial templates for each file in the editor (e.g. `Main.java` + `Person.java`), and `entryClass` specifies which class contains the `main` method. Single-file assignments continue to use `starter`.
+
+`Project.entryClass`/`requiredClasses` describe the eventual VS Code solution
+shape (useful copy for the brief, e.g. "your `Main` should call a `Tree`
+class") — they're **not** consumed by any endpoint today, since `Project`
+never reaches `execute`/`submission` (see
+[Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)).
 
 `SampleSolutionJson` shape by kind:
 
 ```
-Code:    string                    // one Java source file, same shape as `starter`
-Project: [{ name, content }]       // reference files, same shape as `harness.files`
+Code:    string | [{ name, content }]     // single file string or multi-file array
+Project: [{ name, content }]             // reference files, same shape as `harness.files`
 Predict: not used — ContentJson.expectedOutput already is the answer
 ```
 
@@ -132,7 +140,7 @@ Predict: not used — ContentJson.expectedOutput already is the answer
 | `StudentId` | FK → Student | |
 | `AssignmentId` | FK → Assignment | |
 | `SessionId` | FK → Session, **nullable** | Null for solo/practice submissions made without ever joining a room. See [Design decisions](#sessionid-is-nullable-on-submission). |
-| `ContentJson` | json | Full submitted payload — a string for Code/Predict, `SourceFile[]` for Project. |
+| `ContentJson` | json | Full submitted payload — a string for single-file Code/Predict, `SourceFile[]` (`[{name, content}]`) for multi-file Code. |
 | `ResultJson` | json? | Full raw execution result (`stdout`/`stderr`/`exitCode`) for Code/Project. Null for Predict (no execution happens). |
 | `Passed` | bool? | Server-computed verdict (see [Design decisions](#grading-rules-are-data-evaluated-by-one-backend-engine)). Null = not automatically gradable (e.g. Project today). |
 | `SubmittedAt` | datetime | **DB-owned** — stamped `now()` on insert, not nullable. Needed to order history and to tell submissions apart. See [Value generation](#value-generation--who-owns-each-column). |
@@ -262,15 +270,27 @@ nicety derived from stdout — the server verdict is just `passed`.
   databases, unlike `Id`). No current assignment needs it — prefer extending the
   DSL with a new op over reaching for `custom`.
 
-`Project` assignments have no automated check today (same as the frontend currently
-— they're manually reviewed). `Submission.Passed` stays `null` for them; this
-is an existing gap, not a regression introduced by this design.
+`Project` assignments have no automated check today, and — as of the
+[mini-projects-are-VS-Code-only decision](#mini-projects-are-vs-code-only) —
+never will need one through this app: nothing ever calls `execute` or
+`submission` for `kind: "project"`, so `Submission.Passed` for `Project`
+isn't just `null` today, it's a row that will never exist at all.
 
-> Known follow-on work: running a `Project` submission at all requires
-> `PistonClient` to support multi-file execution — it currently hardcodes a
-> single `Main.java` (see [CLAUDE.md](CLAUDE.md), "Java-only, single-class
-> assumption"). Automated grading for `Project` submissions is unblocked by,
-> but separate from, that change.
+> **Multi-file execution is still needed** — `PistonClient` currently hardcodes a single `Main.java` (see [CLAUDE.md](CLAUDE.md), "Java-only, single-class assumption"), and must be updated to support sending multiple files (`{ name, content }[]`) to Piston. The Day-3 `Code`-kind multi-file assignments (`person-class`, `flight-ticket-class`, `container-class`) send multiple student-editable files directly in `execute` and `submission`.
+
+### Mini-projects are VS-Code-only
+The three Day-3 mini-projects (`build-a-tree`, `grandpas-time-machine`,
+`grandmas-blackmarket-kitchen`) are excluded from `execute`/`submission`
+entirely — see [CONTRACT.md](CONTRACT.md#mini-projects-are-vs-code-only) for
+the full rationale and wire-level consequences. In short: at least one needs
+`Scanner`/interactive `stdin`, which this app's stateless request/response
+`execute` can't drive well, and since students pick **one of the three** to
+work on (they're offered in the same slot, not sequentially), scoping the
+Scanner-free project(s) in and the rest out would make the in-app experience
+depend on which project a student happened to pick. So the whole `Kind.Project`
+enum value is out of scope for `execute`/`submission`, not a per-assignment
+flag — `Assignment.ContentJson` for `Project` needs no new field to express
+this, and no schema change is needed to implement it.
 
 ### `Code` uniqueness is global
 `Session.Code` was originally scoped `UNIQUE (Code, Year)` so a code could be
@@ -349,7 +369,7 @@ record of who attended.
 
 ## Open decisions
 
-- [ ] How does a `Project` submission ever get `Passed = true` — manual teacher review needs an endpoint/UI, which doesn't exist yet.
+- [x] How does a `Project` submission ever get `Passed = true`? — **resolved by scoping it out**, not by building manual review: `Project` is excluded from `execute`/`submission` altogether (see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)), so there's no `Submission` row to review in the first place. Manual review of an uploaded solution is no longer on the table unless this decision is revisited.
 - [x] Migration of the 34 existing frontend assignments into `Assignment` rows — done via the idempotent
       [scripts/seed-tasks.sql](scripts/seed-tasks.sql) (upserts keyed on `Slug`; re-runnable against any environment).
 - [ ] Resume-suggestion tie-break: if more than one `Session` was created "today," which one is suggested — most recent
