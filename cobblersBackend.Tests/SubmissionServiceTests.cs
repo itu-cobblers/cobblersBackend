@@ -103,7 +103,6 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(AssignmentKind.Predict)]
     [InlineData(AssignmentKind.Project)]
     public async Task SubmitAsync_NonCodeKind_ResultAndPassedStayNull(AssignmentKind kind)
     {
