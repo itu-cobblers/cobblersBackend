@@ -48,10 +48,14 @@ jobs:
       - name: SSH and redeploy
         uses: appleboy/ssh-action@v1
         with:
-          host: 68.183.216.189
+          host: 178.105.149.59
           username: root
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
+            cd ~/cobblersBackend
+            git pull
             cd ~/cobblersDevOps
+            docker compose build migrate
+            docker compose up migrate
             docker compose pull backend
             docker compose up -d backend
