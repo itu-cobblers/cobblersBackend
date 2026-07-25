@@ -8,8 +8,8 @@ namespace cobblersBackend.Controllers;
 [Route("api/execute")]
 public class ExecutorController : ControllerBase
 {
-    private readonly ExecutorService _executor;
-    public ExecutorController(ExecutorService executor) => _executor = executor;
+    private readonly IExecutorService _executor;
+    public ExecutorController(IExecutorService executor) => _executor = executor;
 
     [HttpPost]
     public async Task<IActionResult> Execute([FromBody] ExecuteRequestDto request)

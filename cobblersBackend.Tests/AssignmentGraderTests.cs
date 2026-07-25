@@ -139,6 +139,44 @@ public class AssignmentGraderTests
             Grader.Grade("""{"op": "custom", "key": "nobody-home"}""", WithStdout("x")));
     }
 
+    // ── predict quizzes ─────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("10\n9\n8", true)]
+    [InlineData("10  \n9\n8\n", true)]   // trailing whitespace / blank lines tolerated
+    [InlineData("  10\n9\n8", false)]    // leading indent on a line is significant
+    [InlineData("10\n9\n7", false)]
+    public void Predict_NormalizedCompare_MatchesExpectedOutput(string answer, bool expected)
+    {
+        var rule = """
+            {"predict": {"compare": "normalized", "expectedOutput": "10\n9\n8"}}
+            """;
+        Assert.Equal(expected, Grader.Grade(rule, WithCode(answer)).Passed);
+    }
+
+    [Fact]
+    public void Predict_AcceptPhrases_MatchCaseInsensitiveSubstring()
+    {
+        var rule = """
+            {"predict": {
+              "compare": "normalized",
+              "expectedOutput": "infinite loop",
+              "accept": ["never stops", "forever"]
+            }}
+            """;
+        Assert.True(Grader.Grade(rule, WithCode("it Never Stops running")).Passed);
+        Assert.True(Grader.Grade(rule, WithCode("loops forever")).Passed);
+        Assert.False(Grader.Grade(rule, WithCode("stops eventually")).Passed);
+    }
+
+    [Fact]
+    public void Predict_ExactCompare_RequiresByteForByteMatch()
+    {
+        var rule = """{"predict": {"compare": "exact", "expectedOutput": "10\n9"}}""";
+        Assert.True(Grader.Grade(rule, WithCode("10\n9")).Passed);
+        Assert.False(Grader.Grade(rule, WithCode("10\n9\n")).Passed);
+    }
+
     // ── misconfiguration is loud, not a silent verdict ──────────────────────
 
     [Theory]

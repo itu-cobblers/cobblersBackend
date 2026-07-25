@@ -5,7 +5,7 @@ using cobblersBackend.DTOs;
 
 namespace cobblersBackend.Services;
 
-public class ExecutorService
+public class ExecutorService : IExecutorService
 {
     private readonly IPistonClient _piston;
     private readonly IExecuteResultClassifier _classifier;
