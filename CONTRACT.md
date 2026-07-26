@@ -52,6 +52,24 @@ role:         "student" | "teacher"
 Tradeoff we accept: identity is **device/browser-bound**. Clearing the browser
 or switching laptops loses the key. Fine for a 3-day workshop.
 
+### `PUT /api/students/{studentId}` (register/update a display name)
+
+```json
+// request
+{ "displayName": "Maria" }
+
+// → 204 No Content
+```
+
+Upserts the student row server-side. **Required before any `Submission` can
+be written** — `POST /api/assignments/{assignmentId}/submissions` rejects a
+`studentId` it doesn't recognize (see api repo CLAUDE.md, and
+[Submission](#submission) below). The frontend calls this once per
+join/solo/rehydrate (`@lib/studentApi.upsertStudent`), best-effort — a
+failure here doesn't block reaching the IDE; it just means the *next*
+submission will 400, which the submit flow already renders as "not
+submitted" rather than crashing.
+
 > `studentId` (who you are) and **session membership** (which live room you're in)
 > are different things with different lifetimes — see [Sessions](#sessions-rooms).
 > `execute` and `submission` only need `studentId`; only _broadcasts_ are session-scoped.
@@ -93,6 +111,66 @@ connection open); the historical record of who attended does not depend on it.
 `assignmentSetId` comes from [`GET /api/assignmentsets`](#assignments) — the teacher picks one
 before creating the room. See [STORIES.md](STORIES.md) S6.
 
+A session has a **`status`**: `"active"` (default, from creation) or `"ended"`.
+See [SCHEMA.md](SCHEMA.md#sessionstatus) for the column. All session-lookup
+endpoints below (`GET /api/sessions/{code}`, `GET /api/sessions/today-latest`)
+only ever consider `active` sessions — an ended room is invisible to new joins,
+even though its historical `Attendance`/`Submission` rows are untouched.
+
+### `POST /api/sessions/{code}/end` (teacher manually ends a room)
+
+```json
+// no request body
+
+// → 204 No Content
+```
+
+- Sets `Session.Status = "ended"` in the database.
+- Clears the room's in-memory `SessionStore` entry (`SessionStore.RemoveRoom`)
+  — the ephemeral roster/timer for that room stop existing.
+- **Broadcasts** `SessionEnded` (no payload) to every connection in Group `code`.
+- `404 Not Found` if `code` doesn't resolve to any session at all (never
+  existed). Ending a session that's already `ended` still succeeds (`204`) —
+  there's no "already ended" error, since the desired end state is identical.
+
+### `SessionEnded` — SignalR event (server → students in the room)
+
+```json
+// no payload
+```
+
+The student side treats this the same as "the room is gone": it drops any
+local session/room state and **navigates back to the entry screen** — never a
+silent no-op, since continuing to render a room that no longer exists (e.g. a
+teacher could later reuse the code's assignment set for a new session) would
+be misleading. Solo (off-site) students never receive this — no room, no group.
+
+### `GET /api/sessions/today-latest` (student entry screen — is a session live today)
+
+```json
+// → 200 OK — an active session was created today
+{ "code": "ABCD", "assignmentSetId": "day1-2026" }
+
+// → 404 Not Found — no active session created today
+```
+
+Called once, unauthenticated, when the entry screen mounts (`@lib/sessionApi.fetchTodayLatestSession`)
+— no `studentId` involved, since this isn't personalized (unlike the retired
+[Resume suggestion](#resume-suggestion-retired) design below, this doesn't care
+whether *this* student already attended). "Today" is server UTC-midnight to
+now; if more than one session was created today, the most recently created
+`active` one wins (same tie-break as `today-latest` sharing its query shape
+with the retired [resume-suggestion heuristic](SCHEMA.md#welcome-back-resume-suggestion-retired--superseded-by-today-latest)).
+
+**Frontend flow:** the entry screen's "Join current Session" button is
+disabled with "No current active session to join" while this resolves to
+`404`/no session, and enabled with the `code` badge shown inline once one
+exists — clicking it calls `JoinSession` with that `code` directly, same as
+if the student had typed it. A `404` here is an expected, non-error outcome
+("nothing to join right now"), not a fault — the frontend treats it exactly
+like any other non-2xx/network error: "no session today" (button stays
+disabled). This endpoint is a convenience, never a hard blocker to Solo Practice.
+
 ### `JoinSession` — SignalR hub method (student joins a room)
 
 ```
@@ -105,8 +183,8 @@ JoinSession({ code, studentId, displayName })
 
 ```json
 // SessionState (reply to caller only)
-{ "activeTimer": { "endsAt": "2026-06-19T14:30:00Z" } }
- // activeTimer omitted if none
+{ "activeTimer": { "endsAt": "2026-06-19T14:30:00Z" }, "focusedAssignmentId": 101 }
+ // activeTimer / focusedAssignmentId omitted if none — see Follow below
 ```
 
 - On a successful join the server also **broadcasts** `StudentJoined` to the group
@@ -182,6 +260,11 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 // → 200 OK
 { "code": "ABCD", "assignmentSetId": "day1-2026" }
 ```
+
+> Only resolves **active** sessions — `404` for an unknown code *or* a code
+> that exists but has `Status = "ended"` (see [above](#post-apisessionscodeend-teacher-manually-ends-a-room)).
+> A student mid-session whose teacher ends the room is redirected out via the
+> `SessionEnded` broadcast, not by this endpoint 404-ing on the next call.
 
 ### `GET /api/assignmentsets/{assignmentSetId}/assignments` (both cohorts — fetch content)
 
@@ -381,6 +464,38 @@ The timer is a **non-coercive reminder** — nothing is forced if it elapses.
 
 ---
 
+## Follow (teacher → room broadcast)
+
+Unlike the timer, both the trigger and the fan-out go over SignalR — the teacher
+already holds a live hub connection (`ObserveSession`), so there's no need for a
+separate REST endpoint.
+
+### `FocusAssignment` — SignalR hub method (teacher moves to an assignment)
+
+```
+FocusAssignment(code, assignmentId)
+```
+
+- Server stores `assignmentId` as the room's focused assignment (so late joiners /
+  reconnects sync — see `focusedAssignmentId` on `SessionState` above), then
+  **broadcasts** `AssignmentFocused` to every connection in Group `code`.
+- No reply value — this is fire-and-forget from the teacher's point of view.
+
+### `AssignmentFocused` — SignalR event (server → students in the room)
+
+```json
+101
+```
+
+Just the bare `assignmentId` (a number), not wrapped in an object.
+
+The student side is **non-coercive**, same spirit as the timer: it shows a
+"teacher is on _X_ — Follow?" banner rather than force-navigating. The student
+decides whether to jump. Solo (off-site) students never receive this — no room,
+no group.
+
+---
+
 ## Mini-projects are VS-Code-only
 
 All three Day-3 mini-projects (`build-a-tree`, `grandpas-time-machine`,
@@ -499,6 +614,25 @@ Submission history — used for the resume flow (a student returning across the
 ]
 ```
 
+`sessionId` here is the room's **join code** (`Session.Code`, e.g. `"ABCD"`),
+not an internal id — same shape a student typed to join, so the frontend can
+label an attempt "Room ABCD" vs "Solo" without a second lookup. `null` for a
+solo/practice submission. Deliberately thin: no `content`/`result` — see
+[SCHEMA.md](SCHEMA.md#submission) for why this stays a lightweight list, not
+a full replay of each attempt.
+
+> **Status: frontend built, backend not yet implemented** (STORIES.md S5).
+> The frontend's "My Progress" panel (`ProgressModal`, opened from the
+> Toolbar or the entry screen) calls this on load and groups the response by
+> `assignmentId` — showing every attempt, but the assignment-level status is
+> "passed" if **any** attempt has `passed: true` (not the latest attempt,
+> not an average). It also seeds which assignments already show as done in
+> the stepper across a reload or the next day's session. Until the backend
+> route exists, every 404/network error is treated as "no history yet" — an
+> empty list, not an error banner — so this ships ahead of the backend
+> without breaking the rest of the app. Remove that fallback expectation
+> once the endpoint is live and a 404 means something again.
+
 ---
 
 ## Solution
@@ -534,47 +668,29 @@ classroom students** — see [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-o
 
 ---
 
-## Resume suggestion (planned)
+## Resume suggestion (retired)
 
-**Not yet built.** This section is a design plan, written down so frontend
-and backend agree on the approach before either side builds it — see
-[STORIES.md](STORIES.md) S9.
+**Retired — replaced by [`GET /api/sessions/today-latest`](#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today).**
+This section originally planned a *personalized*, per-`studentId` suggestion
+(`GET /api/students/{studentId}/resume-suggestion`, matched against that
+student's `Attendance` history) surfaced via a dismissible `WelcomeBackBanner`
+component. Neither the endpoint nor the component exist anymore.
 
-Goal: a student who attended yesterday's session, and returns today while the
-teacher has already opened a new one, gets prompted to continue in today's
-session instead of manually re-entering a code.
+**Why retired, not just deferred:** the personalization added real complexity
+(a query joining `Attendance`, a banner that could appear over either screen,
+dismiss-state) for a payoff that didn't matter in practice — the workshop runs
+one live class at a time, so "the session I should join" is the same answer
+for every student on a given day, not something that needs *this student's*
+history to compute. `today-latest` answers the simpler, sufficient question
+("is a session live right now?") with no `studentId`, no `Attendance` join,
+and no banner — just a button on the entry screen that's enabled/disabled
+based on the response. See [STORIES.md](STORIES.md) S9 for the before/after.
 
-### `GET /api/students/{studentId}/resume-suggestion`
-
-```json
-// → 200 OK — a newer session exists that this student hasn't joined
-{
-  "suggested": {
-    "code": "WXYZ",
-    "assignmentSetDisplayTitle": "BootIT Day 2 — 2026",
-    "createAt": "2026-06-20T08:00:00Z"
-  }
-}
-
-// → 200 OK — nothing to suggest
-{ "suggested": null }
-```
-
-Matching heuristic (see
-[SCHEMA.md](SCHEMA.md#welcome-back-resume-suggestion-needs-no-new-schema)):
-the most recently created `Session` that this `studentId` does not already
-have an `Attendance` row for. No course/cohort concept — the app assumes one
-active class at a time, so "the newest session" is "today's session."
-
-**Frontend flow:** on load, if `suggested` is non-null, show "Welcome back,
-{displayName}! Continue in today's session {code}?" with a one-click join
-(calls the existing `JoinSession` hub method with that `code`) or a dismiss
-that falls through to the normal join bar / Solo Practice choice.
-
-| Open item                                            | |
-| ----------------------------------------------------- | --- |
-| Multiple sessions created the same day                | Most recent `CreateAt` wins — see [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions). |
-| Prompt UI / component                                 | Not designed yet — this defines the contract, not the component. |
+The tie-break for "which session, if more than one was created today" is
+unchanged from the original design — most recent `CreateAt` wins, now
+filtered to `Status = "active"` too (an ended session is never suggested,
+even if it's the most recent one created). See
+[SCHEMA.md](SCHEMA.md#welcome-back-resume-suggestion-retired--superseded-by-today-latest).
 
 ---
 
@@ -598,8 +714,8 @@ Resolve each _in this file_ before the relevant feature is built.
 - [x] **Sample solution reveal** — see [Solution](#solution). Gating rule decided; endpoint not implemented yet (STORIES.md S8).
 - [x] **Mini-projects are VS-Code-only** — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). `execute`/`submission` are never called for `kind: "project"`, at all, not per-assignment.
 - [x] **Multi-file execution for Day-3 single-class assignments** — see the [harness note](#post-apiexecute) under `execute`. No new wire shape (`files`/`entryClass` was already documented); the open work is `PistonClient` actually sending Piston more than one file (see CLAUDE.md, "Java-only, single-class assumption").
-- [ ] **Resume suggestion** — see [Resume suggestion (planned)](#resume-suggestion-planned). Plan only — not built (STORIES.md S9).
-- [ ] **Session lifetime** — when does a room end (teacher ends it / idle timeout)?
+- [x] **Resume suggestion** — **retired**, see [Resume suggestion (retired)](#resume-suggestion-retired). Replaced end-to-end by [`GET /api/sessions/today-latest`](#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today) (STORIES.md S9).
+- [x] **Session lifetime** — a room ends only when the teacher manually ends it (`POST /api/sessions/{code}/end`, see [Sessions](#sessions-rooms)); no idle timeout. `Session.Status` persists the end so it survives a server restart; `SessionStore`'s in-memory roster/timer for that room are cleared at the same time.
 - [ ] **`ProgressUpdated` broadcast** — teacher sees live per-assignment progress, not just who's online (backlog in STORIES.md).
 
 See [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions) for persistence-layer

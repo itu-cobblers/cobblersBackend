@@ -51,6 +51,9 @@ public class SessionStore
     public int? GetFocusedAssignment(string code) =>
         _rooms.TryGetValue(code, out var session) ? session.FocusedAssignmentId : null;
 
+    /// <summary>Drop all live state (roster/timer/focus) for a room — called once a session ends.</summary>
+    public void RemoveRoom(string code) => _rooms.TryRemove(code, out _);
+
     private sealed class RoomState
     {
         public ConcurrentDictionary<string, StudentDto> Students { get; } = new();

@@ -41,11 +41,12 @@ public static class TestData
         OrderIndex = orderIndex,
     };
 
-    public static Session MakeSession(string assignmentSetId, string? code = null) => new()
+    public static Session MakeSession(string assignmentSetId, string? code = null, SessionStatus status = SessionStatus.Active) => new()
     {
         SessionId = Guid.NewGuid().ToString(),
         Code = code ?? $"CODE{Next()}",
         AssignmentSetId = assignmentSetId,
+        Status = status,
         // CreateAt: not set because DB owns the parameter
     };
 

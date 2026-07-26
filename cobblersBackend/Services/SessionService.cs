@@ -61,9 +61,34 @@ public class SessionService : ISessionService
     public async Task<GetSessionResponse?> GetSessionAsync(string code)
     {
         code = SessionCode.Normalize(code);
+        // Ended rooms resolve as "not found" — a student can't join, and a
+        // teacher can't restart the timer on, a room that's already closed.
         return await _db.Session
             .AsNoTracking()
-            .Where(s => s.Code == code)
+            .Where(s => s.Code == code && s.Status == SessionStatus.Active)
+            .Select(s => new GetSessionResponse(s.Code, s.AssignmentSetId))
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<bool> EndSessionAsync(string code)
+    {
+        code = SessionCode.Normalize(code);
+        var session = await _db.Session.FirstOrDefaultAsync(s => s.Code == code);
+        if (session is null) return false;
+
+        session.Status = SessionStatus.Ended;
+        await _db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<GetSessionResponse?> GetTodayLatestActiveSessionAsync()
+    {
+        // "Today" in UTC — good enough for a single-timezone bootcamp; see SCHEMA.md.
+        var todayStart = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
+        return await _db.Session
+            .AsNoTracking()
+            .Where(s => s.Status == SessionStatus.Active && s.CreateAt >= todayStart)
+            .OrderByDescending(s => s.CreateAt)
             .Select(s => new GetSessionResponse(s.Code, s.AssignmentSetId))
             .FirstOrDefaultAsync();
     }
