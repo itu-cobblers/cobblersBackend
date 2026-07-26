@@ -41,10 +41,21 @@ public class SessionStore
     public TimerInfo? GetTimer(string code) =>
         _rooms.TryGetValue(code, out var session) ? session.ActiveTimer : null;
 
+    /// <summary>Store which assignment the teacher last focused, so late joiners sync to it.</summary>
+    public void SetFocusedAssignment(string code, int assignmentId)
+    {
+        var room = _rooms.GetOrAdd(code, _ => new RoomState());
+        room.FocusedAssignmentId = assignmentId;
+    }
+
+    public int? GetFocusedAssignment(string code) =>
+        _rooms.TryGetValue(code, out var session) ? session.FocusedAssignmentId : null;
+
     private sealed class RoomState
     {
         public ConcurrentDictionary<string, StudentDto> Students { get; } = new();
         public TimerInfo? ActiveTimer { get; set; }
+        public int? FocusedAssignmentId { get; set; }
 
         public IReadOnlyList<StudentDto> Roster() => 
             Students.Values.ToList();

@@ -52,7 +52,7 @@ public class SessionHub : Hub
         await Clients.Group(code).SendAsync("StudentJoined", student);
         await Clients.Group(code).SendAsync("RosterUpdated", roster);
 
-        return new SessionState(_store.GetTimer(code));
+        return new SessionState(_store.GetTimer(code), _store.GetFocusedAssignment(code));
     }
 
     /// <summary>Teacher observes a room. Returns the current roster to the caller.</summary>
@@ -61,6 +61,14 @@ public class SessionHub : Hub
         code = SessionCode.Normalize(code);
         await Groups.AddToGroupAsync(Context.ConnectionId, code);
         return _store.GetRoster(code);
+    }
+
+    /// <summary>Teacher moves to a different assignment. Broadcasts it to the room so every student can follow.</summary>
+    public async Task FocusAssignment(string code, int assignmentId)
+    {
+        code = SessionCode.Normalize(code);
+        _store.SetFocusedAssignment(code, assignmentId);
+        await Clients.Group(code).SendAsync("AssignmentFocused", assignmentId);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
