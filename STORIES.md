@@ -99,15 +99,16 @@ back the next day (or reload), **so that** I don't lose progress or redo
 finished assignments.
 
 - **Transport:** REST
-- **Contract:** [`GET /api/students/{studentId}/submissions`](CONTRACT.md#submission)
-- **Frontend:** ✅ built now — `useStudentSession` fetches history on load (independent of join/solo/entry screen) and seeds `useAssignments`'s completed-assignment set from it (replaces the old local active/completed-key logic), so the stepper shows yesterday's passes without a fresh submission this session. A dedicated **"My Progress"** panel (`ProgressModal`, opened from the Toolbar or a link on the entry screen) lists every catalog assignment with every attempt ever made, grouped by assignment — an assignment shows *Passed* if **any** attempt passed (not the latest, not an average); `project`-kind assignments are excluded (they never submit — see [Mini-projects are VS-Code-only](CONTRACT.md#mini-projects-are-vs-code-only)). Calls the endpoint defensively: any failure (it doesn't exist yet) resolves to `[]`, so the rest of the app behaves as if the student has no history yet, not broken.
-- **Backend:** not built yet — the query itself is straightforward once `Submission` exists; see [SCHEMA.md](SCHEMA.md#submission) for the exact shape (filter + order by `SubmittedAt` desc, join `Session` for the wire `sessionId`/code).
+- **Contract:** [`GET /api/students/{studentId}/submissions`](CONTRACT.md#submission) (thin list) + [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission) (code + result for one attempt, on demand)
+- **Frontend:** ✅ built now — `useStudentSession` fetches the thin history on load (independent of join/solo/entry screen) and seeds `useAssignments`'s completed-assignment set from it (replaces the old local active/completed-key logic), so the stepper shows yesterday's passes without a fresh submission this session. The **Submissions tab** of `AssignmentPanel` lists that assignment's attempts (outcome badge + timestamp only, from the thin list) — an assignment shows *Passed* if **any** attempt passed (not the latest, not an average); `project`-kind assignments are excluded (they never submit — see [Mini-projects are VS-Code-only](CONTRACT.md#mini-projects-are-vs-code-only)). Calls the list endpoint defensively: any failure (it doesn't exist yet) resolves to `[]`, so the rest of the app behaves as if the student has no history yet, not broken. **Not built yet:** clicking a row to fetch that attempt's code + result via the detail endpoint — today the Submissions tab only shows the outcome, no replay.
+- **Backend:** not built yet — the list query is straightforward once `Submission` exists; see [SCHEMA.md](SCHEMA.md#submission) for the exact shape (filter + order by `SubmittedAt` desc, join `Session` for the wire `sessionId`/code). The detail-by-`subId` read is a second, trivial query — see [CONTRACT.md](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission).
 - **Depends on:** S2 (persisted submissions); [Identity](CONTRACT.md#identity-no-registration) (`studentId` survives in `localStorage` across days).
 - **Decisions already made:**
   - Completion is derived from `Submission.passed` server-side, not a
     client-side id list — this retires the frontend's old
     active/completed-key hack. See [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).
-  - An assignment's status is "passed" if **any** submission for it passed — the frontend still lists every attempt (My Progress), it just doesn't gate "done" on the *latest* one.
+  - An assignment's status is "passed" if **any** submission for it passed — the frontend still lists every attempt (Submissions tab), it just doesn't gate "done" on the *latest* one.
+  - The list endpoint stays thin (no `content`/`result` per row); a student wanting to see their own past code/output calls the same shared [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission) the teacher dashboard uses (S10) — one detail route, not a student-specific widening of the list.
 - **Open questions:**
   - [ ] A student who loses their `studentId` (new browser/device) has no
     recovery path today — treated as a brand-new student. Accepted risk, not solved.
@@ -248,17 +249,18 @@ sent back to the entry screen.
 after I reload, reconnect, or the server restarts, **so that** I don't lose
 the class's state just because a connection dropped.
 
-- **Transport:** REST (hydration) + SignalR (live deltas — existing `StudentJoined`, plus a backlog `ProgressUpdated`)
-- **Contract:** [`GET /api/sessions/{code}/attendance`](CONTRACT.md#teacher-dashboard-hydration-attendance--progress), [`GET /api/sessions/{code}/progress`](CONTRACT.md#teacher-dashboard-hydration-attendance--progress)
-- **Frontend:** not built — on dashboard load, hydrate the roster from `/attendance` and pass status from `/progress`, **then** start `ObserveSession` for live `StudentJoined`. Today the dashboard has only the live layer, so a reconnecting teacher sees just who's currently connected — anyone who stepped away has vanished.
-- **Backend:** not built — needs persisted `Attendance` + `Submission` (see [SCHEMA.md](SCHEMA.md)); the queries themselves are straightforward reads.
+- **Transport:** REST (hydration) + SignalR (live deltas — `AttendanceUpdated` / `ProgressUpdated`, superseding `StudentJoined`/`RosterUpdated`)
+- **Contract:** ✅ decided — [`GET /api/sessions/{code}/attendance`](CONTRACT.md#get-apisessionscodeattendance-teacher-roster-hydration), [`GET /api/sessions/{code}/progress`](CONTRACT.md#get-apisessionscodeprogress-teacher--per-assignment-per-student-status), [`GET /api/sessions/{code}/assignments/{assignmentId}/submissions`](CONTRACT.md#get-apisessionscodeassignmentsassignmentidsubmissions-teacher--submission-history-for-one-assignment-in-this-room) (thin list) + [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission) (code + result for the row Col 4 has selected), [`AttendanceUpdated` / `ProgressUpdated`](CONTRACT.md#live-progress-broadcasts-server--teacher-observers-in-the-room).
+- **Frontend:** not built — on dashboard load, hydrate the roster from `/attendance` and pass status from `/progress`, **then** start `ObserveSession` and subscribe to `AttendanceUpdated`/`ProgressUpdated` for live deltas instead of `StudentJoined`/`RosterUpdated`. Col 4's read-only code+result view (currently a `mockSubmissions` placeholder in `TeacherDashboard.tsx`) wires up to the session+assignment list for Col 3's attempt rows, then calls the shared detail endpoint for whichever `subId` is selected. Today the dashboard has only the live layer, so a reconnecting teacher sees just who's currently connected — anyone who stepped away has vanished.
+- **Backend:** not built — needs persisted `Attendance` + `Submission` (see [SCHEMA.md](SCHEMA.md)); the queries themselves are straightforward reads. The two broadcasts hook into the existing `Attendance` join/leave path and `SubmissionService`'s grading step respectively.
 - **Depends on:** S2 (persisted submissions); persisted Sessions / Attendance (SCHEMA.md).
 - **Decisions already made:**
   - Live roster (`ObserveSession`) and persisted attendance are **different reads** — the first is who's connected now, the second is who attended. Don't conflate them; the teacher side needs a REST hydration layer mirroring the student side's `SessionState`.
-  - "passed" is per-(student, assignment) EXISTS a passing submission, **not** a row average; `project` assignments (`passed = null`) are excluded from pass lists. See [CONTRACT.md](CONTRACT.md#teacher-dashboard-hydration-attendance--progress).
-- **Open questions:**
-  - [ ] Live per-assignment progress push (`ProgressUpdated`) so the dashboard updates without re-fetching — still backlog.
-- **Done when:** a teacher who reloads mid-class sees the full roster of everyone who joined **and** each student's passed assignments, not just who's currently connected.
+  - "passed" is per-(student, assignment) EXISTS a passing submission, **not** a row average; `project` assignments (`passed = null`) are excluded from pass lists. See [CONTRACT.md](CONTRACT.md#get-apisessionscodeprogress-teacher--per-assignment-per-student-status).
+  - `/attendance`'s active-student set is the shared denominator for `passedNum`/`totalNum` everywhere in the dashboard — a student who left stops counting even though their `Submission` history isn't deleted.
+  - Both submission-history `GET` list endpoints (this one, and S5's student-facing one) stay **thin** — `subId` + outcome, no `content`/`result`. Either side gets the actual code + result the same way: one shared [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission), fetched only for the one row currently selected. No teacher-only "fat" list endpoint.
+  - `AttendanceUpdated`/`ProgressUpdated` are point-patch deltas (one row each), not full-list re-broadcasts — the dashboard applies them to whatever it hydrated from the `GET`s rather than re-fetching.
+- **Done when:** a teacher who reloads mid-class sees the full roster of everyone who joined **and** each student's passed assignments, not just who's currently connected — and Col 1's pass-rate badges / Col 2's status dots update live off the two broadcasts without re-polling.
 
 ---
 
@@ -300,7 +302,7 @@ titles.
 
 Stub stories — flesh out before building.
 
-- Teacher sees live student progress via a `ProgressUpdated` broadcast (the live-delta half of S10 — hydration is defined; the push is not).
+- ~~Teacher sees live student progress via a `ProgressUpdated` broadcast~~ — contract decided, see [S10](#s10--teacher-re-syncs-full-attendance--progress-on-reconnect) and [CONTRACT.md](CONTRACT.md#live-progress-broadcasts-server--teacher-observers-in-the-room); not yet implemented.
 - Student picks an assignment from the sidebar.
 - ~~Teacher manually marks a `project` submission as passed/failed~~ — dropped, not deferred: `project` no longer submits at all (see [CONTRACT.md](CONTRACT.md#mini-projects-are-vs-code-only)), so there's nothing to review in-app.
 - Multi-file execution in `PistonClient`/`ExecutorService` — needed to actually run the Day-3 single-class assignments (`person-class`/`flight-ticket-class`/`container-class`) via `execute`'s `harness`; see [CONTRACT.md](CONTRACT.md#post-apiexecute) and [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine). This is an implementation gap, not a contract gap — `files`/`entryClass` are already documented.
