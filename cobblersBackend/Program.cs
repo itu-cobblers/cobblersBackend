@@ -17,6 +17,7 @@ builder.Services.AddScoped<IExecuteResultClassifier,JavaExecuteResultClassifier>
 // means no custom (slug-keyed) checks are registered — none are needed today.
 builder.Services.AddSingleton<IAssignmentGrader>(_ => new AssignmentGrader());
 builder.Services.AddScoped<IAssignmentSetService, AssignmentSetService>();
+builder.Services.AddScoped<IAssignmentSolutionService, AssignmentSolutionService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ISubmissionService, SubmissionService>();
 

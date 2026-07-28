@@ -24,3 +24,14 @@ public record AssignmentDto(
     [property: JsonPropertyName("lesson"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? Lesson,
     [property: JsonPropertyName("hint"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Hint,
     [property: JsonPropertyName("content")] JsonElement Content);
+
+/// <summary>
+/// GET /api/assignments/{assignmentId}/solution — deliberately generic across
+/// `Kind` and with no access-control parameters. The frontend alone decides
+/// when to call this (per-kind reveal rules — see CONTRACT.md's Solution
+/// section); the backend just answers "does this assignment have a stored
+/// sample solution or not."
+/// </summary>
+public record SolutionResponseDto(
+    [property: JsonPropertyName("available")] bool Available,
+    [property: JsonPropertyName("solution"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? Solution);
