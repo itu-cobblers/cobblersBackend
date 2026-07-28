@@ -1,0 +1,22 @@
+name: Seed Assignments (manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and run seed-tasks.sql against cobblers-postgres
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 178.105.149.59
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/cobblersBackend
+            git pull
+            docker cp scripts/seed-tasks.sql cobblers-postgres:/tmp/seed-tasks.sql
+            docker exec cobblers-postgres psql -U cobblers_user -d cobblers -v ON_ERROR_STOP=1 -f /tmp/seed-tasks.sql
+            docker exec cobblers-postgres rm -f /tmp/seed-tasks.sql
