@@ -11,9 +11,10 @@ public record StudentDto(
     [property: JsonPropertyName("studentId")] string StudentId,
     [property: JsonPropertyName("displayName")] string DisplayName);
 
-/// <summary>The countdown a teacher started, as an absolute end time.</summary>
+/// <summary>The countdown a teacher started, as an absolute end time, scoped to one assignment.</summary>
 public record TimerInfo(
-    [property: JsonPropertyName("endsAt")] string EndsAt);
+    [property: JsonPropertyName("endsAt")] string EndsAt,
+    [property: JsonPropertyName("assignmentId")] int AssignmentId);
 
 /// <summary>Replied to a student on join so a late joiner / reconnect syncs.</summary>
 public record SessionState(
@@ -40,4 +41,5 @@ public record GetSessionResponse(
     [property: JsonPropertyName("assignmentSetId")] string AssignmentSetId);
 
 public record StartTimerRequest(
-    [property: JsonPropertyName("durationMinutes")] int DurationMinutes);
+    [property: JsonPropertyName("durationMinutes")] int DurationMinutes,
+    [property: JsonPropertyName("assignmentId")] int AssignmentId);

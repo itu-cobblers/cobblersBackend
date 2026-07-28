@@ -96,7 +96,11 @@ public class SessionsController : ControllerBase
             return NotFound(new { error = $"Session '{code}' not found." });
 
         var endsAt = DateTimeOffset.UtcNow.AddMinutes(request.DurationMinutes);
-        var timer = new TimerInfo(endsAt.ToString("o")); // ISO 8601 / round-trip
+        // durationMinutes: 0 is a valid (if unusual) input — an instantly-elapsed
+        // timer. It has no special meaning: the timer is purely a per-assignment
+        // pacing countdown (see CONTRACT.md Timer) and never gates answer reveal
+        // — that's submission-based end to end, see CONTRACT.md's Solution section.
+        var timer = new TimerInfo(endsAt.ToString("o"), request.AssignmentId); // ISO 8601 / round-trip
         _store.SetTimer(code, timer);
 
         await _hub.Clients.Group(code).SendAsync("TimerStarted", timer);
