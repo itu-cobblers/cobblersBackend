@@ -234,7 +234,13 @@ Keeping it a separate field makes "don't send this yet" an API-layer decision
 (simply omit the field from the response) rather than something that has to
 be filtered out of a shared blob.
 
-### Sample solution reveal uses one rule for both solo and classroom
+### Sample solution reveal uses one rule for both solo and classroom (superseded)
+> **Superseded 2026-07-27** — see [Solution reveal moved entirely to the
+> frontend](#solution-reveal-moved-entirely-to-the-frontend) below for the
+> current design. Kept for history: this is where the "no teacher-set delay"
+> philosophy that the newer decision still follows for `code`-in-solo and
+> `predict` originally came from.
+
 Two options were on the table for when a *classroom* student (as opposed to
 solo) can see an assignment's sample solution:
 
@@ -260,9 +266,60 @@ solo) can see an assignment's sample solution:
   mechanic than anything else in the app, for a marginal benefit over "you
   already had to try."
 
-So: `GET /api/assignments/{assignmentId}/solution?studentId=...` is available whenever
+So: `GET /api/assignments/{assignmentId}/solution?studentId=...` was available whenever
 any `Submission` exists for that `(studentId, assignmentId)` pair — solo or in a
-room, no session-specific logic. See [CONTRACT.md](CONTRACT.md#solution).
+room, no session-specific logic.
+
+### Solution reveal moved entirely to the frontend
+Rather than build a gating path server-side, the decision here is to **drop
+the server-side gate entirely**:
+
+- `GET /api/assignments/{assignmentId}/solution` (see
+  [CONTRACT.md](CONTRACT.md#solution)) takes no `studentId`, checks nothing
+  but "does `Assignment.SampleSolutionJson` exist," and doesn't branch on
+  `Kind`. Every reveal rule lives purely in the frontend's decision of *when
+  to call this endpoint / show "Show answer."*
+- This is a deliberate simplicity-over-strictness tradeoff: a student who
+  opens devtools can call the endpoint immediately and see the answer before
+  the frontend would normally reveal it. Accepted for a 3-day workshop POC —
+  nothing here is exam-integrity-grade, and building a server-side rule that
+  correctly composes the reveal condition would be meaningfully more code
+  (and a second source of truth for a rule the frontend already has to
+  encode for its own UI state — button disabled/enabled, etc.) for a threat
+  model this app doesn't need to defend against.
+
+**The frontend rule itself is submitted-once for `code`/`predict`, same in
+solo and in a room — no timer involved.** An earlier iteration tried scoping
+"Decision A" (teacher-set delay, rejected above for solo/predict) to the
+room via the per-assignment [Timer](CONTRACT.md#timer-teacher--room-broadcast)
+instead of per-student: `code` opened once the room's timer for that
+assignment had ≤3 minutes left; `project` (still no `Submission` to gate on,
+see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)) opened
+once the teacher explicitly triggered it via a `durationMinutes: 0` timer.
+That's been **reverted**:
+
+- The room has only *one* active timer at a time, scoped to whichever
+  assignment it was last started for. Deriving "is this assignment's answer
+  unlocked" from "is the timer currently scoped to it" meant that state
+  disappeared the moment either (a) the student refreshed, or (b) the
+  teacher started a new timer for a different assignment — because neither
+  the *timer* nor a separate "unlocked" flag was ever persisted anywhere
+  durable. A frontend-only latch (a React state `Set`) patched over case (b)
+  within one page session, but not across a refresh — and fixing that
+  properly would have meant adding a new persistence layer (a DB column, a
+  new SignalR broadcast + in-memory room-level set, or per-browser
+  `localStorage`) for a rule change alone.
+- Reverting to "submitted once, same in solo and a room" sidesteps the whole
+  problem: eligibility is derived from `Submission` rows the backend already
+  persists forever, so there's nothing new to keep in sync, and nothing to
+  lose on refresh or when the teacher moves the timer to another assignment.
+  `project` goes back to "always available," exactly like solo — it never
+  had a `Submission` to gate on either way, and the "teacher explicitly
+  reveals it" UI (reusing the timer endpoint with `durationMinutes: 0`) is
+  retired along with it.
+- The per-assignment Timer itself is unaffected and still exists — it's
+  reverted to its original, sole purpose: a live "how much longer on this
+  question" countdown for the room, with zero effect on solution reveal.
 
 ### Grading rules are data, evaluated by one backend engine
 > **Revises an earlier decision.** The first version of this section ported

@@ -183,7 +183,7 @@ JoinSession({ code, studentId, displayName })
 
 ```json
 // SessionState (reply to caller only)
-{ "activeTimer": { "endsAt": "2026-06-19T14:30:00Z" }, "focusedAssignmentId": 101 }
+{ "activeTimer": { "endsAt": "2026-06-19T14:30:00Z", "assignmentId": 101 }, "focusedAssignmentId": 101 }
  // activeTimer / focusedAssignmentId omitted if none — see Follow below
 ```
 
@@ -441,21 +441,41 @@ The teacher's _trigger_ is plain REST (a normal request). SignalR is used only f
 the _fan-out_ to students. So only students need a live connection; the teacher side
 stays simple and testable.
 
+**Scoped to one `assignmentId`, not the whole room.** A room has at most one
+*active* timer at a time — starting a new one (for the same or a different
+`assignmentId`) simply replaces it; there's no per-assignment concurrency.
+This matters for the student UI: a countdown badge only shows on the
+assignment whose `assignmentId` matches the active timer.
+
+**Purely a pacing display — it never gates [Solution](#solution) reveal.**
+An earlier design tied the `code`/`project` reveal rule to this timer (room
+students only saw the answer once the countdown was low); that's been
+dropped (see [SCHEMA.md](SCHEMA.md#solution-reveal-moved-entirely-to-the-frontend)).
+The timer answers "how much longer on this question," full stop — reveal is
+submission-based end to end, same in solo and in a room.
+
 ### `POST /api/sessions/{code}/timer` (teacher starts a timer)
 
 ```json
 // request
-{ "durationMinutes": 10 }
+{ "durationMinutes": 10, "assignmentId": 101 }
 
-// → 200 OK  — server computes the absolute end time, stores it on the session,
-//             then broadcasts TimerStarted to Group {code}
-{ "endsAt": "2026-06-19T14:30:00Z" }
+// → 200 OK  — server computes the absolute end time, stores it (with the
+//             assignmentId) on the session, then broadcasts TimerStarted to
+//             Group {code}
+{ "endsAt": "2026-06-19T14:30:00Z", "assignmentId": 101 }
 ```
+
+> `durationMinutes: 0` is a valid, if unusual, input — just an
+> instantly-elapsed timer. It has no special meaning; there used to be a
+> teacher "reveal this project's answer now" action that reused this
+> endpoint with `durationMinutes: 0`, but that's retired — see
+> [Solution](#solution).
 
 ### `TimerStarted` — SignalR event (server → students in the room)
 
 ```json
-{ "endsAt": "2026-06-19T14:30:00Z" }
+{ "endsAt": "2026-06-19T14:30:00Z", "assignmentId": 101 }
 ```
 
 Why **absolute `endsAt`**, not a duration: a student who reconnects or joins
@@ -870,34 +890,61 @@ fetched.
 
 ## Solution
 
-Reveal an assignment's sample/reference solution. **One rule for both solo and
-classroom students** — see [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom) for why a teacher-controlled delay was considered and rejected.
+Reveal an assignment's sample/reference solution. **Deliberately generic and
+gate-free on the backend** — see
+[SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom)
+for the superseded server-side rule and why reveal timing moved to the
+frontend entirely.
 
-### `GET /api/assignments/{assignmentId}/solution?studentId={studentId}`
+### `GET /api/assignments/{assignmentId}/solution`
 
 ```json
-// → 200 OK — at least one Submission exists for (studentId, assignmentId)
+// → 200 OK — Assignment.SampleSolutionJson is set
 { "available": true, "solution": "public class Main {...}" }
 
-// → 200 OK — no Submission yet
+// → 200 OK — no sample solution stored for this assignment
 { "available": false, "solution": null }
+
+// → 404 Not Found — unknown assignmentId
 ```
 
 | Field       | Type                                     | Notes                                                                                                                                             |
 | ----------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `available` | boolean                                   | `true` once the student has submitted this assignment at least once — pass or fail, in a room or solo.                                                     |
-| `solution`  | string \| `{name, content}[]` \| null     | Present only when `available`. Shape matches `Assignment.SampleSolutionJson` for the assignment's `kind`. Not applicable to `predict` (its `expectedOutput`, from Assignments, already is the answer). |
+| `available` | boolean                                   | `true` iff `Assignment.SampleSolutionJson` is non-null. **No other check** — no `studentId`, no submission lookup, no `kind` branch, no timer/session awareness. |
+| `solution`  | string \| `{name, content}[]` \| null     | Present only when `available`. Shape matches `Assignment.SampleSolutionJson` as stored (single string for single-file `code`, `{name,content}[]` for multi-file `code`/`project`). |
 
-> **Not yet implemented.** Formalizes the previously-vague "reveal a sample
-> solution" backlog stub now that the gating rule is decided — see
-> [STORIES.md](STORIES.md) S8. Frontend: disable the "Show solution" button
-> until the student has submitted at least once, with a hover explaining why.
+> **No access-control boundary, by design.** Unlike the earlier "at least one
+> submission" server-side gate this replaces, *when* a student is allowed to
+> see the answer is decided entirely by the frontend (see below) — this
+> endpoint answers only "does a solution exist," the same way `GET
+> /api/submissions/{subId}` has no ownership check (see
+> [Submission](#submission)). A student opening devtools can call this early
+> and see the answer before the frontend would normally reveal it; accepted
+> for a 3-day workshop POC with no grading stakes tied to secrecy.
 >
-> **`project` never has a `Submission`** (see
-> [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)), so this
-> gate can never open for one — `available` would stay `false` forever. Don't
-> wire a "Show solution" button for `project` assignments at all; showing a
-> permanently-disabled button would be confusing, not honest UI.
+> **Frontend reveal rules, per `kind` — same rule in solo and in a room, no
+> [Timer](#timer-teacher--room-broadcast) involved at all:**
+> - `code`: after the student has submitted this assignment at least once.
+> - `predict`: submitted at least once. In practice `predict` never calls
+>   this endpoint at all; its answer is `content.expectedOutput`, already
+>   sent with the assignment.
+> - `project`: always available immediately — a `project`
+>   [never produces a `Submission`](#mini-projects-are-vs-code-only), so
+>   there's no "submitted once" signal to gate on, same reasoning as solo
+>   `code` would use if it had none either.
+>
+> An earlier iteration tied the `code`/`project` room rule to the per-assignment
+> Timer (answer opens at ≤3 min remaining for `code`; teacher-triggered via a
+> `durationMinutes: 0` timer for `project`) instead of the submission check.
+> That's been dropped — see
+> [SCHEMA.md](SCHEMA.md#solution-reveal-moved-entirely-to-the-frontend) for
+> why: tying reveal to the room's *one* active timer meant a student's
+> unlocked state depended on which assignment the timer currently happened to
+> be scoped to, which doesn't survive a refresh or the teacher starting a new
+> timer for a different assignment without extra client- or server-side
+> persistence. Keying reveal off `submissionHistory` instead avoids that
+> entirely — it's data the backend already persists, so there's nothing new
+> to keep in sync.
 
 ---
 
