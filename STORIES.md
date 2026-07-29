@@ -298,6 +298,40 @@ titles.
 
 ---
 
+## S11 — Teacher follow: point students at the assignment I'm on
+
+**As a** teacher, **I want** to signal which assignment I'm currently discussing,
+**so that** students in the room can jump there without me reading out ids or
+titles.
+
+- **Transport:** SignalR only (hub method trigger + room broadcast — no REST leg,
+  unlike the timer, since the teacher already holds a live hub connection)
+- **Contract:** [`FocusAssignment`](CONTRACT.md#follow-teacher--room-broadcast) → `AssignmentFocused` event
+- **Frontend:** ✅ built — a `Focus` button on each assignment in the teacher's
+  `AssignmentSetPreview` calls `sessionHub.focusAssignment(code, id)`; a `Live`
+  badge marks the currently-focused one. Students receive `AssignmentFocused` in
+  `useStudentSession` and, if it names an assignment other than the one they're
+  looking at, `StudentIde` shows a `TeacherFollowBanner` ("teacher is on _X_ —
+  Follow →"); clicking it navigates via the existing assignment-select path. If
+  the student is already on the focused assignment, the Toolbar shows a small
+  "following teacher" pill instead of a banner.
+- **Backend:** ✅ built — `SessionHub.FocusAssignment` stores the id on
+  `SessionStore` (so a late joiner's `JoinSession` reply includes
+  `focusedAssignmentId`, mirroring the timer's `activeTimer`) and broadcasts
+  `AssignmentFocused` to Group `code`.
+- **Depends on:** [Sessions / rooms](CONTRACT.md#sessions-rooms) — scoped to a
+  room, so solo students never see it.
+- **Decisions already made:**
+  - Non-coercive, like the timer — a banner/badge invitation, never a forced
+    navigation.
+  - The room stores only the *latest* focused assignment (a single
+    `int?`, overwritten each call) — no history of what was focused when.
+- **Done when:** a teacher clicking Focus on an assignment shows a Follow banner
+  on every other student's screen for that assignment, clicking it takes them
+  there, and a student who joins after the fact still sees the current focus.
+
+---
+
 ## Backlog (unwritten)
 
 Stub stories — flesh out before building.
