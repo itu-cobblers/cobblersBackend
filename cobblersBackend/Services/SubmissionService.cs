@@ -12,6 +12,8 @@ public class SubmissionService : ISubmissionService
     private readonly CobblersDbContext _db;
     private readonly IExecutorService _executor;
     private readonly IAssignmentGrader _grader;
+    private static readonly JsonSerializerOptions ResultJsonOptions = 
+        new() { PropertyNameCaseInsensitive = true };
 
     public SubmissionService(CobblersDbContext db, IExecutorService executor, IAssignmentGrader grader)
     {
@@ -128,14 +130,10 @@ public class SubmissionService : ISubmissionService
             .FirstOrDefaultAsync();
         if (row is null) return null;
 
-        // Case insensitive
-        // wire/entity is not
-        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
         return new SubmissionDetailDto(
             row.SubId, row.StudentId, row.AssignmentId, row.SessionCode,
             JsonSerializer.Deserialize<JsonElement>(row.ContentJson),
-            row.ResultJson is null ? null : JsonSerializer.Deserialize<ExecuteResponseDto>(row.ResultJson, opts),
+            row.ResultJson is null ? null : JsonSerializer.Deserialize<ExecuteResponseDto>(row.ResultJson, ResultJsonOptions),
             row.Passed, row.SubmittedAt);
     }
 
