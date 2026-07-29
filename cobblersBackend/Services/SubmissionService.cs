@@ -12,6 +12,8 @@ public class SubmissionService : ISubmissionService
     private readonly CobblersDbContext _db;
     private readonly IExecutorService _executor;
     private readonly IAssignmentGrader _grader;
+    private static readonly JsonSerializerOptions ResultJsonOptions = 
+        new() { PropertyNameCaseInsensitive = true };
 
     public SubmissionService(CobblersDbContext db, IExecutorService executor, IAssignmentGrader grader)
     {
@@ -105,5 +107,35 @@ public class SubmissionService : ISubmissionService
             Stderr: "",
             ExitCode: 0)).Passed;
     }
+
+    public async Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId) =>
+        await _db.Submission.AsNoTracking()
+            .Where(s => s.StudentId == studentId)
+            .OrderByDescending(s => s.SubmittedAt)          // newest-first, per CONTRACT
+            .Select(s => new SubmissionHistoryDto(
+                s.SubId, s.AssignmentId,
+                s.Session != null ? s.Session.Code : null,  // null for solo
+                s.Passed, s.SubmittedAt))
+                .ToListAsync();
+
+
+    public async Task<SubmissionDetailDto?> GetSubmissionAsync(Guid subId)
+    {
+        var row = await _db.Submission.AsNoTracking()
+            .Where(s => s.SubId == subId)
+            .Select(s => new {
+                s.SubId, s.StudentId, s.AssignmentId,
+                SessionCode = s.Session != null ? s.Session.Code : null,
+                s.ContentJson, s.ResultJson, s.Passed, s.SubmittedAt})
+            .FirstOrDefaultAsync();
+        if (row is null) return null;
+
+        return new SubmissionDetailDto(
+            row.SubId, row.StudentId, row.AssignmentId, row.SessionCode,
+            JsonSerializer.Deserialize<JsonElement>(row.ContentJson),
+            row.ResultJson is null ? null : JsonSerializer.Deserialize<ExecuteResponseDto>(row.ResultJson, ResultJsonOptions),
+            row.Passed, row.SubmittedAt);
+    }
+
 
 }

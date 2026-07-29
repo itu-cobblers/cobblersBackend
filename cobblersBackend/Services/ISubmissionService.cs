@@ -5,4 +5,6 @@ namespace cobblersBackend.Services;
 public interface ISubmissionService
 {
     Task<SubmissionResponseDto?> SubmitAsync(int assignmentId, SubmissionRequestDto request);
+    Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId);
+    Task<SubmissionDetailDto?> GetSubmissionAsync(Guid subId);
 }
