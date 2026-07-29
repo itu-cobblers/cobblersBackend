@@ -320,7 +320,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         int assignmentId;
         await using (var setup = _fixture.CreateContext())
         {
-            setup.Add(TestData.MakeStudent("student-1"));
+            setup.Student.Add(TestData.MakeStudent("student-1"));
             var assignment = TestData.MakeAssignment(AssignmentKind.Code);
             assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"ignored"}""";
             setup.Assignment.Add(assignment);
@@ -349,5 +349,293 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         Assert.Equal(sessionId, submission.SessionId);
         Assert.NotEqual(sessionCode, submission.SessionId);
 
+    }
+
+    [Fact]
+    public async Task GetHistoryAsync_ReturnsNewestFirst()
+    {
+        // Given
+        string studentId = "student-1";
+        List<int> AssignmentIdList = [];
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment1 = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment1.GradingJson = """{"target":"stdout","op":"containsLine","value":"ignored"}""";
+            write.Assignment.Add(assignment1);
+            var assignment2 = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment2.GradingJson = """{"target":"stdout","op":"containsLine","value":"ignored"}""";
+            write.Assignment.Add(assignment2);
+            var assignmentSet = TestData.MakeAssignmentSet();
+            write.AssignmentSet.Add(assignmentSet);
+            await write.SaveChangesAsync();
+            AssignmentIdList.Add(assignment1.Id);
+            AssignmentIdList.Add(assignment2.Id); // insert order.
+
+        }
+
+        var expectedOrder = new List<int> { AssignmentIdList[1], AssignmentIdList[1] }; // newest first check
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "ignored", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var request1 = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("x"));
+        await service.SubmitAsync(expectedOrder[0], request1);
+        await service.SubmitAsync(expectedOrder[1], request1);
+
+        var result = await service.GetHistoryAsync(studentId);
+
+        // Then
+        var actualOrder = result.Select(dto => dto.AssignmentId).ToList();
+        Assert.Equal(expectedOrder, actualOrder);
+    }
+
+    [Fact]
+    public async Task GetHistoryAsync_SubmissionWithNoSession_AssertSessionIsNull()
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"ignored"}""";
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "ignored", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var request1 = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("x"));
+        await service.SubmitAsync(assignmentId, request1);
+
+        var result = await service.GetHistoryAsync(studentId);
+
+        // Then
+        var only = Assert.Single(result);
+        Assert.Null(only.SessionId);
+    }
+
+    [Fact] 
+    public async Task GetHistoryAsync_ValidSessionId_AssertEqualToSessionCode()
+    {
+        // Given 
+        string sessionCode;
+        string sessionId;
+        int assignmentId;
+        string studentId = "student-1";
+        await using (var setup = _fixture.CreateContext())
+        {
+            setup.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"ignored"}""";
+            setup.Assignment.Add(assignment);
+            var assignmentSet = TestData.MakeAssignmentSet();
+            setup.AssignmentSet.Add(assignmentSet);
+            var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
+            setup.Session.Add(session);
+            await setup.SaveChangesAsync();
+            sessionCode = session.Code;
+            sessionId = session.SessionId;
+            assignmentId = assignment.Id;
+
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "ignored", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var request = new SubmissionRequestDto(studentId, sessionCode, JsonSerializer.SerializeToElement("ignored"));
+        await service.SubmitAsync(assignmentId, request);
+
+
+        // Then
+        var result = await service.GetHistoryAsync(studentId);
+        var only = Assert.Single(result);
+        Assert.NotEqual(sessionId, only.SessionId);
+        Assert.Equal(sessionCode, only.SessionId);
+    }
+
+    [Fact]
+    public async Task GetHistoryAsync_UknownStudentId_ReturnEmptyList()
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"ignored"}""";
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "ignored", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var request1 = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("x"));
+        await service.SubmitAsync(assignmentId, request1);
+
+        var result = await service.GetHistoryAsync("unknown-student");
+
+        // Then
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetSubmissionAsync_CodeKind_RoundTripsContentResultAndPassed()
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"hello"}""";
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "hello", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
+        var request1 = new SubmissionRequestDto(studentId, null, content);
+        var response = await service.SubmitAsync(assignmentId, request1);
+
+        var result = await service.GetSubmissionAsync(response!.SubId);
+
+        // Then
+        
+        Assert.NotNull(result);
+        Assert.Equal(content.GetString(), result.Content.GetString());
+        Assert.NotNull(result.Result);
+        Assert.True(result.Passed);
+    }
+
+    [Fact]
+    public async Task GetSubmissionAsync_PredictKind_RoundTripsContentAndPassed() // suggest a better name
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Predict);
+            assignment.GradingJson = """{"predict":{"compare":"normalized","expectedOutput":"42"}}""";
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "Ignored", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        JsonElement content = JsonSerializer.SerializeToElement("42");
+        var request1 = new SubmissionRequestDto(studentId, null, content);
+        var response = await service.SubmitAsync(assignmentId, request1);
+
+        var result = await service.GetSubmissionAsync(response!.SubId);
+
+        // Then
+        
+        Assert.NotNull(result);
+        Assert.Equal(content.GetString(), result.Content.GetString());
+        Assert.Null(result.Result);
+        Assert.True(result.Passed);
+    }
+
+    [Fact]
+    public async Task GetSubmissionAsync_ValidSessionId_AssertEqualSessionCode() // suggest a better name
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        string sessionId;
+        string sessionCode;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"hello"}""";
+            write.Assignment.Add(assignment);
+            var assignmentSet = TestData.MakeAssignmentSet();
+            write.AssignmentSet.Add(assignmentSet);
+            var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
+            write.Session.Add(session);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+            sessionId = session.SessionId;
+            sessionCode = session.Code;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "hello", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
+        var request1 = new SubmissionRequestDto(studentId, sessionCode, content);
+        var response = await service.SubmitAsync(assignmentId, request1);
+
+        var result = await service.GetSubmissionAsync(response!.SubId);
+
+        // Then
+        
+        Assert.NotNull(result);
+        Assert.Equal(content.GetString(), result.Content.GetString());
+
+        Assert.NotEqual(sessionId, result.SessionId);
+        Assert.Equal(sessionCode, result.SessionId);
+    }
+
+    [Fact]
+    public async Task GetSubmissionAsync_UnknownSubId_returnNull() // suggest a better name{}
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"hello"}""";
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "hello", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
+        var request1 = new SubmissionRequestDto(studentId, null, content);
+        var response = await service.SubmitAsync(assignmentId, request1);
+        var unknownSubId = new Guid();
+        var result = await service.GetSubmissionAsync(unknownSubId);
+
+        // Then
+        
+        Assert.Null(result);
     }
 }
