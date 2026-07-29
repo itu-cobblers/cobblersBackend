@@ -54,6 +54,37 @@ public class SessionsController : ControllerBase
     }
 
     /// <summary>
+    /// GET /api/sessions/today-latest — the entry screen's "join session (CODE)"
+    /// shortcut: today's newest still-active room, so a student doesn't have to
+    /// type a code. 404 when no such room exists.
+    /// </summary>
+    [HttpGet("today-latest")]
+    public async Task<ActionResult<GetSessionResponse>> GetTodayLatestSession()
+    {
+        var session = await _session.GetTodayLatestActiveSessionAsync();
+        return session is null ? NotFound() : Ok(session);
+    }
+
+    /// <summary>
+    /// POST /api/sessions/{code}/end — the teacher's manual "Exit"/"End session"
+    /// action. Marks the room ended in the DB and broadcasts SessionEnded so any
+    /// still-connected students bounce back to the entry screen.
+    /// </summary>
+    [HttpPost("{code}/end")]
+    public async Task<IActionResult> EndSession(string code)
+    {
+        code = SessionCode.Normalize(code);
+        var ended = await _session.EndSessionAsync(code);
+        if (!ended)
+            return NotFound(new { error = $"Session '{code}' not found." });
+
+        _store.RemoveRoom(code);
+        await _hub.Clients.Group(code).SendAsync("SessionEnded");
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// POST /api/sessions/{code}/timer — compute the absolute end time, store it
     /// on the room, then broadcast TimerStarted to the group.
     /// </summary>

@@ -1,3 +1,4 @@
+using cobblersBackend.Data.Entities;
 using cobblersBackend.Services;
 using cobblersBackend.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -111,6 +112,82 @@ public sealed class SessionServiceTest : IAsyncLifetime
 
         Assert.NotNull(result);
         Assert.Equal("ABCD", result.Code);
+    }
+
+    [Fact]
+    public async Task GetSessionAsync_EndedSession_ReturnsNull()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        ctx.AssignmentSet.Add(assignmentSet);
+        ctx.Session.Add(TestData.MakeSession(assignmentSet.AssignmentSetId, code: "ABCD", status: SessionStatus.Ended));
+        await ctx.SaveChangesAsync();
+
+        var service = new SessionService(ctx);
+        var result = await service.GetSessionAsync("ABCD");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task EndSessionAsync_UnknownCode_ReturnsFalse()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var service = new SessionService(ctx);
+
+        Assert.False(await service.EndSessionAsync("NOPE"));
+    }
+
+    [Fact]
+    public async Task EndSessionAsync_MarksSessionEnded()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        ctx.AssignmentSet.Add(assignmentSet);
+        ctx.Session.Add(TestData.MakeSession(assignmentSet.AssignmentSetId, code: "ABCD"));
+        await ctx.SaveChangesAsync();
+
+        var service = new SessionService(ctx);
+        var result = await service.EndSessionAsync("abcd"); // lowercase input, normalized
+
+        Assert.True(result);
+        await using var read = _fixture.CreateContext();
+        var session = await read.Session.SingleAsync(s => s.Code == "ABCD");
+        Assert.Equal(SessionStatus.Ended, session.Status);
+    }
+
+    [Fact]
+    public async Task GetTodayLatestActiveSessionAsync_NoActiveSessions_ReturnsNull()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        ctx.AssignmentSet.Add(assignmentSet);
+        ctx.Session.Add(TestData.MakeSession(assignmentSet.AssignmentSetId, code: "ABCD", status: SessionStatus.Ended));
+        await ctx.SaveChangesAsync();
+
+        var service = new SessionService(ctx);
+        var result = await service.GetTodayLatestActiveSessionAsync();
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetTodayLatestActiveSessionAsync_ReturnsMostRecentActiveSession()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        ctx.AssignmentSet.Add(assignmentSet);
+        ctx.Session.Add(TestData.MakeSession(assignmentSet.AssignmentSetId, code: "OLD1"));
+        await ctx.SaveChangesAsync();
+        // A second insert sorts later by CreateAt (DB-stamped `now()`).
+        ctx.Session.Add(TestData.MakeSession(assignmentSet.AssignmentSetId, code: "NEW1"));
+        await ctx.SaveChangesAsync();
+
+        var service = new SessionService(ctx);
+        var result = await service.GetTodayLatestActiveSessionAsync();
+
+        Assert.NotNull(result);
+        Assert.Equal("NEW1", result.Code);
     }
 
 }
