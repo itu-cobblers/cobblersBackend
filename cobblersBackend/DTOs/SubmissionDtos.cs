@@ -31,3 +31,10 @@ public record SubmissionDetailDto(
     [property: JsonPropertyName("result")]       ExecuteResponseDto? Result, // null for predict
     [property: JsonPropertyName("passed")]       bool? Passed,
     [property: JsonPropertyName("submittedAt")]  DateTimeOffset SubmittedAt);
+
+public record AssignmentSubmissionDto(
+    [property: JsonPropertyName("subId")] Guid SubId,
+    [property: JsonPropertyName("studentId")] string StudentId,
+    [property: JsonPropertyName("displayName")] string DisplayName,
+    [property: JsonPropertyName("passed")] bool? Passed,
+    [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt);

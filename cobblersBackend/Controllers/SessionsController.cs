@@ -18,13 +18,15 @@ public class SessionsController : ControllerBase
     private readonly ISessionService _session;
     private readonly SessionStore _store;
     private readonly IHubContext<SessionHub> _hub;
+    private readonly ISubmissionService _submissions;
 
 
-    public SessionsController(SessionStore store, IHubContext<SessionHub> hub, ISessionService session)
+    public SessionsController(SessionStore store, IHubContext<SessionHub> hub, ISessionService session, ISubmissionService submissions)
     {
         _store = store;
         _hub = hub;
         _session = session;
+        _submissions = submissions;
     }
 
     /// <summary>POST /api/sessions — create a room, return its join code.</summary>
@@ -104,5 +106,11 @@ public class SessionsController : ControllerBase
         return Ok(timer);
     }
 
+    [HttpGet("{code}/assignments/{assignmentId:int}/submissions")]
+    public async Task<IActionResult> GetAssignmentHistory(string code, int assignmentId, [FromQuery] string? studentId)
+    {
+        var rows = await _submissions.GetAssignmentHistoryAsync(code, assignmentId, studentId);
+        return rows is null ? NotFound() : Ok(rows);
+    }
    
 }

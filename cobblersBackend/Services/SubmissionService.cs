@@ -137,5 +137,25 @@ public class SubmissionService : ISubmissionService
             row.Passed, row.SubmittedAt);
     }
 
+    public async Task<IReadOnlyList<AssignmentSubmissionDto>?> GetAssignmentHistoryAsync(string code, int assignmentId, string? studentId)
+    {
+        code = SessionCode.Normalize(code);
 
+        var session = await _db.Session.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Code == code);
+        if (session is null) return null;
+
+        var inSet = await _db.AssignmentSetAssignment.AsNoTracking().AnyAsync(
+            m => m.AssignmentSetId == session.AssignmentSetId && m.AssignmentId == assignmentId);
+        if (!inSet) return null;
+
+        return await _db.Submission.AsNoTracking()
+            .Where(s => s.SessionId == session.SessionId
+                        && s.AssignmentId == assignmentId
+                        && (studentId == null || s.StudentId == studentId))
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new AssignmentSubmissionDto(
+                s.SubId, s.StudentId, s.Student.DisplayName, s.Passed, s.SubmittedAt))
+            .ToListAsync();
+    }
 }

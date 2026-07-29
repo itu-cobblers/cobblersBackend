@@ -7,4 +7,5 @@ public interface ISubmissionService
     Task<SubmissionResponseDto?> SubmitAsync(int assignmentId, SubmissionRequestDto request);
     Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId);
     Task<SubmissionDetailDto?> GetSubmissionAsync(Guid subId);
+    Task<IReadOnlyList<AssignmentSubmissionDto>?> GetAssignmentHistoryAsync(string code, int assignmentId, string? studentId);
 }
