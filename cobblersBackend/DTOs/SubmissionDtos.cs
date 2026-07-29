@@ -24,6 +24,7 @@ public record SubmissionHistoryDto(
 
 public record SubmissionDetailDto(
     [property: JsonPropertyName("subId")]        Guid SubId,
+    [property: JsonPropertyName("studentId")]    string StudentId,
     [property: JsonPropertyName("assignmentId")] int AssignmentId,
     [property: JsonPropertyName("sessionId")]    string? SessionId,          // =Session.Code, null for solo
     [property: JsonPropertyName("content")]      JsonElement Content,        // raw ContentJson, string | {name,content}[]
