@@ -12,7 +12,12 @@ frontend↔backend wire format; this file governs what's behind it.
 > `cobblersBackend/Data/`, across several migrations. `Session`/`Attendance`
 > persist via `SessionService`/`AttendanceService`; `SessionStore` (in-memory)
 > now holds only the live SignalR roster + active timer, not the persisted
-> record. `Submission` isn't wired to a controller yet (S2, not built).
+> record. `Submission` writes are wired up (`SubmissionController` →
+> `SubmissionService`, S2). Two **reads** over the same table are still
+> missing: `GET /api/students/{studentId}/submissions` (S5) and
+> `GET /api/students/{studentId}/resume-suggestion` (S9) — see
+> [CONTRACT.md](CONTRACT.md#submission) / [STORIES.md](STORIES.md). Both are
+> pure queries; neither needs a schema change.
 
 > **Naming:** fully renamed to **Assignment** as of 2026-07-17 — code, tables,
 > columns, and the wire contract (CONTRACT.md) all agree. `Assignment` (was
@@ -43,8 +48,27 @@ User stories that drove these decisions live in [STORIES.md](STORIES.md).
 | `Code` | string | The 4-char join code shown to students. App-generated (random). |
 | `AssignmentSetId` | FK → AssignmentSet | Which content this session's day uses. |
 | `CreateAt` | datetime | **DB-owned** — stamped `now()` on insert, never sent by a caller. See [Value generation](#value-generation--who-owns-each-column). |
+| `Status` | text (enum: `active` \| `ended`) | App-owned, defaults `active` on insert. Flips to `ended` via [`POST /api/sessions/{code}/end`](CONTRACT.md#post-apisessionscodeend). See [`Session.Status`](#sessionstatus) below. |
 
-Constraint: **`UNIQUE (Code)`** — see [Design decisions](#code-uniqueness-is-global).
+Constraints: **`UNIQUE (Code)`** — see [Design decisions](#code-uniqueness-is-global) —
+and `ck_session_status CHECK (status IN ('active', 'ended'))`.
+
+#### `Session.Status`
+
+A teacher-ended room needs to stay "gone" for future lookups (new joins,
+[`today-latest`](CONTRACT.md#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today))
+across a server restart — the in-memory `SessionStore` roster alone can't
+carry that, since it's explicitly ephemeral (see
+[Persistence replaces `SessionStore`'s ephemeral-by-design contract](#persistence-replaces-sessionstores-ephemeral-by-design-contract)
+below). A real column, not a `DeletedAt` soft-delete, because the row and its
+`Attendance`/`Submission` history stay fully intact and queryable — "ended"
+is a lifecycle state, not a deletion. Modeled as a C# enum (`SessionStatus`),
+persisted as lowercase text (not an int) so the DB value is self-describing
+in a `psql` shell without a lookup table. `GET /api/sessions/{code}` and
+`GET /api/sessions/today-latest` both filter `Status == Active`; nothing
+currently reads `ended` sessions back out over the API — only their
+`Attendance`/`Submission` rows remain reachable, via the student/history
+endpoints, not via a session lookup.
 
 ### Attendance
 | Column | Type | Notes |
@@ -112,16 +136,24 @@ wouldn't.
 / `ProjectAssignment`, minus `check`):
 
 ```
-Code:    { starter?, stdin?, harness?: { files: [{name, content}], entryClass }, solutionFile? }
+Code:    { starter?, starterFiles?: [{name, content}], entryClass?, stdin?, harness?: { files: [{name, content}], entryClass }, solutionFile? }
 Predict: { snippet, expectedOutput, accept?: string[] }
-Project: { brief, requiredClasses?: string[], entryClass? }
+Project: { brief, requiredClasses?: string[], entryClass? }   // display-only — see below
 ```
+
+For multi-file `Code` assignments (e.g. `person-class`, `flight-ticket-class`, `container-class`), `ContentJson.starterFiles` provides initial templates for each file in the editor (e.g. `Main.java` + `Person.java`), and `entryClass` specifies which class contains the `main` method. Single-file assignments continue to use `starter`.
+
+`Project.entryClass`/`requiredClasses` describe the eventual VS Code solution
+shape (useful copy for the brief, e.g. "your `Main` should call a `Tree`
+class") — they're **not** consumed by any endpoint today, since `Project`
+never reaches `execute`/`submission` (see
+[Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)).
 
 `SampleSolutionJson` shape by kind:
 
 ```
-Code:    string                    // one Java source file, same shape as `starter`
-Project: [{ name, content }]       // reference files, same shape as `harness.files`
+Code:    string | [{ name, content }]     // single file string or multi-file array
+Project: [{ name, content }]             // reference files, same shape as `harness.files`
 Predict: not used — ContentJson.expectedOutput already is the answer
 ```
 
@@ -132,10 +164,25 @@ Predict: not used — ContentJson.expectedOutput already is the answer
 | `StudentId` | FK → Student | |
 | `AssignmentId` | FK → Assignment | |
 | `SessionId` | FK → Session, **nullable** | Null for solo/practice submissions made without ever joining a room. See [Design decisions](#sessionid-is-nullable-on-submission). |
-| `ContentJson` | json | Full submitted payload — a string for Code/Predict, `SourceFile[]` for Project. |
+| `ContentJson` | json | Full submitted payload — a string for single-file Code/Predict, `SourceFile[]` (`[{name, content}]`) for multi-file Code. |
 | `ResultJson` | json? | Full raw execution result (`stdout`/`stderr`/`exitCode`) for Code/Project. Null for Predict (no execution happens). |
 | `Passed` | bool? | Server-computed verdict (see [Design decisions](#grading-rules-are-data-evaluated-by-one-backend-engine)). Null = not automatically gradable (e.g. Project today). |
 | `SubmittedAt` | datetime | **DB-owned** — stamped `now()` on insert, not nullable. Needed to order history and to tell submissions apart. See [Value generation](#value-generation--who-owns-each-column). |
+
+> **Implementation note — `GET /api/students/{studentId}/submissions` (S5).**
+> A single filtered, ordered read — no new query object needed:
+> `Submission.Where(s => s.StudentId == studentId).OrderByDescending(s => s.SubmittedAt)`,
+> projected to the wire DTO in [CONTRACT.md](CONTRACT.md#submission). Two
+> details that aren't obvious from the entity alone:
+> - The wire field `sessionId` is the room's **`Session.Code`** (e.g.
+>   `"ABCD"`), not `Submission.SessionId` (the internal `Session` PK) — join
+>   to `Session` (`LEFT JOIN`, since `SessionId` is nullable) and project
+>   `Code`, or the frontend can't display/compare it against
+>   `GET /api/sessions/{code}`'s `code`.
+> - Deliberately **thin** — no `ContentJson`/`ResultJson` in the response.
+>   The frontend's "My Progress" panel only needs `passed` + `submittedAt` +
+>   which room; it never needs to replay past code/output. Don't widen this
+>   DTO without a frontend reason — see CONTRACT.md's response shape.
 
 ---
 
@@ -262,15 +309,27 @@ nicety derived from stdout — the server verdict is just `passed`.
   databases, unlike `Id`). No current assignment needs it — prefer extending the
   DSL with a new op over reaching for `custom`.
 
-`Project` assignments have no automated check today (same as the frontend currently
-— they're manually reviewed). `Submission.Passed` stays `null` for them; this
-is an existing gap, not a regression introduced by this design.
+`Project` assignments have no automated check today, and — as of the
+[mini-projects-are-VS-Code-only decision](#mini-projects-are-vs-code-only) —
+never will need one through this app: nothing ever calls `execute` or
+`submission` for `kind: "project"`, so `Submission.Passed` for `Project`
+isn't just `null` today, it's a row that will never exist at all.
 
-> Known follow-on work: running a `Project` submission at all requires
-> `PistonClient` to support multi-file execution — it currently hardcodes a
-> single `Main.java` (see [CLAUDE.md](CLAUDE.md), "Java-only, single-class
-> assumption"). Automated grading for `Project` submissions is unblocked by,
-> but separate from, that change.
+> **Multi-file execution is still needed** — `PistonClient` currently hardcodes a single `Main.java` (see [CLAUDE.md](CLAUDE.md), "Java-only, single-class assumption"), and must be updated to support sending multiple files (`{ name, content }[]`) to Piston. The Day-3 `Code`-kind multi-file assignments (`person-class`, `flight-ticket-class`, `container-class`) send multiple student-editable files directly in `execute` and `submission`.
+
+### Mini-projects are VS-Code-only
+The three Day-3 mini-projects (`build-a-tree`, `grandpas-time-machine`,
+`grandmas-blackmarket-kitchen`) are excluded from `execute`/`submission`
+entirely — see [CONTRACT.md](CONTRACT.md#mini-projects-are-vs-code-only) for
+the full rationale and wire-level consequences. In short: at least one needs
+`Scanner`/interactive `stdin`, which this app's stateless request/response
+`execute` can't drive well, and since students pick **one of the three** to
+work on (they're offered in the same slot, not sequentially), scoping the
+Scanner-free project(s) in and the rest out would make the in-app experience
+depend on which project a student happened to pick. So the whole `Kind.Project`
+enum value is out of scope for `execute`/`submission`, not a per-assignment
+flag — `Assignment.ContentJson` for `Project` needs no new field to express
+this, and no schema change is needed to implement it.
 
 ### `Code` uniqueness is global
 `Session.Code` was originally scoped `UNIQUE (Code, Year)` so a code could be
@@ -327,15 +386,33 @@ assignments contiguously from 0.
 > a CONTRACT.md-relevant field — the assignment-list response order (and any
 > index-based addressing) should be defined against it.
 
-### Welcome-back resume suggestion needs no new schema (Frontend only)
-On login, a student who joined a session yesterday can be prompted to
-continue in today's session, without retyping a code. This needs no new
-columns — `Session.CreateAt` and `Attendance` already carry what's
-needed. See [CONTRACT.md](CONTRACT.md#resume-suggestion-planned) for the
-full plan (endpoint shape, matching heuristic, edge cases). Noted here only
-so it's clear this is orchestration/query logic, not a schema change —
-deliberately not introducing a course/cohort entity just to answer "is this
-the same class as yesterday" (see [STORIES.md](STORIES.md) S9).
+### Welcome-back resume suggestion retired — superseded by `today-latest`
+The original plan here was a *personalized* suggestion: on login, a student
+who joined a session yesterday would be prompted to continue in today's
+session, by diffing `Session.CreateAt` against their own `Attendance` rows
+(no new columns needed for that either — it was pure query logic). That
+plan, and its one-off frontend `WelcomeBackBanner` component, are both
+**retired** — see [CONTRACT.md](CONTRACT.md#resume-suggestion-retired) for
+the reasoning.
+
+What shipped instead is simpler and needs no `Attendance` join at all:
+[`GET /api/sessions/today-latest`](CONTRACT.md#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today)
+just asks "is there an `active` `Session` created today," full stop —
+
+```
+var todayStart = DateTimeOffset.UtcNow.Date;
+var latest = Session
+  .Where(s => s.Status == SessionStatus.Active && s.CreateAt >= todayStart)
+  .OrderByDescending(s => s.CreateAt)
+  .FirstOrDefault();
+```
+
+— then projects `{ code: latest.Code, assignmentSetId: latest.AssignmentSetId }`
+(reusing `GetSessionResponse`, the same shape as `GET /api/sessions/{code}`),
+or `404 Not Found` if nothing matches. No per-student personalization, no
+course/cohort entity, and — unlike the retired design — no `WelcomeBackBanner`;
+the entry screen's join button just enables/disables itself against this
+response.
 
 ### Persistence replaces `SessionStore`'s ephemeral-by-design contract 
 `SessionStore` (in-memory) is explicitly ephemeral: a server restart loses
@@ -345,15 +422,24 @@ SignalR roster (who's currently connected) stays in-memory and *is* still
 ephemeral; it's a separate, smaller concern from the persisted historical
 record of who attended.
 
+A manual [`POST /api/sessions/{code}/end`](CONTRACT.md#post-apisessionscodeend)
+now clears a room's `SessionStore` entry (`RemoveRoom`) at the same time it
+persists `Session.Status = ended` — the two representations (durable
+`Status`, ephemeral roster/timer) are kept in lockstep on every state change
+that matters, rather than one silently drifting from the other.
+
 ---
 
 ## Open decisions
 
-- [ ] How does a `Project` submission ever get `Passed = true` — manual teacher review needs an endpoint/UI, which doesn't exist yet.
+- [x] How does a `Project` submission ever get `Passed = true`? — **resolved by scoping it out**, not by building manual review: `Project` is excluded from `execute`/`submission` altogether (see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)), so there's no `Submission` row to review in the first place. Manual review of an uploaded solution is no longer on the table unless this decision is revisited.
 - [x] Migration of the 34 existing frontend assignments into `Assignment` rows — done via the idempotent
       [scripts/seed-tasks.sql](scripts/seed-tasks.sql) (upserts keyed on `Slug`; re-runnable against any environment).
-- [ ] Resume-suggestion tie-break: if more than one `Session` was created "today," which one is suggested — most recent
-      `CreateAt`? (Single-class-at-a-time assumption makes this unlikely in practice, but not impossible.)
-- [ ] Resume-suggestion across a year rollover (student's last `Attendance` was December of last year): does the prompt still
-      make sense? Probably rare enough to ignore, flagging in case it isn't. (`Year` is no longer a column — this is purely a
-      calendar-date question on `CreateAt` / `JoinedAt` now.)
+- [x] `today-latest` tie-break: if more than one `active` `Session` was created "today," the most recent `CreateAt` wins —
+      same heuristic the retired resume-suggestion design used (single-class-at-a-time assumption makes ties unlikely in
+      practice, but not impossible). See [Welcome-back resume suggestion retired](#welcome-back-resume-suggestion-retired--superseded-by-today-latest).
+- [ ] `today-latest` across a year/midnight rollover for a session running late: "today" is server-UTC-midnight-to-now on
+      `CreateAt`, so a session created just before UTC midnight stops being "today's" the moment the clock ticks over, even
+      mid-class. Probably rare enough to ignore for a 3-day workshop, flagging in case it isn't.
+- [x] Session lifetime — a room ends only when the teacher manually ends it; see [`Session.Status`](#sessionstatus) and
+      [CONTRACT.md → Open decisions](CONTRACT.md#open-decisions). No idle timeout.

@@ -19,9 +19,20 @@ public class SessionConfiguration : IEntityTypeConfiguration<Session>
                .ValueGeneratedOnAdd()
                .HasDefaultValueSql("now()");
 
+        builder.Property(s => s.Status)
+               .HasConversion(
+                     v => v.ToString().ToLowerInvariant(),
+                     v => Enum.Parse<SessionStatus>(v, ignoreCase: true))
+               .HasColumnType("text")
+               .HasDefaultValue(SessionStatus.Active);
+
         builder.HasOne(s => s.AssignmentSet)
                .WithMany(ts => ts.Sessions)
                .HasForeignKey(s => s.AssignmentSetId)
                .OnDelete(DeleteBehavior.Restrict);
+
+        builder.ToTable("session", s => s.HasCheckConstraint(
+              "ck_session_status",
+              "status IN ('active', 'ended')"));
     }
 }

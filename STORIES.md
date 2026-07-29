@@ -35,16 +35,18 @@ Ordered by dependency and risk: build top-down.
 - **Transport:** REST
 - **Contract:** [`POST /api/assignments/{assignmentId}/submissions`](CONTRACT.md#submission)
 - **Introduces:** identity (`studentId`) + persisted progress. Built on top of `execute`.
-- **Frontend:** not built yet — Submit button needs to call the new endpoint and render `passed`/`result` instead of relying on the client-side `check()`.
-- **Backend:** not built yet — needs `Assignment`/`Submission` persistence (see [SCHEMA.md](SCHEMA.md)) and the grading dispatch (`code` lookup / `predict` compare).
+- **Frontend:** ✅ built — Submit (for `code`) and predict's answer submit both call `submitAssignment` (`@lib/submissionApi`) against the real endpoint and render `passed`/`result`, not a client-side `check()`/quiz-check call. `studentId` is registered server-side (`PUT /api/students/{studentId}`, `@lib/studentApi`) before the first submission of a session, since `SubmissionService` rejects an unrecognized `studentId`.
+- **Backend:** ✅ built — `SubmissionController` → `SubmissionService`, `Assignment`/`Submission` persistence (see [SCHEMA.md](SCHEMA.md)) and the grading dispatch (`code`/`predict` via `GradingJson`).
 - **Decisions already made:**
   - Payload is `{ studentId, sessionId?, content }` → returns `{ subId, passed, result, submittedAt }`.
   - "Completed" is decided server-side (`Assignment.Id` → a backend-owned grading
     lookup for `code`, a generic compare for `predict`), not self-reported by
     the client. See [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine).
   - Progress is stored in a `Submission` table, keyed by `studentId` — see [SCHEMA.md](SCHEMA.md).
-- **Open questions:**
-  - [ ] `project` submissions have no automated grader yet (`passed` stays `null`) — manual review path is undecided.
+- **Decided:** `project` doesn't submit through this endpoint at all — see
+  [CONTRACT.md](CONTRACT.md#mini-projects-are-vs-code-only). `code`/`predict`
+  are the only kinds this endpoint needs to handle; the old open question
+  about a manual-review path for `project` is moot.
 - **Done when:** a submission records the student as having completed that assignment, and it survives a reload.
 
 ---
@@ -97,18 +99,20 @@ back the next day (or reload), **so that** I don't lose progress or redo
 finished assignments.
 
 - **Transport:** REST
-- **Contract:** [`GET /api/students/{studentId}/submissions`](CONTRACT.md#submission)
-- **Frontend:** not built yet — fetch history on load, mark completed assignments in the sidebar (replaces the old local active/completed-key logic).
-- **Backend:** not built yet — the query itself is straightforward once `Submission` exists.
+- **Contract:** [`GET /api/students/{studentId}/submissions`](CONTRACT.md#submission) (thin list) + [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission) (code + result for one attempt, on demand)
+- **Frontend:** ✅ built now — `useStudentSession` fetches the thin history on load (independent of join/solo/entry screen) and seeds `useAssignments`'s completed-assignment set from it (replaces the old local active/completed-key logic), so the stepper shows yesterday's passes without a fresh submission this session. The **Submissions tab** of `AssignmentPanel` lists that assignment's attempts (outcome badge + timestamp only, from the thin list) — an assignment shows *Passed* if **any** attempt passed (not the latest, not an average); `project`-kind assignments are excluded (they never submit — see [Mini-projects are VS-Code-only](CONTRACT.md#mini-projects-are-vs-code-only)). Calls the list endpoint defensively: any failure (it doesn't exist yet) resolves to `[]`, so the rest of the app behaves as if the student has no history yet, not broken. **Not built yet:** clicking a row to fetch that attempt's code + result via the detail endpoint — today the Submissions tab only shows the outcome, no replay.
+- **Backend:** not built yet — the list query is straightforward once `Submission` exists; see [SCHEMA.md](SCHEMA.md#submission) for the exact shape (filter + order by `SubmittedAt` desc, join `Session` for the wire `sessionId`/code). The detail-by-`subId` read is a second, trivial query — see [CONTRACT.md](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission).
 - **Depends on:** S2 (persisted submissions); [Identity](CONTRACT.md#identity-no-registration) (`studentId` survives in `localStorage` across days).
 - **Decisions already made:**
   - Completion is derived from `Submission.passed` server-side, not a
     client-side id list — this retires the frontend's old
     active/completed-key hack. See [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).
+  - An assignment's status is "passed" if **any** submission for it passed — the frontend still lists every attempt (Submissions tab), it just doesn't gate "done" on the *latest* one.
+  - The list endpoint stays thin (no `content`/`result` per row); a student wanting to see their own past code/output calls the same shared [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission) the teacher dashboard uses (S10) — one detail route, not a student-specific widening of the list.
 - **Open questions:**
   - [ ] A student who loses their `studentId` (new browser/device) has no
     recovery path today — treated as a brand-new student. Accepted risk, not solved.
-- **Done when:** a student who reloads, or returns the next day, sees which assignments they already passed.
+- **Done when:** a student who reloads, or returns the next day, sees which assignments they already passed. Frontend: done. Backend: pending.
 
 ---
 
@@ -168,24 +172,74 @@ compare approaches.
 
 ---
 
-## S9 — Student sees a "welcome back" resume prompt
+## S9 — Student joins today's session with one click
 
-**As a** returning student, **I want** to be offered today's session
-automatically if I attended yesterday's, **so that** I don't have to ask the
-teacher for the code again or retype it.
+**As a** student, **I want** the entry screen to tell me if a session is
+currently running and let me join it without typing a code, **so that** I
+don't have to ask the teacher to repeat it or copy it down.
+
+> **History:** originally scoped as a *personalized* "welcome back" resume
+> prompt (`GET /api/students/{studentId}/resume-suggestion`, matched against
+> this student's own `Attendance` history, surfaced via a dismissible
+> `WelcomeBackBanner`). That plan was **retired before the backend route was
+> built** in favor of the simpler version below — see
+> [CONTRACT.md](CONTRACT.md#resume-suggestion-retired) for why the
+> personalization wasn't worth its complexity.
 
 - **Transport:** REST
-- **Contract:** [`GET /api/students/{studentId}/resume-suggestion`](CONTRACT.md#resume-suggestion-planned) — **plan only, not implemented.**
-- **Depends on:** [Identity](CONTRACT.md#identity-no-registration) (persistent `studentId`); [Sessions](CONTRACT.md#sessions-rooms) (`Attendance` history).
-- **Decisions already made:** matching heuristic is "the most recently
-  created `Session` this student doesn't already have an `Attendance` row
-  for" — no course/cohort entity needed, since the app assumes one active
-  class at a time. See [SCHEMA.md](SCHEMA.md#welcome-back-resume-suggestion-needs-no-new-schema).
-- **Open questions:**
-  - [ ] Prompt UI/component not designed — CONTRACT.md defines the data, not the component.
-  - [ ] Tie-break if more than one session was created "today" (most recent `CreateDatetime` — see SCHEMA.md open decisions).
-- **Done when:** not started — this story is a written-down plan so both
-  sides agree on the approach ahead of time; nothing is built yet.
+- **Contract:** [`GET /api/sessions/today-latest`](CONTRACT.md#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today)
+- **Frontend:** ✅ built — the entry screen (`EntryPortal`, orchestrated by
+  `useStudentSession`) fetches this on mount, with no `studentId` involved.
+  A "Join current Session" button shows the session `code` inline and is
+  enabled once a name is typed and a session is found; it reads "No current
+  active session to join" (disabled) if none is, and "Checking for a
+  session…" (disabled) while the request is in flight. Clicking it joins via
+  the existing `JoinSession` hub path — no manual code entry, and no more
+  free-text code input on the entry screen at all. Any non-2xx/network error
+  degrades to "no session today," never a blocking error.
+- **Backend:** ✅ built — `SessionService.GetTodayLatestActiveSessionAsync`
+  (most recent `active` `Session` with `CreateAt` on or after today's UTC
+  midnight), exposed via `SessionsController`.
+- **Depends on:** [Sessions](CONTRACT.md#sessions-rooms) (`Session.CreateAt` + the new `Status`, see [SCHEMA.md](SCHEMA.md#sessionstatus)).
+- **Decisions already made:**
+  - No personalization, no `Attendance` join — "is a session live today" has
+    the same answer for every student, so it doesn't need `studentId`.
+  - Tie-break if more than one session was created "today": most recent
+    `CreateAt`, filtered to `Status = active` — see [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions).
+- **Done when:** a student who lands on the entry screen while a session is
+  live sees an enabled "Join current Session ⟨code⟩" button and can join
+  without ever seeing or typing a code; with none live, the button explains
+  why it's disabled instead of just being greyed out silently.
+
+---
+
+## S12 — Teacher manually ends a session
+
+**As a** teacher, **I want** to explicitly end today's session, **so that**
+it stops showing up as joinable and every student currently in the room is
+sent back to the entry screen.
+
+- **Transport:** REST (trigger) + SignalR (fan-out, same split as the timer)
+- **Contract:** [`POST /api/sessions/{code}/end`](CONTRACT.md#post-apisessionscodeend) → `SessionEnded` event
+- **Frontend:** ✅ built — the teacher dashboard's existing "End session"
+  action (`useTeacherSession`) now calls the real endpoint (`@lib/sessionApi.endSession`)
+  instead of only clearing local state, with an `isEndingSession` loading
+  state on the button. Students receive `SessionEnded` in `useStudentSession`
+  and are bounced back to the entry screen — the same teardown path as if
+  they'd never joined, not an error dialog.
+- **Backend:** ✅ built — `SessionsController.EndSession` sets
+  `Session.Status = ended`, clears the room's `SessionStore` entry
+  (`RemoveRoom`), and broadcasts `SessionEnded` to Group `code`. `GET /api/sessions/{code}`
+  and `GET /api/sessions/today-latest` both stop returning the session
+  immediately afterward (see [SCHEMA.md](SCHEMA.md#sessionstatus)).
+- **Depends on:** [Sessions](CONTRACT.md#sessions-rooms); [S9](#s9--student-joins-todays-session-with-one-click) (today-latest must respect `Status` or an ended room would still look joinable).
+- **Decisions already made:**
+  - A real `Status` column, not a soft-delete — `Attendance`/`Submission` history for an ended session stays fully intact and queryable.
+  - No idle-timeout auto-end — a session only ends when the teacher explicitly ends it. See [CONTRACT.md → Open decisions](CONTRACT.md#open-decisions).
+- **Done when:** clicking "End session" on the teacher dashboard immediately
+  redirects every connected student to the entry screen, and the session's
+  code stops being offered by `today-latest` or accepted by a fresh manual
+  join.
 
 ---
 
@@ -195,17 +249,86 @@ teacher for the code again or retype it.
 after I reload, reconnect, or the server restarts, **so that** I don't lose
 the class's state just because a connection dropped.
 
-- **Transport:** REST (hydration) + SignalR (live deltas — existing `StudentJoined`, plus a backlog `ProgressUpdated`)
-- **Contract:** [`GET /api/sessions/{code}/attendance`](CONTRACT.md#teacher-dashboard-hydration-attendance--progress), [`GET /api/sessions/{code}/progress`](CONTRACT.md#teacher-dashboard-hydration-attendance--progress)
-- **Frontend:** not built — on dashboard load, hydrate the roster from `/attendance` and pass status from `/progress`, **then** start `ObserveSession` for live `StudentJoined`. Today the dashboard has only the live layer, so a reconnecting teacher sees just who's currently connected — anyone who stepped away has vanished.
-- **Backend:** not built — needs persisted `Attendance` + `Submission` (see [SCHEMA.md](SCHEMA.md)); the queries themselves are straightforward reads.
+- **Transport:** REST (hydration) + SignalR (live deltas — `AttendanceUpdated` / `ProgressUpdated`, superseding `StudentJoined`/`RosterUpdated`)
+- **Contract:** ✅ decided — [`GET /api/sessions/{code}/attendance`](CONTRACT.md#get-apisessionscodeattendance-teacher-roster-hydration), [`GET /api/sessions/{code}/progress`](CONTRACT.md#get-apisessionscodeprogress-teacher--per-assignment-per-student-status), [`GET /api/sessions/{code}/assignments/{assignmentId}/submissions`](CONTRACT.md#get-apisessionscodeassignmentsassignmentidsubmissions-teacher--submission-history-for-one-assignment-in-this-room) (thin list) + [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission) (code + result for the row Col 4 has selected), [`AttendanceUpdated` / `ProgressUpdated`](CONTRACT.md#live-progress-broadcasts-server--teacher-observers-in-the-room).
+- **Frontend:** not built — on dashboard load, hydrate the roster from `/attendance` and pass status from `/progress`, **then** start `ObserveSession` and subscribe to `AttendanceUpdated`/`ProgressUpdated` for live deltas instead of `StudentJoined`/`RosterUpdated`. Col 4's read-only code+result view (currently a `mockSubmissions` placeholder in `TeacherDashboard.tsx`) wires up to the session+assignment list for Col 3's attempt rows, then calls the shared detail endpoint for whichever `subId` is selected. Today the dashboard has only the live layer, so a reconnecting teacher sees just who's currently connected — anyone who stepped away has vanished.
+- **Backend:** not built — needs persisted `Attendance` + `Submission` (see [SCHEMA.md](SCHEMA.md)); the queries themselves are straightforward reads. The two broadcasts hook into the existing `Attendance` join/leave path and `SubmissionService`'s grading step respectively.
 - **Depends on:** S2 (persisted submissions); persisted Sessions / Attendance (SCHEMA.md).
 - **Decisions already made:**
   - Live roster (`ObserveSession`) and persisted attendance are **different reads** — the first is who's connected now, the second is who attended. Don't conflate them; the teacher side needs a REST hydration layer mirroring the student side's `SessionState`.
-  - "passed" is per-(student, assignment) EXISTS a passing submission, **not** a row average; `project` assignments (`passed = null`) are excluded from pass lists. See [CONTRACT.md](CONTRACT.md#teacher-dashboard-hydration-attendance--progress).
-- **Open questions:**
-  - [ ] Live per-assignment progress push (`ProgressUpdated`) so the dashboard updates without re-fetching — still backlog.
-- **Done when:** a teacher who reloads mid-class sees the full roster of everyone who joined **and** each student's passed assignments, not just who's currently connected.
+  - "passed" is per-(student, assignment) EXISTS a passing submission, **not** a row average; `project` assignments (`passed = null`) are excluded from pass lists. See [CONTRACT.md](CONTRACT.md#get-apisessionscodeprogress-teacher--per-assignment-per-student-status).
+  - `/attendance`'s active-student set is the shared denominator for `passedNum`/`totalNum` everywhere in the dashboard — a student who left stops counting even though their `Submission` history isn't deleted.
+  - Both submission-history `GET` list endpoints (this one, and S5's student-facing one) stay **thin** — `subId` + outcome, no `content`/`result`. Either side gets the actual code + result the same way: one shared [`GET /api/submissions/{subId}`](CONTRACT.md#get-apisubmissionssubid-shared--full-detail-for-one-submission), fetched only for the one row currently selected. No teacher-only "fat" list endpoint.
+  - `AttendanceUpdated`/`ProgressUpdated` are point-patch deltas (one row each), not full-list re-broadcasts — the dashboard applies them to whatever it hydrated from the `GET`s rather than re-fetching.
+- **Done when:** a teacher who reloads mid-class sees the full roster of everyone who joined **and** each student's passed assignments, not just who's currently connected — and Col 1's pass-rate badges / Col 2's status dots update live off the two broadcasts without re-polling.
+
+---
+
+## S11 — Teacher follow: point students at the assignment I'm on
+
+**As a** teacher, **I want** to signal which assignment I'm currently discussing,
+**so that** students in the room can jump there without me reading out ids or
+titles.
+
+- **Transport:** SignalR only (hub method trigger + room broadcast — no REST leg,
+  unlike the timer, since the teacher already holds a live hub connection)
+- **Contract:** [`FocusAssignment`](CONTRACT.md#follow-teacher--room-broadcast) → `AssignmentFocused` event
+- **Frontend:** ✅ built — a `Focus` button on each assignment in the teacher's
+  `AssignmentSetPreview` calls `sessionHub.focusAssignment(code, id)`; a `Live`
+  badge marks the currently-focused one. Students receive `AssignmentFocused` in
+  `useStudentSession` and, if it names an assignment other than the one they're
+  looking at, `StudentIde` shows a `TeacherFollowBanner` ("teacher is on _X_ —
+  Follow →"); clicking it navigates via the existing assignment-select path. If
+  the student is already on the focused assignment, the Toolbar shows a small
+  "following teacher" pill instead of a banner.
+- **Backend:** ✅ built — `SessionHub.FocusAssignment` stores the id on
+  `SessionStore` (so a late joiner's `JoinSession` reply includes
+  `focusedAssignmentId`, mirroring the timer's `activeTimer`) and broadcasts
+  `AssignmentFocused` to Group `code`.
+- **Depends on:** [Sessions / rooms](CONTRACT.md#sessions-rooms) — scoped to a
+  room, so solo students never see it.
+- **Decisions already made:**
+  - Non-coercive, like the timer — a banner/badge invitation, never a forced
+    navigation.
+  - The room stores only the *latest* focused assignment (a single
+    `int?`, overwritten each call) — no history of what was focused when.
+- **Done when:** a teacher clicking Focus on an assignment shows a Follow banner
+  on every other student's screen for that assignment, clicking it takes them
+  there, and a student who joins after the fact still sees the current focus.
+
+---
+
+## S11 — Teacher follow: point students at the assignment I'm on
+
+**As a** teacher, **I want** to signal which assignment I'm currently discussing,
+**so that** students in the room can jump there without me reading out ids or
+titles.
+
+- **Transport:** SignalR only (hub method trigger + room broadcast — no REST leg,
+  unlike the timer, since the teacher already holds a live hub connection)
+- **Contract:** [`FocusAssignment`](CONTRACT.md#follow-teacher--room-broadcast) → `AssignmentFocused` event
+- **Frontend:** ✅ built — a `Focus` button on each assignment in the teacher's
+  `AssignmentSetPreview` calls `sessionHub.focusAssignment(code, id)`; a `Live`
+  badge marks the currently-focused one. Students receive `AssignmentFocused` in
+  `useStudentSession` and, if it names an assignment other than the one they're
+  looking at, `StudentIde` shows a `TeacherFollowBanner` ("teacher is on _X_ —
+  Follow →"); clicking it navigates via the existing assignment-select path. If
+  the student is already on the focused assignment, the Toolbar shows a small
+  "following teacher" pill instead of a banner.
+- **Backend:** ✅ built — `SessionHub.FocusAssignment` stores the id on
+  `SessionStore` (so a late joiner's `JoinSession` reply includes
+  `focusedAssignmentId`, mirroring the timer's `activeTimer`) and broadcasts
+  `AssignmentFocused` to Group `code`.
+- **Depends on:** [Sessions / rooms](CONTRACT.md#sessions-rooms) — scoped to a
+  room, so solo students never see it.
+- **Decisions already made:**
+  - Non-coercive, like the timer — a banner/badge invitation, never a forced
+    navigation.
+  - The room stores only the *latest* focused assignment (a single
+    `int?`, overwritten each call) — no history of what was focused when.
+- **Done when:** a teacher clicking Focus on an assignment shows a Follow banner
+  on every other student's screen for that assignment, clicking it takes them
+  there, and a student who joins after the fact still sees the current focus.
 
 ---
 
@@ -213,6 +336,7 @@ the class's state just because a connection dropped.
 
 Stub stories — flesh out before building.
 
-- Teacher sees live student progress via a `ProgressUpdated` broadcast (the live-delta half of S10 — hydration is defined; the push is not).
+- ~~Teacher sees live student progress via a `ProgressUpdated` broadcast~~ — contract decided, see [S10](#s10--teacher-re-syncs-full-attendance--progress-on-reconnect) and [CONTRACT.md](CONTRACT.md#live-progress-broadcasts-server--teacher-observers-in-the-room); not yet implemented.
 - Student picks an assignment from the sidebar.
-- Teacher manually marks a `project` submission as passed/failed (no automated grader exists).
+- ~~Teacher manually marks a `project` submission as passed/failed~~ — dropped, not deferred: `project` no longer submits at all (see [CONTRACT.md](CONTRACT.md#mini-projects-are-vs-code-only)), so there's nothing to review in-app.
+- Multi-file execution in `PistonClient`/`ExecutorService` — needed to actually run the Day-3 single-class assignments (`person-class`/`flight-ticket-class`/`container-class`) via `execute`'s `harness`; see [CONTRACT.md](CONTRACT.md#post-apiexecute) and [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine). This is an implementation gap, not a contract gap — `files`/`entryClass` are already documented.
