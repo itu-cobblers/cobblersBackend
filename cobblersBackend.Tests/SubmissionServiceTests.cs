@@ -280,7 +280,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
     
     [Fact]
-    public async Task SubmitAsync_UknownSession_Throws()
+    public async Task SubmitAsync_UnknownSessionCode_Throws()
     {
         // Given 
         int assignmentId;
@@ -392,7 +392,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetHistoryAsync_SubmissionWithNoSession_AssertSessionIsNull()
+    public async Task GetHistoryAsync_SoloSubmission_SessionIdIsNull()
     {
         // Given
         string studentId = "student-1";
@@ -423,7 +423,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact] 
-    public async Task GetHistoryAsync_ValidSessionId_AssertEqualToSessionCode()
+    public async Task GetHistoryAsync_ValidSessionCode_SessionIdIsCode()
     {
         // Given 
         string sessionCode;
@@ -464,7 +464,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetHistoryAsync_UknownStudentId_ReturnEmptyList()
+    public async Task GetHistoryAsync_UnknownStudentId_ReturnsEmptyList()
     {
         // Given
         string studentId = "student-1";
@@ -529,7 +529,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetSubmissionAsync_PredictKind_RoundTripsContentAndPassed() // suggest a better name
+    public async Task GetSubmissionAsync_PredictKind_RoundTripsContent_ResultIsNull()
     {
         // Given
         string studentId = "student-1";
@@ -564,7 +564,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetSubmissionAsync_ValidSessionId_AssertEqualSessionCode() // suggest a better name
+    public async Task GetSubmissionAsync_ValidSessionCode_SessionIdIsCode()
     {
         // Given
         string studentId = "student-1";
@@ -608,7 +608,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetSubmissionAsync_UnknownSubId_returnNull() // suggest a better name{}
+    public async Task GetSubmissionAsync_UnknownSubId_ReturnsNull()
     {
         // Given
         string studentId = "student-1";
