@@ -52,7 +52,7 @@ INSERT INTO assignment (slug, kind, title, description, hint, lesson_json, conte
   $txt$System.out.println("Hello ITU!");$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Printing a message is the most basic thing every programming language can do. In Java it takes a class, a main method, and one print statement:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$public class Hello {
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
     public static void main(String[] args) {
         System.out.println("Hello World!");
     }
@@ -243,7 +243,7 @@ System.out.println(greet);   // Hello World!$txt$),
 System.out.println("The year is " + year);$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class Hello {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         String first = "Hello";
         String second = "my";
@@ -253,7 +253,7 @@ System.out.println("The year is " + year);$txt$)
 }
 $java$
   ),
-  to_jsonb($java$public class Hello {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         String first = "Hello";
         String second = "my";
@@ -271,7 +271,7 @@ $java$::text),
   $txt$Divide instead of multiply: dkk / 7.45$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$During the break you meet a friend at ITU's own café, Cafe Analog. A coffee costs 20 dkk. Your friend says that is cheap — but you want to see it in euro. This code converts the other way, from euro to kroner:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$public class Valuta {
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
     public static void main(String[] args) {
         int eur = 100;
         double dkk = eur * 7.45;
@@ -280,7 +280,7 @@ $java$::text),
 }$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class Valuta {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         int eur = 100;
         double dkk = eur * 7.45;
@@ -289,7 +289,7 @@ $java$::text),
 }
 $java$
   ),
-  to_jsonb($java$public class Valuta {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         int dkk = 20;
         double eur = dkk / 7.45;
@@ -305,7 +305,7 @@ $java$::text),
   $txt$static void dkk2eur(double dkk) { … }$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Functions let us reuse code and give a snippet a clear responsibility. This does exactly the same as the previous exercise, wrapped in a function:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$public class Valuta {
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
     static void dkk2eur() {
         double dkk = 100;
         double eur = dkk / 7.45;
@@ -328,7 +328,7 @@ public static void main(String[] args) {
 }$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class Valuta {
+    'starter', $java$public class Main {
 
     // Change this to take one parameter: static void dkk2eur(double dkk)
     static void dkk2eur() {
@@ -344,7 +344,7 @@ public static void main(String[] args) {
 }
 $java$
   ),
-  to_jsonb($java$public class Valuta {
+  to_jsonb($java$public class Main {
 
     static void dkk2eur(double dkk) {
         double eur = dkk / 7.45;
@@ -373,7 +373,7 @@ all in semester 1.$txt$,
     jsonb_build_object('kind', 'text', 'text', $txt$At ITU every course is worth ECTS points, and a full semester adds up to 30 ECTS. A function with several parameters can print any course the same way. Software Design semester 1: Introductory Programming (15), Discrete Mathematics (7.5), Software Engineering (7.5).$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class StudyPlan {
+    'starter', $java$public class Main {
 
     // Declare printCourse here
 
@@ -383,7 +383,7 @@ all in semester 1.$txt$,
 }
 $java$
   ),
-  to_jsonb($java$public class StudyPlan {
+  to_jsonb($java$public class Main {
 
     static void printCourse(String name, double ects, int semester) {
         System.out.println(name + " (" + ects + " ECTS) is in semester " + semester + ".");
@@ -456,7 +456,7 @@ if (condition) {
 // code that is always executed$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class ScrollBar {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         String weekday = "Friday"; // try "Thursday" too
         // Print Yes... or No...
@@ -464,7 +464,7 @@ if (condition) {
 }
 $java$
   ),
-  to_jsonb($java$public class ScrollBar {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         String weekday = "Friday"; // try "Thursday" too
         if (weekday == "Friday") {
@@ -497,7 +497,7 @@ if (isThursday) {
 }$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class ScrollBar {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         String weekday = "Friday"; // try "Thursday" too
         // boolean isFriday = ...
@@ -506,7 +506,7 @@ if (isThursday) {
 }
 $java$
   ),
-  to_jsonb($java$public class ScrollBar {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         String weekday = "Friday"; // try "Thursday" too
         boolean isFriday = (weekday == "Friday");
@@ -550,7 +550,7 @@ if (number > 0) {
 }$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class Canteen {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         double time = 13.75; // try 10.5, 12.0, 13.5, 14.5
         // Nested if/else for early / late / serving + discount
@@ -558,7 +558,7 @@ if (number > 0) {
 }
 $java$
   ),
-  to_jsonb($java$public class Canteen {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         double time = 13.75; // try 10.5, 12.0, 13.5, 14.5
 
@@ -596,7 +596,7 @@ Flip the two booleans and check both outcomes.$txt$,
 Logical operators: ! (not), && (and), || (or) — at least one must be true for ||.$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class FitnessAccess {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         boolean hasMembership = false;
         boolean isFreeTrialTuesday = true; // first Tuesday of the month
@@ -606,7 +606,7 @@ Logical operators: ! (not), && (and), || (or) — at least one must be true for 
 }
 $java$
   ),
-  to_jsonb($java$public class FitnessAccess {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         boolean hasMembership = false;
         boolean isFreeTrialTuesday = true;
@@ -637,7 +637,7 @@ System.out.println("During " + period + ", an ITU student is probably at " + pla
     jsonb_build_object('kind', 'text', 'text', $txt$Previous functions were mostly void (they printed). A function can also return a value to the caller with return. The return type goes where void used to be (String, int, boolean, …).$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class StudentDay {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         String period = "morning"; // try "break", "noon", "afternoon"
         System.out.println("During " + period + ", an ITU student is probably at " + place(period));
@@ -650,7 +650,7 @@ System.out.println("During " + period + ", an ITU student is probably at " + pla
 }
 $java$
   ),
-  to_jsonb($java$public class StudentDay {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         String period = "morning";
         System.out.println("During " + period + ", an ITU student is probably at " + place(period));
@@ -689,7 +689,7 @@ while (i < 10) {           // loop condition
     jsonb_build_object('kind', 'text', 'text', $txt$i starts at 0, condition i < 10 → body runs for 0..9 (10 times). It never runs with i == 10.$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class Number {
+    'starter', $java$public class Main {
 
     static void function(int number) {
         System.out.println("Line " + number + ": I will push my code before the deadline!");
@@ -705,7 +705,7 @@ while (i < 10) {           // loop condition
 }
 $java$
   ),
-  to_jsonb($java$public class Number {
+  to_jsonb($java$public class Main {
 
     static void function(int number) {
         System.out.println("Line " + number + ": I will push my code before the deadline!");
@@ -899,7 +899,7 @@ Using a while loop, print the running total after each pack: 5, 10, 15, …, 50 
     jsonb_build_object('kind', 'text', 'text', $txt$Use a while loop when you know you need to repeat until a counter reaches a limit. Initialize → check → body → increment.$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class AnalogTickets {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         int ticketsPerPack = 5;
         // Buy 10 packs with a while loop; print the running total each time
@@ -907,7 +907,7 @@ Using a while loop, print the running total after each pack: 5, 10, 15, …, 50 
 }
 $java$
   ),
-  to_jsonb($java$public class AnalogTickets {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         int ticketsPerPack = 5;
         int total = 0;
@@ -934,7 +934,7 @@ $java$::text),
     jsonb_build_object('kind', 'text', 'text', $txt$A while loop and a for loop can do the same job.$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class AnalogTickets {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         int ticketsPerPack = 5;
         int total = 0;
@@ -948,7 +948,7 @@ $java$::text),
 }
 $java$
   ),
-  to_jsonb($java$public class AnalogTickets {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         int ticketsPerPack = 5;
         int total = 0;
@@ -1115,14 +1115,14 @@ Set 4 Rep 12$txt$,
 }$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$public class GymWorkout {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
         // nested for: sets 1..4, reps 1..12
     }
 }
 $java$
   ),
-  to_jsonb($java$public class GymWorkout {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
         for (int set = 1; set <= 4; set = set + 1) {
             for (int rep = 1; rep <= 12; rep = rep + 1) {
@@ -1135,137 +1135,113 @@ $java$::text),
   $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Set 1 Rep 1"}, {"target": "stdout", "op": "containsLine", "value": "Set 4 Rep 12"}]}$j$::jsonb
 ),
 (
-  'guess-locker', 'code', 'Guess the locker',
-  $txt$You can rent a locker at the Information Desk (deposit 500 DKK). Today you forgot which locker is yours — a secret integer from 0 … 99. Read guesses with a Scanner in a while loop, print "Too low" / "Too high" until correct, then congratulate and print how many guesses you used.$txt$,
-  $txt$Scanner scanner = new Scanner(System.in); while (guess != secret) { guess = scanner.nextInt(); ... }$txt$,
+  'analog-reusable-cup-stamps', 'code', 'Help Analog go sustainable',
+  $txt$Cafe Analog wants fewer disposable cups. Every time you buy a drink and bring your own cup, you get a stamp on your card — the 10th stamp is a free cup, and you start a fresh card right after.
+
+Simulate 24 drinks bought (one per loop iteration) with a for or while loop: stamps starts at 0, and each drink adds one stamp.
+- While stamps != 10: print "Brought my own cup, got a stamp! ({stamps}/10)".
+- The moment stamps == 10: print "Free cup! Here's a new stamp card." instead, then reset stamps back to 0.$txt$,
+  $txt$if (stamps != 10) { ... } else { System.out.println("Free cup! Here's a new stamp card."); stamps = 0; }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Expressions produce values; statements do something with them (assignments, if, while/for, calls). A guessing game glues these together.$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Nothing new here — just a loop combined with if/else, the same way you did for the canteen and fitness room. The trick is that the stamp counter resets itself once it is spent.$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$import java.util.*;
-
-public class Guess {
+    'starter', $java$public class Main {
     public static void main(String[] args) {
-        Random random = new Random();
-        Scanner scanner = new Scanner(System.in);
-        int secret = random.nextInt(100);
-        int tries = 0;
-        int guess = -1;
-        // Loop until the guess equals secret; print Too low / Too high
+        int drinksBought = 24;
+        int stamps = 0;
+
+        // Loop drinksBought times. Each drink: stamps++.
+        // stamps != 10  -> print a stamp message
+        // stamps == 10  -> print a free-cup message, then reset stamps to 0
     }
 }
-$java$,
-    'stdin', $txt$50
-25
-37
-31
-34
-$txt$
+$java$
   ),
-  to_jsonb($java$import java.util.*;
-
-public class Guess {
+  to_jsonb($java$public class Main {
     public static void main(String[] args) {
-        Random random = new Random();
-        Scanner scanner = new Scanner(System.in);
-        int secret = random.nextInt(100);
-        int tries = 0;
-        int guess = -1;
+        int drinksBought = 24;
+        int stamps = 0;
 
-        while (guess != secret) {
-            System.out.println("Make a guess:");
-            guess = scanner.nextInt();
-            tries = tries + 1;
-            if (guess < secret) {
-                System.out.println("Too low");
-            } else if (guess > secret) {
-                System.out.println("Too high");
+        for (int drink = 1; drink <= drinksBought; drink = drink + 1) {
+            stamps = stamps + 1;
+
+            if (stamps != 10) {
+                System.out.println("Brought my own cup, got a stamp! (" + stamps + "/10)");
+            } else {
+                System.out.println("Free cup! Here's a new stamp card.");
+                stamps = 0;
             }
         }
-
-        System.out.println("Correct — that is your locker!");
-        System.out.println("You used " + tries + " guesses");
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "Scanner"}, {"target": "code", "op": "regex", "pattern": "while"}, {"target": "code", "op": "regex", "pattern": "nextInt"}]}$j$::jsonb
+  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bif\\s*\\("}, {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(|\\bwhile\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Free cup! Here's a new stamp card."}, {"target": "stdout", "op": "containsLine", "value": "Brought my own cup, got a stamp! (4/10)"}]}$j$::jsonb
 ),
 (
-  'how-many-ab', 'code', 'Bulls and cows (幾A幾B)',
-  $txt$Bonus: guess a secret 4-digit code (all digits different), e.g. "1704".
+  'beerpong-at-scrollbar', 'code', 'Beer pong at Scrollbar',
+  $txt$Friday at Scrollbar (ITU's Friday bar) means one thing: beer pong. Set up the rack, then simulate a full round.
 
-After each guess print how many A and B:
-- A = correct digit in the correct position
-- B = correct digit in the wrong position
-
-Example: secret 1704, guess 1075 → 1A2B.
-
-Keep looping until 4A0B, then congratulate. Start with a hardcoded secret so you can test.$txt$,
-  $txt$Use guess.charAt(i) == secret.charAt(i) for A; nested loops for B.$txt$,
+1) Print the triangle rack with a nested for loop — one line per row: "Row 1: O", "Row 2: O O", "Row 3: O O O", "Row 4: O O O O" (10 cups total).
+2) Simulate throws with a while loop. cupsLeft starts at 10. Each throw, roll with Random rng = new Random(): int roll = rng.nextInt(4) gives 0, 1, 2 or 3, each equally likely — treat roll == 0 as a hit (25% chance). On a hit, remove a cup and print "Throw {n}: SPLASH! {cupsLeft} cups left."; otherwise print "Throw {n}: MISS! {cupsLeft} cups left." Keep throwing until cupsLeft is 0, then print "GAME OVER — the rack is empty. Chug up!"$txt$,
+  $txt$Random rng = new Random(); int roll = rng.nextInt(4); if (roll == 0) { ... hit ... } else { ... miss ... }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$This bonus mixes Scanner, while, for, if, and Strings. Compare digits with charAt. Print results like 1A2B until you reach 4A0B.$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$One new tool: java.util.Random gives pseudo-random numbers. Calling nextInt(4) produces 0, 1, 2, or 3; use one of those values to decide whether the throw is a hit or miss.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$import java.util.Random;
+
+Random rng = new Random();
+int roll = rng.nextInt(4);     // 0, 1, 2, or 3 -- each 25% likely
+if (roll == 0) {
+    System.out.println("Hit!");
+}$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$Everything else — the while loop, if/else, and the cupsLeft counter — is exactly what you already know.$txt$)
   ),
   jsonb_build_object(
-    'starter', $java$import java.util.*;
+    'starter', $java$import java.util.Random;
 
-public class HowManyAB {
+public class Main {
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        String secret = "1704"; // all digits different
-        String guess = "";
+        // 1) Print the rack: 4 rows, "Row 1: O" ... "Row 4: O O O O"
 
-        // while not 4A:
-        //   read guess
-        //   count A and B
-        //   print e.g. "1A2B"
-        // print a win message
+        // 2) Simulate throws until the rack (10 cups) is empty.
+        //    Random rng = new Random();
+        //    Each throw: int roll = rng.nextInt(4); roll == 0 -> hit (25% chance)
     }
 }
-$java$,
-    'stdin', $txt$1075
-1704
-$txt$
+$java$
   ),
-  to_jsonb($java$import java.util.*;
+  to_jsonb($java$import java.util.Random;
 
-public class HowManyAB {
+public class Main {
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        String secret = "1704";
-        int a = 0;
-
-        while (a != 4) {
-            System.out.println("Guess a 4-digit code:");
-            String guess = scanner.next();
-            a = 0;
-            int b = 0;
-
-            for (int i = 0; i < 4; i = i + 1) {
-                if (guess.charAt(i) == secret.charAt(i)) {
-                    a = a + 1;
-                }
+        for (int row = 1; row <= 4; row = row + 1) {
+            System.out.print("Row " + row + ":");
+            for (int cup = 1; cup <= row; cup = cup + 1) {
+                System.out.print(" O");
             }
-
-            for (int i = 0; i < 4; i = i + 1) {
-                if (guess.charAt(i) == secret.charAt(i)) {
-                    continue;
-                }
-                for (int j = 0; j < 4; j = j + 1) {
-                    if (guess.charAt(i) == secret.charAt(j) && i != j) {
-                        b = b + 1;
-                        break;
-                    }
-                }
-            }
-
-            System.out.println(a + "A" + b + "B");
+            System.out.println();
         }
 
-        System.out.println("You cracked the code!");
+        Random rng = new Random();
+        int cupsLeft = 10;
+        int throwNumber = 0;
+
+        while (cupsLeft > 0) {
+            throwNumber = throwNumber + 1;
+            int roll = rng.nextInt(4);
+            if (roll == 0) {
+                cupsLeft = cupsLeft - 1;
+                System.out.println("Throw " + throwNumber + ": SPLASH! " + cupsLeft + " cups left.");
+            } else {
+                System.out.println("Throw " + throwNumber + ": MISS! " + cupsLeft + " cups left.");
+            }
+        }
+
+        System.out.println("GAME OVER — the rack is empty. Chug up!");
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "Scanner"}, {"target": "code", "op": "regex", "pattern": "while"}, {"target": "code", "op": "regex", "pattern": "charAt"}]}$j$::jsonb
+  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\("}, {"target": "code", "op": "contains", "value": "Random"}, {"target": "code", "op": "contains", "value": "nextInt"}, {"target": "stdout", "op": "containsLine", "value": "Row 4: O O O O"}, {"target": "stdout", "op": "contains", "value": "SPLASH!"}, {"target": "stdout", "op": "containsLine", "value": "GAME OVER — the rack is empty. Chug up!"}]}$j$::jsonb
 ),
 
 -- ─────────────────────────── DAY 3 — classes & objects / projects ───────────────────────────
@@ -1275,7 +1251,17 @@ $java$::text),
   $txt$display(): System.out.println(name + " (" + age + " years old)");$txt$,
   NULL,
   jsonb_build_object(
-    'starter', $java$class Person {
+    'starterFiles', jsonb_build_array(
+      jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
+    public static void main(String[] args) {
+        Person p = new Person("Niek", 25);
+        p.display();
+        p.birthday();
+        p.display();
+    }
+}
+$java$),
+      jsonb_build_object('name', 'Person.java', 'content', $java$public class Person {
     // fields: name, age
 
     // constructor Person(String n, int a)
@@ -1284,9 +1270,10 @@ $java$::text),
 
     // void birthday() -> age + 1
 }
-$java$,
-    'harness', jsonb_build_object(
-      'files', jsonb_build_array(jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
+$java$)),
+    'entryClass', 'Main'),
+  to_jsonb(jsonb_build_array(
+    jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
     public static void main(String[] args) {
         Person p = new Person("Niek", 25);
         p.display();
@@ -1294,10 +1281,26 @@ $java$,
         p.display();
     }
 }
-$java$)),
-      'entryClass', 'Main'),
-    'solutionFile', 'Person.java'),
-  NULL,
+$java$),
+    jsonb_build_object('name', 'Person.java', 'content', $java$public class Person {
+    String name;
+    int age;
+
+    public Person(String n, int a) {
+        name = n;
+        age = a;
+    }
+
+    public void display() {
+        System.out.println(name + " (" + age + " years old)");
+    }
+
+    public void birthday() {
+        age = age + 1;
+    }
+}
+$java$)
+  )),
   $j${"all": [
     {"target": "stdout", "op": "containsLine", "value": "Niek (25 years old)"},
     {"target": "stdout", "op": "containsLine", "value": "Niek (26 years old)"}
@@ -1309,18 +1312,8 @@ $java$)),
   $txt$In discount(), only subtract if the price stays >= 0.$txt$,
   NULL,
   jsonb_build_object(
-    'starter', $java$class FlightTicket {
-    // fields: from, to, price
-
-    // constructor FlightTicket(String f, String t, int p)
-
-    // void show()     -> "CPH --> JFK (7500 DKK)"
-
-    // void discount() -> 500 DKK off, but never below 0
-}
-$java$,
-    'harness', jsonb_build_object(
-      'files', jsonb_build_array(jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
+    'starterFiles', jsonb_build_array(
+      jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
     public static void main(String[] args) {
         FlightTicket t = new FlightTicket("CPH", "JFK", 7500);
         t.show();
@@ -1330,10 +1323,53 @@ $java$,
         t.show();
     }
 }
+$java$),
+      jsonb_build_object('name', 'FlightTicket.java', 'content', $java$public class FlightTicket {
+    // fields: from, to, price
+
+    // constructor FlightTicket(String f, String t, int p)
+
+    // void show()     -> "CPH --> JFK (7500 DKK)"
+
+    // void discount() -> 500 DKK off, but never below 0
+}
 $java$)),
-      'entryClass', 'Main'),
-    'solutionFile', 'FlightTicket.java'),
-  NULL,
+    'entryClass', 'Main'),
+  to_jsonb(jsonb_build_array(
+    jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
+    public static void main(String[] args) {
+        FlightTicket t = new FlightTicket("CPH", "JFK", 7500);
+        t.show();
+        t.discount();
+        t.show();
+        for (int i = 0; i < 20; i++) { t.discount(); }
+        t.show();
+    }
+}
+$java$),
+    jsonb_build_object('name', 'FlightTicket.java', 'content', $java$public class FlightTicket {
+    String from;
+    String to;
+    int price;
+
+    public FlightTicket(String f, String t, int p) {
+        from = f;
+        to = t;
+        price = p;
+    }
+
+    public void show() {
+        System.out.println(from + " --> " + to + " (" + price + " DKK)");
+    }
+
+    public void discount() {
+        if (price >= 500) {
+            price = price - 500;
+        }
+    }
+}
+$java$)
+  )),
   $j${"all": [
     {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7500 DKK)"},
     {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7000 DKK)"},
@@ -1346,18 +1382,8 @@ $java$)),
   $txt$In addCargo, only add if amount + a <= max (mirror the Account guard pattern).$txt$,
   NULL,
   jsonb_build_object(
-    'starter', $java$class Container {
-    // fields: id, amount, max
-
-    // constructor Container(String i, int max)  -> amount = 0
-
-    // void show()           -> "Container: AX35 (23/30)"
-
-    // void addCargo(int a)  -> add boxes, but never above max
-}
-$java$,
-    'harness', jsonb_build_object(
-      'files', jsonb_build_array(jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
+    'starterFiles', jsonb_build_array(
+      jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
     public static void main(String[] args) {
         Container c = new Container("AX35", 30);
         c.addCargo(23);
@@ -1366,10 +1392,52 @@ $java$,
         c.show();
     }
 }
+$java$),
+      jsonb_build_object('name', 'Container.java', 'content', $java$public class Container {
+    // fields: id, amount, max
+
+    // constructor Container(String i, int max)  -> amount = 0
+
+    // void show()           -> "Container: AX35 (23/30)"
+
+    // void addCargo(int a)  -> add boxes, but never above max
+}
 $java$)),
-      'entryClass', 'Main'),
-    'solutionFile', 'Container.java'),
-  NULL,
+    'entryClass', 'Main'),
+  to_jsonb(jsonb_build_array(
+    jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
+    public static void main(String[] args) {
+        Container c = new Container("AX35", 30);
+        c.addCargo(23);
+        c.show();
+        c.addCargo(40);
+        c.show();
+    }
+}
+$java$),
+    jsonb_build_object('name', 'Container.java', 'content', $java$public class Container {
+    String id;
+    int amount;
+    int max;
+
+    public Container(String i, int maximum) {
+        id = i;
+        max = maximum;
+        amount = 0;
+    }
+
+    public void show() {
+        System.out.println("Container: " + id + " (" + amount + "/" + max + ")");
+    }
+
+    public void addCargo(int a) {
+        if (amount + a <= max) {
+            amount = amount + a;
+        }
+    }
+}
+$java$)
+  )),
   $j${"all": [
     {"target": "stdout", "op": "containsLine", "value": "Container: AX35 (23/30)"},
     {"not": {"target": "stdout", "op": "regex", "pattern": "\\((?:3[1-9]|[4-9]\\d|\\d{3,})/30\\)"}}
@@ -1502,8 +1570,8 @@ WITH ordered(slug, ord) AS (VALUES
   ('for-loop-quiz-5', 28),
   ('for-loop-quiz-6', 29),
   ('gym-workout', 30),
-  ('guess-locker', 31),
-  ('how-many-ab', 32),
+  ('analog-reusable-cup-stamps', 31),
+  ('beerpong-at-scrollbar', 32),
   ('person-class', 33),
   ('flight-ticket-class', 34),
   ('container-class', 35),

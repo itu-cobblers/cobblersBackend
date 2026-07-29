@@ -216,7 +216,7 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 | Field     | Type                                   | Notes                                                                                                                    |
 | --------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–33 numbering — see [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).  |
-| `kind`    | `"code"` \| `"predict"` \| `"project"` |                                                                                                                          |
+| `kind`    | `"code"` \| `"predict"` \| `"project"` | `"project"` is content-only for now — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). The frontend should render its `brief`/`lesson` but **no editor, no Run, no Submit**. |
 | `lesson`  | `({kind:"text",text}\| {kind:"code",code})[]`? | Optional teaching blocks shown above the task. Omit when absent. Sibling of `hint`/`content` — not inside `content`. See [SCHEMA.md](SCHEMA.md). |
 | `content` | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeAssignment` / `PredictAssignment` / `ProjectAssignment` fields, minus grading logic / `lesson` / `check`. |
 
@@ -250,17 +250,53 @@ the payload.
 | Field        | Type                 | Notes                                                                                                                                                                                  |
 | ------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `code`       | string?              | Single-file sugar: the full contents of one `Main.java`. Use this for the common case (most Day 1–2 exercises).                                                                        |
-| `files`      | `{name, content}[]`? | Multi-file run. Each item is one source file. Used for Day-3 class assignments (student class + a hidden grader `Main`) and the Day-3 mini-projects (student uploads several `.java` files). |
+| `files`      | `{name, content}[]`? | Multi-file run. Each item is one source file. Used for the Day-3 single-class assignments (student's class + a hidden grader `Main`) — see the harness note below.                     |
 | `entryClass` | string?              | When `files` is given, the class whose `main` to run (e.g. `"Main"`).                                                                                                                  |
-| `stdin`      | string?              | Standard input piped to the program — for interactive programs (e.g. the guess-the-number game). Omit/`""` when none.                                                                  |
+| `stdin`      | string?              | Standard input piped to the program. Defined for future interactive programs, but **nothing currently uses it** — see the [Scanner / interactive input](#scanner--interactive-input-is-out-of-scope) note below. Omit/`""` when none.                                                                  |
 
-> **`code` XOR `files`.** Send `code` for one file, or `files` + `entryClass` for several — not both. `code: X` is equivalent to `files: [{name:"Main.java", content:X}], entryClass:"Main"`.
+> **Multi-file execution (`execute` & `submission`).**
+> Send `code` for one file, or `files` + `entryClass` for several.
+> `code: X` is equivalent to `files: [{name:"Main.java", content:X}], entryClass:"Main"`.
+>
+> For Day 3 multi-file assignments (e.g. `person-class`, `flight-ticket-class`, `container-class`),
+> the frontend provides a multi-tab editor (`Main.java` + student's class) and calls `execute` with `files`
+> containing both student-editable files.
 >
 > Language is **implicit** — the backend is Java-only for now (it hardcodes `java`).
-> If more languages are ever needed, add a `language` field rather than reusing `code`;
-> that's a deliberate future change, not a silent one.
 
 The **response** shape is unchanged (`status` / `stdout` / `stderr`) regardless of single- or multi-file input. The executor only compiles + runs — it never grades. Grading happens server-side via [Submission](#submission).
+
+> **Multi-file student submission (Day 3 practice, e.g. `person-class` /
+> `flight-ticket-class` / `container-class`).**
+> When the student works on a multi-file assignment with a multi-tab editor,
+> the frontend submits the full file array in `content: [{ name, content }]`.
+> The backend passes these files directly to `ExecutorService.ExecuteAsync` and evaluates
+> `GradingJson` on the result.
+
+### Scanner / interactive input is out of scope
+
+No assignment served today asks the student for `stdin`, and none is planned to.
+Two precedents:
+
+- The Day-2 `guess-locker` / `how-many-ab` drafts (guess-the-number, bulls-and-cows)
+  were rewritten to use a **fixed-seed `Random`** instead of `Scanner` (see
+  `analog-reusable-cup-stamps` / `beerpong-at-scrollbar` in
+  `scripts/seed-tasks.sql`) — same "guess and branch" pedagogy, but
+  deterministic and gradable without any input at all.
+- Of the three Day-3 mini-projects, **all three are `kind: "project"` and none
+  are run/submitted through this app** — see
+  [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only) below. That
+  decision was made *because* some of them need `Scanner`, but it's written as
+  "the whole `project` kind is out of scope," not "these specific two are" —
+  see that section for why.
+
+`stdin` therefore stays defined on `execute` (Piston supports it, and a truly
+non-interactive canned input — the whole input fed in upfront, not a live
+back-and-forth — is easy to add later for a single-file `code` assignment) but
+is **not wired to anything today**. If a future assignment wants it, add its
+`ContentJson.stdin` and start populating this field; don't build interactivity
+into the frontend for it — `execute` is one request/response, it can't react
+to the program's output mid-run.
 
 ### Response — `200 OK`
 
@@ -345,12 +381,53 @@ The timer is a **non-coercive reminder** — nothing is forced if it elapses.
 
 ---
 
+## Mini-projects are VS-Code-only
+
+All three Day-3 mini-projects (`build-a-tree`, `grandpas-time-machine`,
+`grandmas-blackmarket-kitchen` — `kind: "project"`) are **entirely out of
+scope** for `execute`/`submission`. Students read the `brief` in the app, then
+write, run, and test the code locally in VS Code. Nothing about a project is
+ever sent back to this backend.
+
+This is **not** "2 of 3 need `Scanner`, 1 doesn't, so 2 are VS-Code-only and 1
+stays online." It's all-or-nothing for the whole `project` kind, because the
+three projects are **alternatives students pick from in the same time slot**
+(not all three, back-to-back) — if only the Scanner-free project had a working
+online judge, the in-app experience would silently differ by which project a
+student happened to choose. Kind-level scope is also one rule to implement and
+explain instead of a per-assignment flag that has to be re-decided every time a
+project is added or edited.
+
+Practically:
+
+- `GET /api/assignmentsets/{assignmentSetId}/assignments` still returns
+  `project` items (title/brief/lesson) — the frontend still needs to *display*
+  them, just without an editor or Run/Submit affordance.
+- `POST /api/execute` and `POST /api/assignments/{assignmentId}/submissions`
+  are never called for a `project` assignment. Neither endpoint needs to
+  reject `kind: "project"` today (nothing calls them that way), but if a
+  defensive check is ever added, this is why.
+- There is currently **no completion signal at all** for a project — no
+  `Submission` row, so nothing shows up in
+  [`GET /api/students/{studentId}/submissions`](#submission) for it. That's
+  an accepted gap for now (see [Open decisions](#open-decisions)), not
+  something the frontend needs to work around.
+- This doesn't cost any automated-grading capability that existed before:
+  `Project` had no automated grader even when it was still nominally in scope
+  (`Submission.Passed` stays `null` — see
+  [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine)).
+  What's newly out of scope is *running the code and seeing the output* in
+  the app, not grading.
+
+---
+
 ## Submission
 
-"Did this student complete this assignment?" One endpoint for all three assignment kinds,
-and for both the room cohort and the solo cohort (`sessionId` is optional —
-see [SCHEMA.md](SCHEMA.md#sessionid-is-nullable-on-submission)). Built on top
-of `execute` for `code`/`project`; `predict` never touches the executor.
+"Did this student complete this assignment?" One endpoint for `code`/`predict`
+(not `project` — see [above](#mini-projects-are-vs-code-only)), for both the
+room cohort and the solo cohort (`sessionId` is optional — see
+[SCHEMA.md](SCHEMA.md#sessionid-is-nullable-on-submission)). Built on top
+of `execute` for `code`; `predict` never touches the executor.
 
 Grading is **server-side now**, not client-reported — see
 [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine). The
@@ -359,21 +436,28 @@ frontend's `check()` no longer decides `passed`.
 ### `POST /api/assignments/{assignmentId}/submissions`
 
 ```json
-// request — code / project
+// request — single-file code or predict
 { "studentId": "uuid", "sessionId": "ABCD", "content": "public class Main {...}" }
 
-// request — predict
-{ "studentId": "uuid", "sessionId": "ABCD", "content": "10\n9\n8\n..." }
+// request — multi-file code (Day 3, e.g. `person-class` with editable Main.java + Person.java)
+{
+  "studentId": "uuid",
+  "sessionId": "ABCD",
+  "content": [
+    { "name": "Main.java", "content": "public class Main { ... }" },
+    { "name": "Person.java", "content": "public class Person { ... }" }
+  ]
+}
 
 // request — solo/practice (no room joined)
 { "studentId": "uuid", "content": "public class Main {...}" }
 ```
 
-| Field       | Type                          | Notes                                                                                   |
-| ----------- | ----------------------------- | --------------------------------------------------------------------------------------- |
-| `studentId` | string                        | Required.                                                                               |
-| `sessionId` | string?                       | Omit for solo/practice submissions made without joining a room.                         |
-| `content`   | string \| `{name, content}[]` | A string for `code`/`predict`; a file list for `project` (matches `execute`'s `files`). |
+| Field       | Type                         | Notes                                                                                                                                                                                                                                                                                 |
+| ----------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `studentId` | string                       | Required.                                                                                                                                                                                                                                                                            |
+| `sessionId` | string?                      | Omit for solo/practice submissions made without joining a room.                                                                                                                                                                                                                      |
+| `content`   | string \| `{name, content}[]`| A string for single-file `code` / `predict`; a file list `[{name, content}]` for multi-file `code` assignments (e.g. `person-class`, `flight-ticket-class`, `container-class`). Never called for `project` — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). |
 
 > **`submittedAt` is server-owned** — the client never sends it. The database
 > stamps it on insert and it comes back in the response only. This holds for
@@ -394,8 +478,8 @@ frontend's `check()` no longer decides `passed`.
 
 | Field    | Type     | Notes                                                                                                          |
 | -------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `passed` | boolean? | Server-computed. `null` for `project` today (no automated grader yet) or any assignment without one.                 |
-| `result` | object?  | Present for `code`/`project` (same shape as `execute`'s response). `null` for `predict` — nothing is executed. |
+| `passed` | boolean? | Server-computed. `null` for any assignment without an automated grader. (`project` never reaches this response at all — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only).) |
+| `result` | object?  | Present for `code` (same shape as `execute`'s response). `null` for `predict` — nothing is executed. |
 
 Submission history — used for the resume flow (a student returning across the
 3 days, in or out of a room) and for reviewing a solo student's practice:
@@ -441,6 +525,12 @@ classroom students** — see [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-o
 > solution" backlog stub now that the gating rule is decided — see
 > [STORIES.md](STORIES.md) S8. Frontend: disable the "Show solution" button
 > until the student has submitted at least once, with a hover explaining why.
+>
+> **`project` never has a `Submission`** (see
+> [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)), so this
+> gate can never open for one — `available` would stay `false` forever. Don't
+> wire a "Show solution" button for `project` assignments at all; showing a
+> permanently-disabled button would be confusing, not honest UI.
 
 ---
 
@@ -506,10 +596,11 @@ Resolve each _in this file_ before the relevant feature is built.
 - [x] **Teacher picks an assignment set when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/assignmentsets`](#assignments). Backend endpoints implemented (under the old task naming — rename pending); frontend calls the real API (STORIES.md S6).
 - [x] **Solo Practice entry point** — join-bar UI decision made and built; no new contract beyond S4's existing `sessionId`-omitted submission (STORIES.md S7).
 - [x] **Sample solution reveal** — see [Solution](#solution). Gating rule decided; endpoint not implemented yet (STORIES.md S8).
+- [x] **Mini-projects are VS-Code-only** — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). `execute`/`submission` are never called for `kind: "project"`, at all, not per-assignment.
+- [x] **Multi-file execution for Day-3 single-class assignments** — see the [harness note](#post-apiexecute) under `execute`. No new wire shape (`files`/`entryClass` was already documented); the open work is `PistonClient` actually sending Piston more than one file (see CLAUDE.md, "Java-only, single-class assumption").
 - [ ] **Resume suggestion** — see [Resume suggestion (planned)](#resume-suggestion-planned). Plan only — not built (STORIES.md S9).
 - [ ] **Session lifetime** — when does a room end (teacher ends it / idle timeout)?
 - [ ] **`ProgressUpdated` broadcast** — teacher sees live per-assignment progress, not just who's online (backlog in STORIES.md).
 
 See [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions) for persistence-layer
-items that don't affect the wire format (e.g. manual review for `project`
-submissions, `AssignmentSet` labeling).
+items that don't affect the wire format (e.g. `AssignmentSet` labeling).

@@ -43,8 +43,10 @@ Ordered by dependency and risk: build top-down.
     lookup for `code`, a generic compare for `predict`), not self-reported by
     the client. See [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine).
   - Progress is stored in a `Submission` table, keyed by `studentId` — see [SCHEMA.md](SCHEMA.md).
-- **Open questions:**
-  - [ ] `project` submissions have no automated grader yet (`passed` stays `null`) — manual review path is undecided.
+- **Decided:** `project` doesn't submit through this endpoint at all — see
+  [CONTRACT.md](CONTRACT.md#mini-projects-are-vs-code-only). `code`/`predict`
+  are the only kinds this endpoint needs to handle; the old open question
+  about a manual-review path for `project` is moot.
 - **Done when:** a submission records the student as having completed that assignment, and it survives a reload.
 
 ---
@@ -215,4 +217,5 @@ Stub stories — flesh out before building.
 
 - Teacher sees live student progress via a `ProgressUpdated` broadcast (the live-delta half of S10 — hydration is defined; the push is not).
 - Student picks an assignment from the sidebar.
-- Teacher manually marks a `project` submission as passed/failed (no automated grader exists).
+- ~~Teacher manually marks a `project` submission as passed/failed~~ — dropped, not deferred: `project` no longer submits at all (see [CONTRACT.md](CONTRACT.md#mini-projects-are-vs-code-only)), so there's nothing to review in-app.
+- Multi-file execution in `PistonClient`/`ExecutorService` — needed to actually run the Day-3 single-class assignments (`person-class`/`flight-ticket-class`/`container-class`) via `execute`'s `harness`; see [CONTRACT.md](CONTRACT.md#post-apiexecute) and [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine). This is an implementation gap, not a contract gap — `files`/`entryClass` are already documented.
