@@ -20,7 +20,7 @@
 --   * Predict grading_json: { "predict": { "compare", "expectedOutput", "accept"? } }
 --     — graded by AssignmentGrader on submit (no Piston run).
 --
--- Counts: Day 1 = 9, Day 2 = 24, Day 3 = 6, total = 39.
+-- Counts: Day 1 = 9, Day 2 = 24, Day 3 = 7, total = 40.
 -- ============================================================================
 
 BEGIN;
@@ -1446,6 +1446,10 @@ $java$)
 
 -- ─────────────────────────── DAY 3 — mini-projects (multi-file upload) ───────────────────────────
 -- No grading_json: projects are manually reviewed (Submission.Passed stays null).
+-- hint (like every other kind) holds the PDF's "hint" section — never folded
+-- into content_json.brief. sample_solution_json is [{name, content}], same
+-- shape as a submission — reference files sourced from cobblersSolutions'
+-- day3 folders, package declarations stripped (students never declare one).
 (
   'build-a-tree', 'project', 'Build a Tree',
   $txt$Mini-project: model a growing (and eventually dying, occasionally blooming) tree.$txt$,
@@ -1470,18 +1474,84 @@ Sketch:
   ...
 > The tree has died                           // grow()
 > The tree is dead, and reached the age 11 with a height of 2048.0cm
-> The tree is already dead.                   // grow() again
-
-Develop it in VS Code, then upload your .java files here to run them.$txt$,
+> The tree is already dead.                   // grow() again$txt$,
     'requiredClasses', jsonb_build_array('Tree'),
     'entryClass', 'Main'),
-  NULL,
+  jsonb_build_array(
+    jsonb_build_object('name', 'Main.java', 'content', $sol$public class Main {
+    public static void main(String[] args) {
+        Tree tree = new Tree(1.0, 2.0, 10);
+        tree.display();
+
+        for (int year = 1; year <= 11; year = year + 1) {
+            tree.grow();
+            if (year == 5 || year == 11) {
+                tree.display();
+            }
+        }
+
+        tree.grow();
+    }
+}
+$sol$),
+    jsonb_build_object('name', 'Tree.java', 'content', $sol$public class Tree {
+    private double height;
+    private int age;
+    private final double growthRate;
+    private final int maxAge;
+    private boolean alive = true;
+
+    public Tree(double initialHeight, double growthRate, int maxAge) {
+        if (initialHeight <= 0 || growthRate <= 0 || maxAge < 0) {
+            throw new IllegalArgumentException("Tree values must be positive.");
+        }
+        this.height = initialHeight;
+        this.growthRate = growthRate;
+        this.maxAge = maxAge;
+    }
+
+    public void display() {
+        if (!alive) {
+            System.out.println("The tree is dead, and reached the age " + age
+                    + " with a height of " + height + "cm.");
+            return;
+        }
+
+        System.out.println("Your tree is currently " + age + " years old.");
+        System.out.println("It has reached the height of " + height + "cm.");
+        if (isBlooming()) {
+            System.out.println("It is currently blooming.");
+        }
+    }
+
+    public void grow() {
+        if (!alive) {
+            System.out.println("The tree is already dead.");
+            return;
+        }
+
+        age = age + 1;
+        height = height * growthRate;
+        if (age > maxAge) {
+            alive = false;
+            System.out.println("The tree has died.");
+        } else {
+            System.out.println("And your tree just grew a year older!");
+        }
+    }
+
+    private boolean isBlooming() {
+        return age > 0 && age % 5 == 0 && (age % 20 != 0 || age % 100 == 0);
+    }
+}
+$sol$)
+  ),
   NULL
 ),
 (
   'grandpas-time-machine', 'project', 'Grandpa''s Time Machine',
   $txt$Mini-project: a text-based time machine that travels between years.$txt$,
-  NULL,
+  $txt$Model the machine as an object — store the current year as a field, with one method for each direction (or a single smart loop that handles both).$txt$,
   NULL,
   jsonb_build_object(
     'brief', $txt$Grandpa's Time Machine
@@ -1499,18 +1569,76 @@ Tim3M4chin3: Current year is now 2017
 Tim3M4chin3: Current year is now 2018
 Tim3M4chin3: A lot of awesome people went to BootIT
 Tim3M4chin3: Current year is now 2019
-Tim3M4chin3: You arrived to your destination: 2020
-
-Hint: model the machine as an object — store the current year as a field; one method for each direction (or one smart loop). Develop in VS Code, then upload your .java files here.$txt$,
+Tim3M4chin3: You arrived to your destination: 2020$txt$,
     'requiredClasses', jsonb_build_array('TimeMachine'),
     'entryClass', 'Main'),
-  NULL,
+  jsonb_build_array(
+    jsonb_build_object('name', 'Main.java', 'content', $sol$public class Main {
+    public static void main(String[] args) {
+        TimeMachine machine = new TimeMachine(2016);
+        machine.travelTo(2020);
+
+        System.out.println();
+        machine.travelTo(2016);
+    }
+}
+$sol$),
+    jsonb_build_object('name', 'TimeMachine.java', 'content', $sol$import java.util.Map;
+
+public class TimeMachine {
+    private static final Map<Integer, String> EVENTS = Map.of(
+            1969, "Humans landed on the Moon.",
+            1989, "The Berlin Wall fell.",
+            2018, "A lot of awesome people went to BootIT."
+    );
+
+    private int currentYear;
+    private boolean announceYears = true;
+    private boolean announceLeapYears = true;
+
+    public TimeMachine(int currentYear) {
+        this.currentYear = currentYear;
+    }
+
+    public void travelTo(int destinationYear) {
+        announceCurrentYear();
+        if (destinationYear == currentYear) {
+            System.out.println("Tim3M4chin3: You are already in " + currentYear + ".");
+            return;
+        }
+
+        int direction = destinationYear > currentYear ? 1 : -1;
+        while (currentYear != destinationYear) {
+            currentYear = currentYear + direction;
+            announceCurrentYear();
+        }
+        System.out.println("Tim3M4chin3: You arrived at your destination: " + currentYear);
+    }
+
+    private void announceCurrentYear() {
+        if (announceYears) {
+            System.out.println("Tim3M4chin3: Current year is now " + currentYear);
+        }
+        if (announceLeapYears && isLeapYear(currentYear)) {
+            System.out.println("Tim3M4chin3: A leap year just happened WoOoOOoOW!");
+        }
+        if (EVENTS.containsKey(currentYear)) {
+            System.out.println("Tim3M4chin3: " + EVENTS.get(currentYear));
+        }
+    }
+
+    public static boolean isLeapYear(int year) {
+        return year % 400 == 0 || (year % 4 == 0 && year % 100 != 0);
+    }
+}
+$sol$)
+  ),
   NULL
 ),
 (
   'grandmas-blackmarket-kitchen', 'project', 'Grandma''s Blackmarket Kitchen',
   $txt$Mini-project: a catering planner that assigns menus and dodges the police.$txt$,
-  NULL,
+  $txt$Use if-else for the impossible orders. Subtract the picky eaters from the total, then loop through the rest for the random pick: int r = (new Random()).nextInt(6);$txt$,
   NULL,
   jsonb_build_object(
     'brief', $txt$Grandma's Blackmarket Kitchen
@@ -1523,20 +1651,228 @@ Grandma caters (tax-free!) with two menus. Help her plan orders.
 4) Print the order summary, e.g.:
 Grandma: I want to cook the following 10 menus to you:
 7x 1. Tarteletter, 2. Stegt flæsk m. persillesovs, 3. citronfromage
-3x 1. red cabbage salad, 2. curry chicken, 3. rødgrød m. fløde
-
-Hint: use if-else for the bad orders; subtract picky eaters from the total and loop for the rest. Random: int r = (new Random()).nextInt(6);
-
-Develop in VS Code, then upload your .java files here.$txt$,
+3x 1. red cabbage salad, 2. curry chicken, 3. rødgrød m. fløde$txt$,
     'requiredClasses', jsonb_build_array('Kitchen'),
     'entryClass', 'Main'),
+  jsonb_build_array(
+    jsonb_build_object('name', 'Main.java', 'content', $sol$import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("How many people is the order for? ");
+        if (!scanner.hasNextInt()) {
+            System.out.println("Please enter a whole number.");
+            return;
+        }
+        int people = scanner.nextInt();
+
+        System.out.print("How many are picky eaters? ");
+        if (!scanner.hasNextInt()) {
+            System.out.println("Please enter a whole number.");
+            return;
+        }
+        int pickyEaters = scanner.nextInt();
+
+        Kitchen kitchen = new Kitchen("Grandma", 42);
+        kitchen.planOrder(people, pickyEaters);
+    }
+}
+$sol$),
+    jsonb_build_object('name', 'Kitchen.java', 'content', $sol$import java.util.Random;
+
+public class Kitchen {
+    private final String owner;
+    private final Random random;
+    private final Menu firstMenu = new Menu(
+            "1. Tarteletter, 2. Stegt flæsk m. persillesovs, 3. citronfromage", 110);
+    private final Menu secondMenu = new Menu(
+            "1. red cabbage salad, 2. curry chicken, 3. rødgrød m. fløde", 131);
+
+    public Kitchen(String owner, long randomSeed) {
+        this.owner = owner;
+        this.random = new Random(randomSeed);
+    }
+
+    public void planOrder(int people, int pickyEaters) {
+        if (people == 8 && pickyEaters == 7) {
+            System.out.println(owner + ": Nice try, police. I will not cook this order!");
+            return;
+        }
+        if (people <= 0 || pickyEaters < 0 || pickyEaters > people) {
+            System.out.println(owner + ": That order is impossible. Check the number of people.");
+            return;
+        }
+
+        int firstMenuCount = pickyEaters;
+        int secondMenuCount = 0;
+        for (int person = pickyEaters; person < people; person = person + 1) {
+            if (random.nextBoolean()) {
+                firstMenuCount = firstMenuCount + 1;
+            } else {
+                secondMenuCount = secondMenuCount + 1;
+            }
+        }
+
+        int totalPrice = firstMenuCount * firstMenu.getPrice()
+                + secondMenuCount * secondMenu.getPrice();
+        System.out.println(owner + ": I want to cook the following " + people + " menus for you:");
+        printMenu(firstMenuCount, firstMenu);
+        printMenu(secondMenuCount, secondMenu);
+        System.out.println("Total price: " + totalPrice + " DKK");
+    }
+
+    private void printMenu(int count, Menu menu) {
+        if (count > 0) {
+            System.out.println(count + "x " + menu.getDescription());
+        }
+    }
+}
+$sol$),
+    jsonb_build_object('name', 'Menu.java', 'content', $sol$public class Menu {
+    private final String description;
+    private final int price;
+
+    public Menu(String description, int price) {
+        this.description = description;
+        this.price = price;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public int getPrice() {
+        return price;
+    }
+}
+$sol$)
+  ),
+  NULL
+),
+(
+  'seat-selector', 'project', 'Seat Selector',
+  $txt$Mini-project: tell students which auditorium rows must stay free.$txt$,
+  $txt$A Scanner reads the input; the modulo operator (%) finds every third row. It can be solved with loops (or, for a challenge, without).$txt$,
   NULL,
+  jsonb_build_object(
+    'brief', $txt$Seat Selector
+
+The BootIT teachers want every third row of the auditorium kept free — but it's hard to remember which row is the third. Build a program that helps them enforce it.
+
+1) Ask how many rows are in the room — the room size changes, so the program must handle any number of rows.
+2) For each row a student names, say whether they may sit there.
+3) Handle unreasonable input: a row past the room size, zero, or a negative number.
+4) Stop on "STOP", then optionally report how many free rows there are and how many students found a valid seat.
+
+Sketch:
+> How many rows are there in the room?
+> 10
+> Coolio! I've computed which rows that must be free now!
+> Which row would the student like to sit in?
+> 3
+> That's an invalid row! That row must be free. Try another one...
+> 4
+> That's a brilliant choice. Please take a seat.
+> STOP
+> Cool, everyone must be seated then! Please enjoy the lecture.$txt$,
+    'requiredClasses', jsonb_build_array('SeatSelector'),
+    'entryClass', 'Main'),
+  jsonb_build_array(
+    jsonb_build_object('name', 'Main.java', 'content', $sol$import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("How many rows are there in the room?");
+        if (!scanner.hasNextInt()) {
+            System.out.println("Please enter a whole number.");
+            return;
+        }
+
+        int rows = scanner.nextInt();
+        scanner.nextLine();
+        if (rows <= 0) {
+            System.out.println("The room must have at least one row.");
+            return;
+        }
+
+        SeatSelector selector = new SeatSelector(rows);
+        selector.run(scanner);
+    }
+}
+$sol$),
+    jsonb_build_object('name', 'SeatSelector.java', 'content', $sol$import java.util.Scanner;
+
+public class SeatSelector {
+    private final int totalRows;
+    private int seatedStudents;
+
+    public SeatSelector(int totalRows) {
+        if (totalRows <= 0) {
+            throw new IllegalArgumentException("A room must have at least one row.");
+        }
+        this.totalRows = totalRows;
+    }
+
+    public void run(Scanner scanner) {
+        System.out.println("Coolio! I've computed which rows must be free now!");
+        while (true) {
+            System.out.println("Which row would the student like to sit in? (or STOP)");
+            String input = scanner.nextLine().trim();
+            if (input.equalsIgnoreCase("STOP")) {
+                finishLecture(scanner);
+                return;
+            }
+
+            try {
+                checkRow(Integer.parseInt(input));
+            } catch (NumberFormatException error) {
+                System.out.println("Please enter a row number or STOP.");
+            }
+        }
+    }
+
+    private void checkRow(int row) {
+        if (row < 0) {
+            System.out.println("Negative numbers?! Please pick another seat.");
+        } else if (row == 0) {
+            System.out.println("Really? The floor? Please select another row.");
+        } else if (row > totalRows) {
+            System.out.println("Sorry, there are only " + totalRows + " rows. Please try another.");
+        } else if (mustBeFree(row)) {
+            System.out.println("That's an invalid row! That row must be free. Try another one.");
+        } else {
+            seatedStudents = seatedStudents + 1;
+            System.out.println("That's a brilliant choice. Please take a seat.");
+        }
+    }
+
+    private boolean mustBeFree(int row) {
+        return row % 3 == 0;
+    }
+
+    private void finishLecture(Scanner scanner) {
+        System.out.println("Cool, everyone must be seated then! Please enjoy the lecture.");
+        System.out.println("Do you want to know how many free rows there are? (y/n)");
+        String answer = scanner.nextLine().trim();
+        if (answer.equalsIgnoreCase("y")) {
+            System.out.println("There should be a total of " + totalRows / 3 + " free rows.");
+            String noun = seatedStudents == 1 ? " student" : " students";
+            System.out.println(seatedStudents + noun + " selected valid rows.");
+        } else {
+            System.out.println("Okay... Then count it yourself...");
+        }
+    }
+}
+$sol$)
+  ),
   NULL
 )
 ;
 
 -- ─────────────────────────── set memberships ───────────────────────────
---   Day 1: 0–8 (9)   Day 2: 9–32 (24)   Day 3: 33–38 (6)   total 39
+--   Day 1: 0–8 (9)   Day 2: 9–32 (24)   Day 3: 33–39 (7)   total 40
 
 WITH ordered(slug, ord) AS (VALUES
   ('hello-itu', 0),
@@ -1577,7 +1913,8 @@ WITH ordered(slug, ord) AS (VALUES
   ('container-class', 35),
   ('build-a-tree', 36),
   ('grandpas-time-machine', 37),
-  ('grandmas-blackmarket-kitchen', 38)
+  ('grandmas-blackmarket-kitchen', 38),
+  ('seat-selector', 39)
 ),
 resolved AS (
   SELECT t.id AS assignment_id, o.ord
@@ -1589,7 +1926,7 @@ SELECT 'day1-2026', assignment_id, ord         FROM resolved WHERE ord BETWEEN 0
 UNION ALL
 SELECT 'day2-2026', assignment_id, ord - 9     FROM resolved WHERE ord BETWEEN 9 AND 32
 UNION ALL
-SELECT 'day3-2026', assignment_id, ord - 33    FROM resolved WHERE ord BETWEEN 33 AND 38
+SELECT 'day3-2026', assignment_id, ord - 33    FROM resolved WHERE ord BETWEEN 33 AND 39
 UNION ALL
 SELECT 'all-assignments-for-solo-2026', assignment_id, ord FROM resolved;
 
@@ -1597,8 +1934,8 @@ DO $check$
 DECLARE n int;
 BEGIN
   SELECT count(*) INTO n FROM assignment_set_assignment WHERE assignment_set_id = 'all-assignments-for-solo-2026';
-  IF n <> 39 THEN
-    RAISE EXCEPTION 'seed error: expected 39 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
+  IF n <> 40 THEN
+    RAISE EXCEPTION 'seed error: expected 40 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
   END IF;
 END
 $check$;
