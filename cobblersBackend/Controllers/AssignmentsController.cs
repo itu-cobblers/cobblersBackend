@@ -1,4 +1,3 @@
-using cobblersBackend.Data.Entities;
 using cobblersBackend.DTOs;
 using cobblersBackend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -7,11 +6,11 @@ namespace cobblersBackend.Controllers;
 
 [ApiController]
 [Route("api/assignments")]
-public class SubmissionController : ControllerBase
+public class AssignmentsController : ControllerBase
 {
     private readonly ISubmissionService _service;
 
-    public SubmissionController(ISubmissionService service) => _service = service;
+    public AssignmentsController(ISubmissionService service) => _service = service;
 
     [HttpPost("{assignmentId}/submissions")]
     public async Task<IActionResult> Submit(int assignmentId, [FromBody] SubmissionRequestDto request)
