@@ -224,6 +224,80 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetSolutionAsync_ReturnsStringSolution()
+    {
+        int assignmentId;
+        await using (var setup = _fixture.CreateContext())
+        {
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.SampleSolutionJson = JsonSerializer.Serialize("public class Main {}");
+            setup.Assignment.Add(assignment);
+            await setup.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var result = await service.GetSolutionAsync(assignmentId);
+
+        Assert.NotNull(result);
+        Assert.Equal(JsonValueKind.String, result!.Solution!.Value.ValueKind);
+        Assert.Equal("public class Main {}", result.Solution.Value.GetString());
+    }
+
+    [Fact]
+    public async Task GetSolutionAsync_ReturnsFileListSolution()
+    {
+        int assignmentId;
+        await using (var setup = _fixture.CreateContext())
+        {
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.SampleSolutionJson = """[{"name":"Main.java","content":"class Main {}"}]""";
+            setup.Assignment.Add(assignment);
+            await setup.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var result = await service.GetSolutionAsync(assignmentId);
+
+        Assert.NotNull(result);
+        Assert.Equal(JsonValueKind.Array, result!.Solution!.Value.ValueKind);
+    }
+
+    [Fact]
+    public async Task GetSolutionAsync_NoSampleSolution_ReturnsNullSolution()
+    {
+        int assignmentId;
+        await using (var setup = _fixture.CreateContext())
+        {
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            setup.Assignment.Add(assignment);
+            await setup.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var result = await service.GetSolutionAsync(assignmentId);
+
+        Assert.NotNull(result);
+        Assert.Null(result!.Solution);
+    }
+
+    [Fact]
+    public async Task GetSolutionAsync_UnknownAssignment_ReturnsNull()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var result = await service.GetSolutionAsync(999_999);
+
+        Assert.Null(result);
+    }
+
+    
+    [Fact]
     public async Task SubmitAsync_UnknownAssignmentId_ReturnsNull()
     {
         // Given 
