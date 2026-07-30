@@ -156,19 +156,19 @@ I've attempted it, **so that** I can learn from it if I'm stuck or want to
 compare approaches.
 
 - **Transport:** REST
-- **Contract:** [`GET /api/assignments/{assignmentId}/solution?studentId=...`](CONTRACT.md#solution)
-- **Decisions already made:** the gate is identical for solo and classroom —
-  available once **at least one `Submission` exists** for `(studentId,
+- **Contract:** [`GET /api/assignments/{assignmentId}/solution`](CONTRACT.md#solution)
+- **Decisions already made:** the student-view gate is identical for solo and classroom —
+  reveal once **at least one `Submission` exists** for `(studentId,
   assignmentId)`, pass or fail. A teacher-configurable reveal delay was considered
   and rejected: it would need per-student-per-assignment timers (students in a room
   don't progress in lockstep), plus teacher-facing controls, for marginal
   benefit over the gate that already exists. See
   [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom).
-- **Frontend:** not built yet — "Show solution" button should be disabled
-  until the open assignment has ≥1 submission, with a hover explaining why (same
-  pattern as S7's info icon).
-- **Backend:** not built yet — endpoint doesn't exist; `Assignment.SampleSolutionJson` doesn't exist either (see SCHEMA.md).
-- **Done when:** not built — this story's contract is decided, nothing is implemented.
+  **The gate is enforced in the frontend only** — the backend returns
+  `SampleSolutionJson` on request with no submission check.
+- **Frontend:** reveal button disabled until the open assignment has ≥1 submission.
+- **Backend:** `GET /api/assignments/{assignmentId}/solution` → `{ solution }`.
+- **Done when:** student can reveal a code assignment's reference answer after submitting; teacher preview can fetch the same endpoint without a gate.
 
 ---
 

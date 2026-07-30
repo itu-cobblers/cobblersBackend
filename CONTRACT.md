@@ -870,34 +870,35 @@ fetched.
 
 ## Solution
 
-Reveal an assignment's sample/reference solution. **One rule for both solo and
-classroom students** — see [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom) for why a teacher-controlled delay was considered and rejected.
+Returns an assignment's sample/reference solution from `SampleSolutionJson`.
+**Reveal gating is a frontend concern** — the student view only enables
+"Show solution" after at least one submission; the teacher preview can reveal
+at any time. See [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom).
 
-### `GET /api/assignments/{assignmentId}/solution?studentId={studentId}`
+### `GET /api/assignments/{assignmentId}/solution`
 
 ```json
-// → 200 OK — at least one Submission exists for (studentId, assignmentId)
-{ "available": true, "solution": "public class Main {...}" }
+// → 200 OK — single-file code
+{ "solution": "public class Main {...}" }
 
-// → 200 OK — no Submission yet
-{ "available": false, "solution": null }
+// → 200 OK — multi-file code / project
+{ "solution": [{ "name": "Main.java", "content": "..." }] }
+
+// → 200 OK — no reference answer stored for this assignment
+{ "solution": null }
 ```
 
-| Field       | Type                                     | Notes                                                                                                                                             |
-| ----------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `available` | boolean                                   | `true` once the student has submitted this assignment at least once — pass or fail, in a room or solo.                                                     |
-| `solution`  | string \| `{name, content}[]` \| null     | Present only when `available`. Shape matches `Assignment.SampleSolutionJson` for the assignment's `kind`. Not applicable to `predict` (its `expectedOutput`, from Assignments, already is the answer). |
+| Field      | Type                                 | Notes                                                                                                                                             |
+| ---------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `solution` | string \| `{name, content}[]` \| null | Passthrough of `Assignment.SampleSolutionJson`. Shape matches the assignment's `kind`. Not used for `predict` (its `expectedOutput`, from Assignments, already is the answer). |
 
-> **Not yet implemented.** Formalizes the previously-vague "reveal a sample
-> solution" backlog stub now that the gating rule is decided — see
-> [STORIES.md](STORIES.md) S8. Frontend: disable the "Show solution" button
-> until the student has submitted at least once, with a hover explaining why.
->
+`404 Not Found` when `assignmentId` does not exist.
+
 > **`project` never has a `Submission`** (see
-> [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)), so this
-> gate can never open for one — `available` would stay `false` forever. Don't
-> wire a "Show solution" button for `project` assignments at all; showing a
-> permanently-disabled button would be confusing, not honest UI.
+> [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)), so the
+> student-view reveal gate can never open for one. Don't wire a "Show solution"
+> button for `project` assignments at all; showing a permanently-disabled
+> button would be confusing, not honest UI.
 
 ---
 
@@ -944,7 +945,7 @@ Resolve each _in this file_ before the relevant feature is built.
       [SCHEMA.md](SCHEMA.md)). Replaces the in-memory skeleton.
 - [x] **Teacher picks an assignment set when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/assignmentsets`](#assignments). Backend endpoints implemented (under the old task naming — rename pending); frontend calls the real API (STORIES.md S6).
 - [x] **Solo Practice entry point** — join-bar UI decision made and built; no new contract beyond S4's existing `sessionId`-omitted submission (STORIES.md S7).
-- [x] **Sample solution reveal** — see [Solution](#solution). Gating rule decided; endpoint not implemented yet (STORIES.md S8).
+- [x] **Sample solution reveal** — see [Solution](#solution). Gating in the frontend; backend returns `SampleSolutionJson` on request (STORIES.md S8).
 - [x] **Mini-projects are VS-Code-only** — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). `execute`/`submission` are never called for `kind: "project"`, at all, not per-assignment.
 - [x] **Multi-file execution for Day-3 single-class assignments** — see the [harness note](#post-apiexecute) under `execute`. No new wire shape (`files`/`entryClass` was already documented); the open work is `PistonClient` actually sending Piston more than one file (see CLAUDE.md, "Java-only, single-class assumption").
 - [x] **Resume suggestion** — **retired**, see [Resume suggestion (retired)](#resume-suggestion-retired). Replaced end-to-end by [`GET /api/sessions/today-latest`](#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today) (STORIES.md S9).

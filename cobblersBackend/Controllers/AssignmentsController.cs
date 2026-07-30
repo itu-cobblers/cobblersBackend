@@ -28,4 +28,13 @@ public class AssignmentsController : ControllerBase
             return BadRequest(new { error = ex.Message});
         }
     }
+
+    [HttpGet("{assignmentId}/solution")]
+    public async Task<IActionResult> GetSolution(int assignmentId)
+    {
+        var result = await _service.GetSolutionAsync(assignmentId);
+        return result is null
+            ? NotFound(new { error = $"Assignment '{assignmentId}' not found." })
+            : Ok(result);
+    }
 }

@@ -89,6 +89,20 @@ public class SubmissionService : ISubmissionService
         return (executed, passed);
     }
 
+    public async Task<SolutionResponseDto?> GetSolutionAsync(int assignmentId)
+    {
+        var assignment = await _db.Assignment.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == assignmentId);
+        if (assignment is null)
+            return null;
+
+        if (assignment.SampleSolutionJson is null)
+            return new SolutionResponseDto(null);
+
+        var solution = JsonSerializer.Deserialize<JsonElement>(assignment.SampleSolutionJson);
+        return new SolutionResponseDto(solution);
+    }
+
     /// <summary>
     /// Grade a predict answer from GradingJson `{ "predict": { compare, expectedOutput, accept? } }`.
     /// Nothing is executed — result stays null.
