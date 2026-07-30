@@ -36,11 +36,9 @@ public class PistonClient : IPistonClient
         {
             var httpResponse = await _httpClient.PostAsJsonAsync("api/v2/execute", request);
             stopwatch.Stop();
-            _metrics.ObservePistonDuration(
-                httpResponse.IsSuccessStatusCode ? "success" : "http_error",
-                stopwatch.Elapsed.TotalSeconds);
 
             httpResponse.EnsureSuccessStatusCode();
+            _metrics.ObservePistonDuration("success",stopwatch.Elapsed.TotalSeconds);
 
             var result = await httpResponse.Content.ReadFromJsonAsync<PistonExecuteResponse>();
             return result ?? throw new InvalidOperationException("Piston returned an empty response body.");
