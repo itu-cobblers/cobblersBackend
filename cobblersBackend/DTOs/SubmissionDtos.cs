@@ -38,3 +38,11 @@ public record AssignmentSubmissionDto(
     [property: JsonPropertyName("displayName")] string DisplayName,
     [property: JsonPropertyName("passed")] bool? Passed,
     [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt);
+    
+/// <summary>
+/// `GET /api/assignments/{assignmentId}/solution` — passthrough of
+/// <see cref="Data.Entities.Assignment.SampleSolutionJson"/> (CONTRACT.md
+/// "Solution"). Reveal gating lives in the frontend, not here.
+/// </summary>
+public record SolutionResponseDto(
+    [property: JsonPropertyName("solution")] JsonElement? Solution);

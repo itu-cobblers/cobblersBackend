@@ -260,9 +260,11 @@ solo) can see an assignment's sample solution:
   mechanic than anything else in the app, for a marginal benefit over "you
   already had to try."
 
-So: `GET /api/assignments/{assignmentId}/solution?studentId=...` is available whenever
-any `Submission` exists for that `(studentId, assignmentId)` pair — solo or in a
-room, no session-specific logic. See [CONTRACT.md](CONTRACT.md#solution).
+So: the student view enables "Show solution" once **at least one `Submission`
+exists** for `(studentId, assignmentId)` — solo or in a room, no
+session-specific logic. That gate lives in the frontend; the backend endpoint
+(`GET /api/assignments/{assignmentId}/solution`) simply returns
+`SampleSolutionJson` whenever asked. See [CONTRACT.md](CONTRACT.md#solution).
 
 ### Grading rules are data, evaluated by one backend engine
 > **Revises an earlier decision.** The first version of this section ported
