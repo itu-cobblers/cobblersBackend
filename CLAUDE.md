@@ -61,7 +61,26 @@ for the model and the reasoning behind every column — read it before touching 
 - **Sessions/Attendance are wired and persist.** `SessionService`/`AttendanceService` write
   through `CobblersDbContext`; `SessionsController` + `SessionHub` call them. `SessionStore`
   (in-memory) now holds only the **live** SignalR roster + active timer — a different, smaller
-  concern than the persisted historical record. `Submission` has no controller yet (S2).
+  concern than the persisted historical record.
+- **Submissions persist and are read back three ways** (`SubmissionService`):
+  `POST /api/assignments/{id}/submissions` writes them; `GET /api/students/{id}/submissions`
+  (student history) and `GET /api/sessions/{code}/submissions` (the teacher dashboard's
+  room-wide hydration read) return **thin** rows, and `GET /api/submissions/{subId}` returns
+  the one full detail. Thin lists carry no `content`/`result` — the frontend fetches detail
+  only for the row it has selected.
+- **"Ended ⇒ not found" is a session-lookup rule, not a deletion.** `GetSessionAsync`,
+  `EndSessionAsync`, `GetTodayLatestActiveSessionAsync`, `GetAttendanceAsync` and
+  `GetSessionSubmissionsAsync` all filter `Status == SessionStatus.Active` and answer 404 for
+  an ended room. The rows survive and stay reachable through the student/history endpoints
+  (`GetHistoryAsync`, `GetSubmissionAsync`), which deliberately do **not** filter. `SubmitAsync`
+  is the one write path that still resolves an ended room — see the characterization test
+  `SubmitAsync_EndedSessionCode_CurrentlySucceeds`.
+- **Three service reads return `null` to mean 404.** `GetAttendanceAsync`,
+  `GetSessionSubmissionsAsync` and `GetSubmissionAsync` are `Task<...?>`; their controllers do
+  `rows is null ? NotFound() : Ok(rows)`. Keep the return type nullable — an earlier
+  non-nullable signature made that branch unreachable and the endpoint answered `200 []` for a
+  room that didn't exist, with no compiler warning. Empty list and not-found are different
+  answers and both are load-bearing for the dashboard.
 - **Task → Assignment rename, in two stages (see SCHEMA.md's Assignment section for the
   full history):** a 2026-07-16 CLR-only rename (entity `Task`→`Assignment`, DB/wire stayed
   "task") was **superseded 2026-07-17** by a full wire+DB sweep once CONTRACT.md unified on
@@ -89,13 +108,56 @@ for the model and the reasoning behind every column — read it before touching 
 - **Java-only, single-class assumption.** `PistonClient` hardcodes the filename `Main.java`, so it only works for submissions shaped like `public class Main { ... }` (Java requires the filename to match the public class name). The `language` passed from `ExecutorService` is also hardcoded to `"java"`. See the comment in `PistonClient` before generalizing.
 - **Piston URL is set via environment variable.** Do not hardcode the droplet IP in `appsettings.json`. Set it at runtime with `export Piston__BaseUrl=http://<ip>:2000/` (double underscore maps to the `Piston:BaseUrl` config key). The `appsettings.json` placeholder (`http://localhost:2000/`) is intentional — it documents the expected shape without leaking the real address.
 - **`PistonClient` has no HTTP error handling.** `EnsureSuccessStatusCode()` will throw an unhandled `HttpRequestException` if Piston returns 4xx/5xx. Fine for now; catch and wrap before exposing to real users.
+- **Each Piston outcome is observed exactly once.** `ObservePistonDuration` is called from one
+  place per path: `"success"` after `EnsureSuccessStatusCode()`, `"http_error"` and `"timeout"`
+  in their catches. It used to be observed inline *before* the throw as well, so every failed
+  call double-counted `cobblers_piston_request_duration_seconds{outcome="http_error"}` and the
+  Grafana error rate read 2×. `PistonClientTests` asserts `Times.Once` per outcome — don't add
+  a second recording site. Note `"success"` means *Piston answered 2xx*, not that the student's
+  code passed: a compile error is a success for this histogram.
 - **Compile-error detection is a `run.Stderr` substring heuristic**, not a structured Piston field — see `JavaExecuteResultClassifier` above. If Piston/Java version changes and starts populating `Compile` again, this classifier should be revisited.
 
 ## Testing
 
-xUnit + Moq for pure logic (no DB): `ExecutorServiceTests`, `AssignmentGraderTests`. Mock
-`IPistonClient` and assert `JavaExecuteResultClassifier`'s (or `ExecutorService`'s
-end-to-end) status classification — no live Piston needed.
+Four layers, each with its own reason to exist. `dotnet test` runs all of them; the DB-backed
+and HTTP layers need **Docker running locally**.
+
+**1. Pure logic (no DB, no HTTP)** — xUnit + Moq: `ExecutorServiceTests`,
+`AssignmentGraderTests`, `SessionStoreTests`. Mock `IPistonClient` and assert
+`JavaExecuteResultClassifier`'s (or `ExecutorService`'s end-to-end) status classification —
+no live Piston needed. `SessionStoreTests` covers the in-memory live-room state (roster
+merge-by-`studentId`, timer, focus, `RemoveRoom` teardown) including a concurrent-join test,
+since the store is a singleton shared by every connection.
+
+**2. HTTP-stubbed clients** — `PistonClientTests` drives the real `PistonClient` through a
+hand-written `HttpMessageHandler` stub: no network, and it can assert the exact JSON we send
+Piston, which metric label each failure mode records, and the hardcoded `Main.java` filename.
+
+**3. SignalR hub** — `SessionHubTests` builds a `SessionHub` with a real `SessionStore`, a
+mocked `IAttendanceService`, and mocked SignalR plumbing.
+
+- `SendAsync` is an **extension method** over `IClientProxy.SendCoreAsync(method, args, token)`
+  — that's the seam Moq can see, so assert broadcasts there.
+- `Context.Items` must be ASP.NET's **`ConnectionItems`**, not a plain `Dictionary`.
+  `OnDisconnectedAsync` reads `Context.Items["code"]` unguarded and relies on the missing-key
+  indexer returning `null` (which `ConnectionItems` does and `Dictionary` does not — it
+  throws). A `Dictionary` double fails the test for a reason production never hits.
+
+**4. Whole-app over HTTP** — `ApiEndpointTests` + `Infrastructure/ApiFactory.cs`
+(`WebApplicationFactory<Program>`, which works because `Program.cs` ends with
+`public partial class Program { }`). The factory points the app at the Testcontainers Postgres
+via `UseSetting("ConnectionStrings:DefaultConnection", …)`, runs as environment `Testing` (keeps
+OpenAPI and EF's sensitive-data SQL logging off), and swaps `IPistonClient` for a stub with
+`RemoveAll<IPistonClient>()` — the real one is registered via `AddHttpClient`, so removing the
+typed client wholesale is easier than re-pointing its address. This is the **only** layer that
+can prove a route exists, that a service's `null` becomes a 404, and that the JSON on the wire
+matches CONTRACT.md — a service test asserting `null` proves nothing about the status code, which
+is exactly how `/attendance` shipped answering `200 []` for an unknown room.
+
+`scripts/apiSmoke.sh` is the manual counterpart: curl every endpoint against a locally running
+API (`BASE_URL`, `SKIP_PISTON=1`, `VERBOSE=1`; needs `jq`). It exercises the real Piston and the
+real seeded data, which the test suite deliberately does not. Point it at a **freshly restarted**
+API — it caught the `/end` 204 quirk, and it will just as happily report a stale binary's bugs.
 
 **DB-backed tests use a real Postgres via Testcontainers** (`cobblersBackend.Tests/Infrastructure/`)
 — not SQLite, not EF InMemory, so unique/check/FK constraints and jsonb behave exactly

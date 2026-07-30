@@ -109,7 +109,26 @@ dotnet run --project cobblersBackend
 dotnet test
 ```
 
-Tests mock `IPistonClient` — no live Piston or database needed.
+No live Piston is needed — it's stubbed at every layer. **Docker must be running**, though:
+the DB-backed and whole-app tests spin up a real Postgres via Testcontainers (first run pulls
+`postgres:18-alpine`). See [CLAUDE.md](CLAUDE.md#testing) for the four test layers and their
+gotchas.
+
+### Smoke-testing a running API
+
+`scripts/apiSmoke.sh` curls every REST endpoint against a locally running backend — the manual
+counterpart to the test suite, since it exercises the real Piston and your real seeded data:
+
+```bash
+dotnet run --project cobblersBackend   # in another shell
+./scripts/apiSmoke.sh                  # needs jq
+```
+
+`BASE_URL=…` to point elsewhere, `SKIP_PISTON=1` to skip the two calls that need Piston,
+`VERBOSE=1` to dump response bodies. It walks a full lifecycle (create room → submit → hydrate
+→ end room) and exits non-zero on the first mismatch. Restart the API before running it, or
+you'll be testing a stale binary. It can't cover `/attendance` with real attendees or anything
+on `/hub` — attendance rows are only created by the SignalR `JoinSession`.
 
 ## API
 
@@ -117,8 +136,16 @@ The full frontend↔backend contract lives in [CONTRACT.md](CONTRACT.md) (source
 
 - `POST /api/execute` — run source code, get `{ status, stdout, stderr }` back
 - `GET /api/assignmentsets` / `GET /api/assignmentsets/:id/assignments` — assignment data
-- `POST /api/sessions`, `GET /api/sessions/:code`, `POST /api/sessions/:code/timer` — live rooms + timer
+- `GET /api/assignments/:id/solution` — the reference answer (reveal gating lives in the frontend)
+- `POST /api/sessions`, `GET /api/sessions/:code`, `POST /api/sessions/:code/timer`, `POST /api/sessions/:code/end` — live rooms + timer
+- `GET /api/sessions/:code/attendance` / `GET /api/sessions/:code/submissions` — teacher-dashboard hydration (the ever-joined roll + every thin attempt in the room)
+- `PUT /api/students/:id`, `GET /api/students/:id/submissions` — identity + own history
+- `POST /api/assignments/:id/submissions`, `GET /api/submissions/:subId` — submit, then replay one attempt in full
 - `/hub` — SignalR hub for room broadcasts
+- `/metrics` — Prometheus scrape endpoint
+
+Every `/api/sessions/:code/…` lookup treats an **ended** room as not-found (404), while the
+student/history endpoints keep serving its rows.
 
 ## Troubleshooting
 
