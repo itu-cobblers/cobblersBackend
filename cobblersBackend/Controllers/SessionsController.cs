@@ -107,7 +107,7 @@ public class SessionsController : ControllerBase
     }
 
     [HttpGet("{code}/submissions")]
-    public async Task<IActionResult> GetAssignmentHistory(string code)
+    public async Task<IActionResult> GetSessionSubmissions(string code)
     {
         var rows = await _submissions.GetSessionSubmissionsAsync(code);
         return rows is null ? NotFound() : Ok(rows);

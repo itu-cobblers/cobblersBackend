@@ -151,19 +151,20 @@ public class SubmissionService : ISubmissionService
             row.Passed, row.SubmittedAt);
     }
 
-    public async Task<IReadOnlyList<AssignmentSubmissionDto>?> GetSessionSubmissionsAsync(string code)
+    public async Task<IReadOnlyList<SessionSubmissionDto>?> GetSessionSubmissionsAsync(string code)
     {
         code = SessionCode.Normalize(code);
 
         var session = await _db.Session.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Code == code);
+            .FirstOrDefaultAsync(s => s.Code == code && s.Status == SessionStatus.Active);
         if (session is null) return null;
+        
 
         return await _db.Submission.AsNoTracking()
             .Where(s => s.SessionId == session.SessionId)
             .OrderByDescending(s => s.SubmittedAt)
-            .Select(s => new AssignmentSubmissionDto(
-                s.SubId, s.StudentId, s.AssignmentId, s.Passed, s.SubmittedAt)) //not sure if it needs all these //YA
+            .Select(s => new SessionSubmissionDto(
+                s.SubId, s.StudentId, s.AssignmentId, s.Passed, s.SubmittedAt))
             .ToListAsync();
     }
 }
