@@ -222,12 +222,7 @@ fi
 # ── End of life ─────────────────────────────────────────────────────────────
 phase 'Ending the room (ended ⇒ 404 everywhere)'
 call 204 POST "/api/sessions/$CODE/end"
-# KNOWN QUIRK: re-ending an already-ended room answers 204, not 404 —
-# EndSessionAsync looks the row up without the Status == Active filter every
-# other session lookup applies. Asserted as-is so the script stays a clean
-# signal; see the note below.
-call 204 POST "/api/sessions/$CODE/end"
-note 'known quirk: second /end returns 204, every other ended-room lookup 404s'
+call 404 POST "/api/sessions/$CODE/end"
 note 'the contract rule: an ended room reads as not-found on every session lookup'
 call 404 GET "/api/sessions/$CODE"
 call 404 GET "/api/sessions/$CODE/attendance"
