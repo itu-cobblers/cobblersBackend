@@ -35,7 +35,7 @@ public record SubmissionDetailDto(
 public record AssignmentSubmissionDto(
     [property: JsonPropertyName("subId")] Guid SubId,
     [property: JsonPropertyName("studentId")] string StudentId,
-    [property: JsonPropertyName("displayName")] string DisplayName,
+    [property: JsonPropertyName("assignmentId")] int AssignmentId,
     [property: JsonPropertyName("passed")] bool? Passed,
     [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt);
     

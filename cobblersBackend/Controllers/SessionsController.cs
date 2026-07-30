@@ -106,10 +106,10 @@ public class SessionsController : ControllerBase
         return Ok(timer);
     }
 
-    [HttpGet("{code}/assignments/{assignmentId:int}/submissions")]
-    public async Task<IActionResult> GetAssignmentHistory(string code, int assignmentId, [FromQuery] string? studentId)
+    [HttpGet("{code}/submissions")]
+    public async Task<IActionResult> GetAssignmentHistory(string code)
     {
-        var rows = await _submissions.GetAssignmentHistoryAsync(code, assignmentId, studentId);
+        var rows = await _submissions.GetSessionSubmissionsAsync(code);
         return rows is null ? NotFound() : Ok(rows);
     }
    
