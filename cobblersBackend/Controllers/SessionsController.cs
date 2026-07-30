@@ -20,13 +20,16 @@ public class SessionsController : ControllerBase
     private readonly IHubContext<SessionHub> _hub;
     private readonly ISubmissionService _submissions;
 
+    private readonly IAttendanceService _attendance;
 
-    public SessionsController(SessionStore store, IHubContext<SessionHub> hub, ISessionService session, ISubmissionService submissions)
+
+    public SessionsController(SessionStore store, IHubContext<SessionHub> hub, ISessionService session, ISubmissionService submissions, IAttendanceService attendance)
     {
         _store = store;
         _hub = hub;
         _session = session;
         _submissions = submissions;
+        _attendance = attendance;
     }
 
     /// <summary>POST /api/sessions — create a room, return its join code.</summary>
@@ -112,5 +115,11 @@ public class SessionsController : ControllerBase
         var rows = await _submissions.GetSessionSubmissionsAsync(code);
         return rows is null ? NotFound() : Ok(rows);
     }
-   
+
+    [HttpGet("{code}/attendance")]
+    public async Task<IActionResult> GetSessionAttendance(string code)
+    {
+        var rows = await _attendance.GetAttendanceAsync(code);
+        return rows is null ? NotFound() : Ok(rows);
+    }
 }

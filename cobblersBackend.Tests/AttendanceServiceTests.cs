@@ -169,6 +169,7 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
 
         // Then
         var roster = await service.GetAttendanceAsync(sessionCode);
+        Assert.NotNull(roster);
         Assert.Equal(["Maria", "Joe", "Valarie"], roster.Select(s => s.DisplayName).ToArray());
 
     }
