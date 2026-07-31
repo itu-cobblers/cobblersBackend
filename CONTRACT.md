@@ -6,12 +6,54 @@ The agreement between the **frontend** (React + Monaco) and the **backend** (ASP
 > As long as both sides honor what's written here, frontend and backend can be
 > developed in parallel — each mocking the other against this contract.
 
+## Backend implementation status (audited 2026-07-31)
+
+This table records the state of the backend in this repository. It is an
+implementation audit, not a change to the wire contract. Status meanings:
+**complete** = the implemented route/behavior matches the contract;
+**partial** = the main path exists but one or more contracted behaviors are
+missing; **not implemented** = no backend implementation exists yet.
+
+| Contract area | Status | Backend note / remaining work |
+| --- | --- | --- |
+| Student identity — `PUT /api/students/{studentId}` | **Complete** | Student rows are inserted/updated and the endpoint returns `204`. Submissions reject unknown students. |
+| Create/resolve/latest session — `POST /api/sessions`, `GET /api/sessions/{code}`, `GET /api/sessions/today-latest` | **Complete** | Assignment-set validation, globally unique code retry, active-session filtering, and UTC latest-today lookup are implemented. |
+| End session — `POST /api/sessions/{code}/end` + `SessionEnded` | **Partial** | First end persists `ended`, clears live state, broadcasts, and returns `204`. **Missing:** ending an already-ended session currently returns `404`; the contract requires idempotent `204`. |
+| Join/observe/live roster — `JoinSession`, `ObserveSession`, `StudentJoined`, `RosterUpdated` | **Partial** | Join, attendance persistence, group membership, observer hydration, join events, and disconnect events exist. **Missing:** `JoinSession` does not reject an ended session. Multiple simultaneous connections for one `studentId` are not reference-counted, so one disconnect can incorrectly mark the student offline. `ObserveSession` also accepts unknown/ended room codes. |
+| Join reply — `SessionState` | **Partial** | Timer and focused assignment are returned. **Missing:** absent `activeTimer` / `focusedAssignmentId` values serialize as `null`; the contract says to omit them. |
+| Assignment sets/content — both `/api/assignmentsets` GET routes | **Complete** | New Assignment naming, camel-case DTO fields, ordering, lesson/content passthrough, and exclusion of grading/solution data are implemented. |
+| Execute — `POST /api/execute` | **Partial** | Single-file Java execution and result classification exist. **Missing:** `files` + `entryClass`, multi-file Piston payloads, and explicit mapping of executor infrastructure failures to `502`/`503`. (`stdin` is intentionally defined but not wired today.) |
+| Timer — `POST /api/sessions/{code}/timer` + `TimerStarted` | **Complete** | Active-room validation, absolute `endsAt`, in-memory late-join state, and group broadcast are implemented. |
+| Follow — `FocusAssignment` + `AssignmentFocused` | **Partial** | State and broadcast exist. **Missing:** the hub method accepts unknown/ended rooms. |
+| Teacher hydration — `/attendance`, session `/submissions` | **Complete** | Both active-room-only endpoints, persisted attendance, thin attempt DTOs, and newest-first submission order are implemented. |
+| Live progress — `SubmissionRecorded` | **Complete** | A thin attempt is broadcast after a room submission is saved; solo submissions are not broadcast and broadcast failure is best-effort. |
+| Submit — `POST /api/assignments/{assignmentId}/submissions` | **Partial** | Student/session validation, single-file code grading, predict grading, persistence, response, and live broadcast exist. **Missing:** multi-file `content` currently fails because grading assumes a JSON string; ended sessions are also accepted. |
+| Student submission history — `GET /api/students/{studentId}/submissions` | **Complete** | Thin, newest-first history with room code or `null` is implemented. |
+| Submission detail — `GET /api/submissions/{subId}` | **Complete** | Full content/result replay and `404` for an unknown UUID are implemented. |
+| Solution — `GET /api/assignments/{assignmentId}/solution` | **Complete** | Stored JSON is returned unchanged, including `null`; unknown assignments return `404`. |
+| Retired resume suggestion | **Complete (no implementation intended)** | The retired personalized endpoint is absent; `today-latest` is its implemented replacement. |
+
+### Remaining backend work
+
+- [ ] Make session ending idempotent (`204` for an already-ended session).
+- [ ] Reject joins, observations, focus changes, and room submissions when the session is ended; validate live Hub operations against persisted sessions.
+- [ ] Track multiple live connections per student so disconnecting one connection does not remove another still-connected presence.
+- [ ] Omit empty `SessionState` fields rather than serializing them as `null`.
+- [X] Implement `files` / `entryClass` through `ExecutorController`, `ExecutorService`, and `PistonClient`.
+- [X] Grade and persist multi-file submission content without calling `JsonElement.GetString()` on an array.
+- [X] Map Piston/network infrastructure failures to the contracted `502`/`503` responses.
+
+> Verification note (2026-07-31): the solution and test projects build with
+> `dotnet test ... -m:1`, but the test runner cannot execute in the current
+> restricted environment because it is denied permission to open its local
+> communication socket. The statuses above therefore come from static code and
+> test inspection, not a successful full test run.
+
 > **Naming:** the entity is **Assignment** everywhere — code on both sides, and
 > this wire contract (`/api/assignmentsets`, `assignmentId`, `assignmentSetId`).
 > It was previously called _Task_/_taskset_; the rename happened because the
-> backend entity clashed with `System.Threading.Tasks.Task`. The frontend
-> (branch `feat/taskAPI`) already calls the new routes; backend routes/DTOs and
-> the seed data id still carry the old naming and need to be renamed to match.
+> backend entity clashed with `System.Threading.Tasks.Task`. The backend now
+> uses the Assignment routes/DTOs and renamed persistence model described here.
 
 ---
 
@@ -25,8 +67,8 @@ There are **two separate concerns**, and they get **two separate endpoints**:
   student + assignment + progress. Called once, when the student thinks they're done.
   **Built on top of `execute`** (it runs the code, then records the result).
 
-`execute` is fully defined. `submission` is deferred until we build the
-assignments/progress feature — see [Open decisions](#open-decisions).
+`execute` and `submission` are fully defined. Their current backend
+implementation status and remaining gaps are recorded in the audit above.
 
 User stories that drive these features live in [STORIES.md](STORIES.md).
 Persistence/DB design for what's behind these endpoints lives in [SCHEMA.md](SCHEMA.md).
@@ -255,10 +297,9 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 [`POST /api/sessions`](#sessions-rooms). `displayTitle` is
 `AssignmentSet.DisplayTitle` (see [SCHEMA.md](SCHEMA.md)).
 
-> **Implemented on the backend under the old task naming** (along with
+> **Implemented on the backend using the Assignment naming** (along with
 > `GET /api/sessions/{code}` and `GET /api/assignmentsets/{assignmentSetId}/assignments`
-> below); content is loaded by `scripts/seed-tasks.sql`. Routes, DTO fields, and
-> the seed data id must be renamed to match this contract. The frontend already
+> below); content is loaded by `scripts/seed-tasks.sql`. The frontend already
 > calls the real endpoints (`@lib/assignmentSetApi`, branch `feat/taskAPI`) —
 > no mock remains (see [STORIES.md](STORIES.md) S6). Note `POST /api/sessions`
 > **requires** the `assignmentSetId` body shown above and rejects unknown ids
@@ -799,7 +840,7 @@ solo/practice submission. Deliberately thin: no `content`/`result` — see
 [SCHEMA.md](SCHEMA.md#submission) for why this stays a lightweight list, not
 a full replay of each attempt.
 
-> **Status: frontend built, backend not yet implemented** (STORIES.md S5).
+> **Status: implemented on the backend** (STORIES.md S5).
 > The frontend's "My Progress" panel (`ProgressModal`, opened from the
 > Toolbar or the entry screen) calls this on load and groups the response by
 > `assignmentId` — showing every attempt, but the assignment-level status is
@@ -936,7 +977,7 @@ Resolve each _in this file_ before the relevant feature is built.
       [Live progress broadcasts](#live-progress-broadcasts-server--teacher-observers-in-the-room)).
 - [x] **Progress persistence** — `Submission` rows, keyed by `studentId` (see
       [SCHEMA.md](SCHEMA.md)). Replaces the in-memory skeleton.
-- [x] **Teacher picks an assignment set when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/assignmentsets`](#assignments). Backend endpoints implemented (under the old task naming — rename pending); frontend calls the real API (STORIES.md S6).
+- [x] **Teacher picks an assignment set when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/assignmentsets`](#assignments). Backend endpoints and Assignment naming are implemented; frontend calls the real API (STORIES.md S6).
 - [x] **Solo Practice entry point** — join-bar UI decision made and built; no new contract beyond S4's existing `sessionId`-omitted submission (STORIES.md S7).
 - [x] **Sample solution reveal** — see [Solution](#solution). Gating in the frontend; backend returns `SampleSolutionJson` on request (STORIES.md S8).
 - [x] **Mini-projects are VS-Code-only** — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). `execute`/`submission` are never called for `kind: "project"`, at all, not per-assignment.
@@ -944,7 +985,7 @@ Resolve each _in this file_ before the relevant feature is built.
 - [x] **Resume suggestion** — **retired**, see [Resume suggestion (retired)](#resume-suggestion-retired). Replaced end-to-end by [`GET /api/sessions/today-latest`](#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today) (STORIES.md S9).
 - [x] **Session lifetime** — a room ends only when the teacher manually ends it (`POST /api/sessions/{code}/end`, see [Sessions](#sessions-rooms)); no idle timeout. `Session.Status` persists the end so it survives a server restart; `SessionStore`'s in-memory roster/timer for that room are cleared at the same time.
 - [x] **Teacher dashboard hydration + live progress** — see [Teacher dashboard hydration](#teacher-dashboard-hydration-attendance--submissions) and [Live progress broadcasts](#live-progress-broadcasts-server--teacher-observers-in-the-room). Contract decided (2 `GET`s — `/attendance` = ever-joined roll + `/submissions` — + `SubmissionRecorded` for live grading; green/gray presence and live roll growth stay on `ObserveSession` + `RosterUpdated` only; Leave ≡ disconnect for presence, neither deletes `Attendance`; per-cell status is frontend-derived, no `/progress`). **The backend is complete**: both `GET`s (branch `feat/teacher-dashboard`, each 404-ing on an unknown *or ended* room) and `SubmissionRecorded` (branch `feat/submission-recorded`, broadcast best-effort from the submit path — room submissions only, never solo, never `project`). The frontend half is not built (STORIES.md S10).
-- [x] **Submission detail (code + result replay)** — see [`GET /api/submissions/{subId}`](#get-apisubmissionssubid-shared--full-detail-for-one-submission). One shared, unscoped-by-role endpoint for both the student's own "My Progress" review and the teacher's Col 4 replay; both `GET .../submissions` list endpoints stay thin (`subId` + outcome only) and hand off to this one. Not implemented yet.
+- [x] **Submission detail (code + result replay)** — see [`GET /api/submissions/{subId}`](#get-apisubmissionssubid-shared--full-detail-for-one-submission). One shared, unscoped-by-role endpoint for both the student's own "My Progress" review and the teacher's Col 4 replay; both `GET .../submissions` list endpoints stay thin (`subId` + outcome only) and hand off to this one. Implemented on the backend.
 
 See [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions) for persistence-layer
 items that don't affect the wire format (e.g. `AssignmentSet` labeling).
