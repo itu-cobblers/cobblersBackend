@@ -73,7 +73,8 @@ public class SessionService : ISessionService
     public async Task<bool> EndSessionAsync(string code)
     {
         code = SessionCode.Normalize(code);
-        var session = await _db.Session.FirstOrDefaultAsync(s => s.Code == code);
+        var session = await _db.Session.FirstOrDefaultAsync(s => s.Code == code && 
+                                                                 s.Status == SessionStatus.Active);
         if (session is null) return false;
 
         session.Status = SessionStatus.Ended;

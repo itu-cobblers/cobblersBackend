@@ -190,4 +190,66 @@ public sealed class SessionServiceTest : IAsyncLifetime
         Assert.Equal("NEW1", result.Code);
     }
 
+    [Fact]
+    public async Task EndSessionAsync_AlreadyEnded_ReturnsFalse()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        ctx.AssignmentSet.Add(assignmentSet);
+        ctx.Session.Add(TestData.MakeSession(assignmentSet.AssignmentSetId, code: "ABCD", status: SessionStatus.Ended));
+        await ctx.SaveChangesAsync();
+
+        var service = new SessionService(ctx);
+
+        // Ending an already-ended room is a 404, like every other lookup on that
+        // code — EndSessionAsync filters `Status == Active` the same way
+        // GetSessionAsync does. Without this test the filter can be dropped and
+        // only an end-to-end run would notice (it was in fact missing until
+        // apiSmoke.sh caught the 204).
+        Assert.False(await service.EndSessionAsync("ABCD"));
+
+        await using var read = _fixture.CreateContext();
+        Assert.Equal(SessionStatus.Ended, (await read.Session.SingleAsync(s => s.Code == "ABCD")).Status);
+    }
+
+    [Fact]
+    public async Task GetSessionAsync_NormalizesWhitespaceAndCase()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        ctx.AssignmentSet.Add(assignmentSet);
+        ctx.Session.Add(TestData.MakeSession(assignmentSet.AssignmentSetId, code: "ABCD"));
+        await ctx.SaveChangesAsync();
+
+        var service = new SessionService(ctx);
+
+        // SessionCode.Normalize trims as well as upper-cases — a code pasted out
+        // of a chat message arrives with whitespace more often than not.
+        var result = await service.GetSessionAsync("  abcd ");
+
+        Assert.NotNull(result);
+        Assert.Equal("ABCD", result.Code);
+    }
+
+    [Fact]
+    public async Task GetTodayLatestActiveSessionAsync_IgnoresYesterdaysRoom()
+    {
+        await using var ctx = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        ctx.AssignmentSet.Add(assignmentSet);
+        var stale = TestData.MakeSession(assignmentSet.AssignmentSetId, code: "OLD1");
+        ctx.Session.Add(stale);
+        await ctx.SaveChangesAsync();
+
+        // CreateAt is DB-owned, so back-date it after the insert.
+        stale.CreateAt = DateTimeOffset.UtcNow.AddDays(-1);
+        await ctx.SaveChangesAsync();
+
+        var service = new SessionService(ctx);
+        var result = await service.GetTodayLatestActiveSessionAsync();
+
+        // "today-latest" is the student entry screen's shortcut — an active room
+        // left open overnight must not be offered as today's class.
+        Assert.Null(result);
+    }
 }

@@ -212,15 +212,25 @@ ObserveSession(code)   // → returns the current roster
 ### Roster events (server → teacher observers in the room)
 
 ```json
-// StudentJoined — one student, sent when someone joins
+// StudentJoined — one student, sent when someone joins (live presence)
 { "studentId": "uuid", "displayName": "Maria" }
 
-// RosterUpdated — the full list (sent on changes, e.g. a leave); optional but preferred
+// RosterUpdated — the full *connected* list (sent on join / leave / disconnect)
 [ { "studentId": "uuid", "displayName": "Maria" } ]
 ```
 
 A `Student` is `{ studentId: string, displayName: string }`. The teacher dashboard
 renders `displayName`s; `studentId` keys them so duplicates merge.
+
+This list is **who's connected right now** (`SessionStore`) — the source of
+**green** presence dots on the teacher dashboard. Explicit Leave and hub
+disconnect are treated the same: the student drops out of this list (dot
+goes gray) but stays on the persisted
+[`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration) roll.
+If a `studentId` appears here that is not yet on the hydrated roll (first
+join while the teacher is watching), the frontend **appends** them to the
+roll and bumps `totalNum` — no separate attendance event. See
+[Teacher dashboard hydration](#teacher-dashboard-hydration-attendance--submissions).
 
 ---
 
@@ -496,14 +506,14 @@ no group.
 
 ---
 
-## Teacher dashboard hydration (attendance + progress)
+## Teacher dashboard hydration (attendance + submissions)
 
 "Who's here, and how far did each of them get?" — the teacher-side counterpart
 to the student's [`SessionState`](#joinsession-signalr-hub-method-student-joins-a-room)
 reply. `ObserveSession` alone only ever answers "who's connected **right
 now**" (the live, in-memory roster) — a teacher who reloads the dashboard,
 reconnects, or whose server process restarted mid-class has no way to
-recover *who attended* or *what they'd already passed*, since neither of
+recover *who attended* or *what they'd already submitted*, since neither of
 those lives on the SignalR connection. These two `GET` endpoints are the
 **REST hydration layer**: called once when the dashboard mounts (or
 reconnects), *before* calling `ObserveSession` for the live delta on top.
@@ -514,7 +524,27 @@ See [STORIES.md](STORIES.md) S10.
 > survives a server restart. This is a deliberately **different read** from
 > `ObserveSession`'s in-memory `SessionStore` roster; don't conflate "who
 > attended" with "who's connected this second." A student who joined, then
-> closed their laptop, still shows up here.
+> closed their laptop or hit Leave, **still shows up** on `/attendance`.
+
+> **Presence (gray / green) is frontend-only.** `/attendance` is the roll of
+> everyone who has ever joined — each name renders with a **gray** presence
+> dot by default. A name turns **green** only while that `studentId` appears
+> in the live SignalR roster (`ObserveSession` reply / `RosterUpdated`).
+> Explicit Leave and hub disconnect are the **same** offline state for
+> presence: both drop the student from `SessionStore`, neither deletes their
+> `Attendance` row. After a break, the teacher therefore sees the full class
+> as gray names until each student reconnects and SignalR paints them green
+> again.
+
+> **No `/progress` endpoint.** The teacher dashboard always lands with an
+> assignment selected, so it needs the thin attempt list on mount anyway —
+> not as a lazy drill-down. Per-`(assignmentId, studentId)` status
+> (`passed` / `failed` / `untried`), Col 1's `passedNum`/`totalNum`, and
+> status dots are all **derived on the frontend** from
+> [`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration) +
+> [`/submissions`](#get-apisessionscodesubmissions-teacher--all-thin-submissions-in-this-room)
+> (+ the session's assignment list). The backend ships the raw attempts;
+> it does not pre-aggregate a status matrix.
 
 ### `GET /api/sessions/{code}/attendance` (teacher — roster hydration)
 
@@ -526,159 +556,122 @@ See [STORIES.md](STORIES.md) S10.
 ]
 ```
 
-The set of students **currently active** in this session — i.e. joined and
-not yet left/removed (see `Attendance` in [SCHEMA.md](SCHEMA.md) for what
-flips a row inactive). Same shape as `ObserveSession`'s reply, but backed by
-the persisted table instead of the in-memory roster, so it survives a
-reload/reconnect/restart. This list is also the **denominator** for
-`passedNum`/`totalNum` on [`/progress`](#get-apisessionscodeprogress-teacher--per-assignment-per-student-status)
-below and for the teacher assignment list's pass-rate badge (Col 1) — a
-student who left the room stops counting toward "how many passed," even
-though their `Submission` rows aren't deleted.
+Everyone who has **ever joined** this session — one `Attendance` row per
+`(studentId, session)`, created on first successful `JoinSession` and
+**never removed** for Leave, disconnect, or a temporary laptop close (see
+[`Attendance`](SCHEMA.md#attendance) in [SCHEMA.md](SCHEMA.md)). Same shape
+as `ObserveSession`'s reply, but backed by the persisted table instead of
+the in-memory roster, so it survives a reload/reconnect/restart. This list
+is the **denominator** for the frontend-derived pass-rate badge on Col 1
+(`passedNum` / `totalNum`) for the whole class roll — leaving or going
+offline does **not** shrink `totalNum`. Label rows in Col 3 by joining
+`studentId` → `displayName` from this list (the submissions endpoint does
+not denormalize names).
 
 `404 Not Found` if `code` doesn't resolve to any session (same rule as
 [`GET /api/sessions/{code}`](#get-apisessionscode-room-cohort-resolve-the-rooms-assignment-set)) —
 including an `ended` one, since there's nothing live left to hydrate.
 
-### `GET /api/sessions/{code}/progress` (teacher — per-assignment × per-student status)
+### `GET /api/sessions/{code}/submissions` (teacher — all thin submissions in this room)
 
 ```json
 // → 200 OK
 [
-  { "assignmentId": 101, "studentId": "uuid-maria", "status": "passed" },
-  { "assignmentId": 101, "studentId": "uuid-jonas", "status": "untried" },
-  { "assignmentId": 118, "studentId": "uuid-maria", "status": "failed" }
+  { "subId": "uuid-1", "assignmentId": 101, "studentId": "uuid-maria", "passed": true,  "submittedAt": "2026-06-19T14:28:00Z" },
+  { "subId": "uuid-0", "assignmentId": 101, "studentId": "uuid-maria", "passed": false, "submittedAt": "2026-06-19T14:25:00Z" },
+  { "subId": "uuid-2", "assignmentId": 118, "studentId": "uuid-jonas", "passed": true,  "submittedAt": "2026-06-19T14:20:00Z" }
 ]
 ```
 
-| Field          | Type                                    | Notes                                                                                                                      |
-| -------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `assignmentId` | number                                   | One of the session's `assignmentSetId`'s assignments.                                                                       |
-| `studentId`    | string                                    | One of the session's currently-active students (same population as `/attendance`).                                        |
-| `status`       | `"passed"` \| `"failed"` \| `"untried"` | See derivation below.                                                                                                       |
+Every `Submission` row tagged to this session — **all assignments, all
+students, every attempt** — in one flat list. No
+`/assignments/{assignmentId}/…` scoping and no query filters: the dashboard
+hydrates once and filters/groups client-side for whichever assignment (and
+optionally student) is selected.
 
-**Derivation** (per `(assignmentId, studentId)` pair, mirrors S5's "any
-attempt" rule — see [`GET /api/students/{studentId}/submissions`](#get-apistudentsstudentidsubmissions)):
-
-- `"passed"` — **at least one** `Submission` for this pair has `passed = true`.
-- `"failed"` — at least one `Submission` exists, but **none** has `passed = true`
-  (covers `passed = false` and the `predict`/`code` "tried and missed" case).
-- `"untried"` — **no** `Submission` row exists for this pair yet.
-
-`kind: "project"` assignments never appear in this array — they have no
-`Submission` at all (see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)),
-so there's no status to report; the frontend should treat a missing pair the
-same as `"untried"` rather than expecting an explicit row for every
-assignment × student combination. `passed = null` (an assignment kind with
-no automated grader) is likewise excluded — never emitted as `"passed"` or `"failed"`.
-
-**Frontend usage:** feeds both `passedNum`/`totalNum` on each row of Col 1
-(`TeacherProblemsList` — count `status: "passed"` divided by
-`/attendance`'s length) and the per-student dot color in Col 1/Col 2 once a
-specific assignment or student is selected (`TeacherProblemItem.studentStatus`,
-`AttendanceStudent.assignmentStatus`). The response is intentionally **flat**
-(not pre-grouped by assignment or by student) — the frontend already needs
-both groupings (by-assignment for Col 1, by-student for Col 2) depending on
-which side has a selection, so a single flat list lets it index into
-whichever shape it needs rather than the backend guessing.
-
-`404 Not Found` under the same rule as `/attendance` above.
-
-### `GET /api/sessions/{code}/assignments/{assignmentId}/submissions` (teacher — submission history for one assignment in this room)
-
-```json
-// → 200 OK
-[
-  { "subId": "uuid-1", "studentId": "uuid-maria", "displayName": "Maria", "passed": true, "submittedAt": "2026-06-19T14:28:00Z" },
-  { "subId": "uuid-0", "studentId": "uuid-maria", "displayName": "Maria", "passed": false, "submittedAt": "2026-06-19T14:25:00Z" }
-]
-```
-
-Optional query: `?studentId={studentId}` — filters to that one student's full
-attempt history for this assignment (the "pick a question + a student"
-drill-down). Omit it to get **every** active student's attempts for this
-assignment.
-
-| Field         | Type      | Notes                                                                                                                |
-| ------------- | --------- | ------------------------------------------------------------------------------------------------------------------- |
-| `subId`       | string    | Same id as `submission`'s response — the key into [`GET /api/submissions/{subId}`](#get-apisubmissionssubid-shared--full-detail-for-one-submission) for the code + result replay. |
-| `studentId`   | string    |                                                                                                                        |
-| `displayName` | string    | Denormalized onto each row so the frontend never needs a second lookup against `/attendance` to label a row.        |
-| `passed`      | boolean?  | `null` for a kind with no automated grader.                                                                          |
-| `submittedAt` | string    |                                                                                                                        |
+| Field          | Type     | Notes                                                                                                                |
+| -------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `subId`        | string   | Same id as `submission`'s response — the key into [`GET /api/submissions/{subId}`](#get-apisubmissionssubid-shared--full-detail-for-one-submission) for the code + result replay. |
+| `assignmentId` | number   | Which assignment this attempt belongs to.                                                                            |
+| `studentId`    | string   | Join against [`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration) for `displayName`.             |
+| `passed`       | boolean? | `null` for a kind with no automated grader.                                                                          |
+| `submittedAt`  | string   |                                                                                                                      |
 
 This list is deliberately **thin, same as the student's own history below** —
-no `content`/`result` per row. Col 3 renders straight off this list (one row
-per attempt); Col 4 only needs one submission's code + result at a time (the
-one the teacher clicked), so shipping every historical attempt's full source
-on every list load would be pure waste. See
+no `content`/`result` per row. Col 3 filters this list to the selected
+assignment (and optionally student) and renders one row per attempt; Col 4
+only needs one submission's code + result at a time (the one the teacher
+clicked), so shipping every historical attempt's full source on every list
+load would be pure waste. See
 [`GET /api/submissions/{subId}`](#get-apisubmissionssubid-shared--full-detail-for-one-submission)
 below for how Col 4 actually gets the code.
 
 **Sort order:** newest-first (`submittedAt` desc) — same convention as the
 student history endpoint. **Grouping:** the response is a flat list, sorted
-by `submittedAt` only (not pre-grouped by `studentId`) — when called without
-`?studentId`, the frontend groups client-side to build Col 1/Col 2's
-attempt-by-attempt views; the `?studentId` filter exists precisely so the
-common single-student drill-down doesn't have to fetch-then-discard everyone
-else's rows.
+by `submittedAt` only (not pre-grouped by `assignmentId` or `studentId`) —
+the frontend already needs both cuts depending on selection, so one flat
+list lets it index into whichever shape it needs.
 
-`404 Not Found` under the same session-lookup rule as `/attendance` and
-`/progress` above; an `assignmentId` that isn't part of this session's
-`assignmentSetId` also `404`s (not a `200` with an empty array — it's an
-addressing error, not "no submissions yet").
+**Frontend derivation** (per `(assignmentId, studentId)` pair among
+everyone on [`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration)
+× non-`project` assignments — mirrors S5's "any attempt" rule):
+
+- `"passed"` — **at least one** row for this pair has `passed = true`.
+- `"failed"` — at least one row exists, but **none** has `passed = true`.
+- `"untried"` — **no** row exists for this pair yet.
+
+`kind: "project"` assignments never appear in this array — they have no
+`Submission` at all (see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)).
+Treat a missing pair the same as `"untried"`. `passed = null` rows do not
+count as `"passed"` or `"failed"`. Col 1's `passedNum` is the count of
+attendees with derived `"passed"` for that assignment; `totalNum` is
+[`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration)'s
+length (the full ever-joined roll — offline / Leave does not shrink it).
+
+`404 Not Found` under the same session-lookup rule as `/attendance` above.
+An empty array is a valid `200` ("nobody has submitted yet").
 
 ---
 
 ## Live progress broadcasts (server → teacher observers in the room)
 
-The three `GET`s above cover the **snapshot** a teacher dashboard hydrates
-on load/reconnect. These two SignalR events are the **live delta** on top —
-the same REST-hydrate-then-subscribe split the timer and follow features
-already use, so the dashboard never has to re-poll (2)/(3) after a student
-does something. Both attach to the same `ObserveSession` subscription
-pipeline the roster already uses, and **replace** `StudentJoined` /
-`RosterUpdated`'s job going forward — those two only ever carried
-`{ studentId, displayName }` with no notion of active/inactive or grading
-outcome, which is exactly the gap these two close. Not optional — required to
-close S10's live half (see [STORIES.md](STORIES.md) S10 / Backlog).
+The two `GET`s above cover the **snapshot** a teacher dashboard hydrates
+on load/reconnect. Live deltas on top use the same
+REST-hydrate-then-subscribe split the timer and follow features already
+use, so the dashboard never has to re-poll after a student does something.
+They attach to the same `ObserveSession` subscription pipeline the roster
+already uses. Not optional — required to close S10's live half (see
+[STORIES.md](STORIES.md) S10 / Backlog).
 
-### `AttendanceUpdated` (a student joins or leaves the room)
+**Presence (and live roll growth) stay on
+[`RosterUpdated`](#roster-events-server--teacher-observers-in-the-room) /
+`ObserveSession`.** There is no separate attendance SignalR event: a
+`studentId` that appears on the connected roster but is not yet in the
+hydrated `/attendance` list is appended to the roll (and shown green);
+Leave and disconnect only drop them from the connected set (dot goes
+gray) — neither deletes the persisted `Attendance` row. Submission
+progress has its own event below.
 
-```json
-{ "studentId": "uuid", "displayName": "Maria", "isActive": true }
-```
-
-Broadcast to every observer in Group `code` whenever a student's `Attendance`
-row flips active/inactive — joining (`isActive: true`, superseding
-`StudentJoined`) or leaving/disconnecting (`isActive: false`, superseding the
-"someone left" half of `RosterUpdated`). The teacher dashboard applies this
-as an incremental patch to the roster it hydrated from
-[`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration) —
-add/update the row by `studentId` — and recomputes `/progress`'s denominator
-(`totalNum` on Col 1) from the new active count, **without** re-fetching
-`/progress` itself.
-
-### `ProgressUpdated` (a student's submission is graded)
+### `SubmissionRecorded` (a student's submission is graded)
 
 ```json
-{ "studentId": "uuid", "assignmentId": 101, "status": "passed" }
+{ "subId": "uuid-1", "assignmentId": 101, "studentId": "uuid-maria", "passed": true, "submittedAt": "2026-06-19T14:28:00Z" }
 ```
 
 Broadcast to every observer in Group `code` whenever
 [`POST /api/assignments/{assignmentId}/submissions`](#post-apiassignmentsassignmentidsubmissions)
-finishes grading a submission from a student in this room (`status` uses the
-same two-value-only rule as [`/progress`](#get-apisessionscodeprogress-teacher--per-assignment-per-student-status):
-a submission always produces `"passed"` or `"failed"`, never `"untried"` —
-that value only exists as the *absence* of a submission). The dashboard
-applies this as a point patch: update that one cell's status in whatever it
-hydrated from `/progress` (recomputing Col 1's `passedNum` badge for
-`assignmentId`, and — if that `(studentId, assignmentId)` pair is the
-currently-selected Col 1/Col 2 combination — the status dot color) instead of
-re-fetching the whole `/progress` array. Never broadcast for a `project`
-submission — there is none to broadcast (see
+finishes grading a submission from a student in this room. Payload shape
+matches one row of
+[`GET /api/sessions/{code}/submissions`](#get-apisessionscodesubmissions-teacher--all-thin-submissions-in-this-room)
+— the dashboard **prepends** it to the hydrated list (newest-first) and
+re-derives that `(assignmentId, studentId)` cell's status / Col 1's
+`passedNum`, instead of re-fetching the whole array. Never broadcast for a
+`project` submission — there is none to broadcast (see
 [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)).
 
+> **Renamed from `ProgressUpdated`.** The old event carried a derived
+> `{ studentId, assignmentId, status }` cell. Now that status is
+> frontend-owned, the live delta is the thin attempt itself.
 ---
 
 ## Mini-projects are VS-Code-only
@@ -848,7 +841,7 @@ both:
   history via [`GET /api/students/{studentId}/submissions`](#get-apistudentsstudentidsubmissions),
   clicking an attempt calls this to show that attempt's code + result.
 - **The teacher's Col 4 replay** — after listing a room's attempts via
-  [`GET /api/sessions/{code}/assignments/{assignmentId}/submissions`](#get-apisessionscodeassignmentsassignmentidsubmissions-teacher--submission-history-for-one-assignment-in-this-room),
+  [`GET /api/sessions/{code}/submissions`](#get-apisessionscodesubmissions-teacher--all-thin-submissions-in-this-room),
   clicking a row calls the exact same endpoint.
 
 Both list endpoints already carry `subId` on every row specifically so
@@ -939,8 +932,8 @@ Resolve each _in this file_ before the relevant feature is built.
       replaces the frontend's static bundle.
 - [x] **SignalR hub path** — `/hub` (see Sessions).
 - [x] **Roster → teacher** — `ObserveSession` + `StudentJoined` / `RosterUpdated`
-      (see Sessions). A richer `ProgressUpdated` (per-assignment progress, not just names)
-      is still open.
+      (see Sessions). Live attempt deltas are `SubmissionRecorded` (see
+      [Live progress broadcasts](#live-progress-broadcasts-server--teacher-observers-in-the-room)).
 - [x] **Progress persistence** — `Submission` rows, keyed by `studentId` (see
       [SCHEMA.md](SCHEMA.md)). Replaces the in-memory skeleton.
 - [x] **Teacher picks an assignment set when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/assignmentsets`](#assignments). Backend endpoints implemented (under the old task naming — rename pending); frontend calls the real API (STORIES.md S6).
@@ -950,7 +943,7 @@ Resolve each _in this file_ before the relevant feature is built.
 - [x] **Multi-file execution for Day-3 single-class assignments** — see the [harness note](#post-apiexecute) under `execute`. No new wire shape (`files`/`entryClass` was already documented); the open work is `PistonClient` actually sending Piston more than one file (see CLAUDE.md, "Java-only, single-class assumption").
 - [x] **Resume suggestion** — **retired**, see [Resume suggestion (retired)](#resume-suggestion-retired). Replaced end-to-end by [`GET /api/sessions/today-latest`](#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today) (STORIES.md S9).
 - [x] **Session lifetime** — a room ends only when the teacher manually ends it (`POST /api/sessions/{code}/end`, see [Sessions](#sessions-rooms)); no idle timeout. `Session.Status` persists the end so it survives a server restart; `SessionStore`'s in-memory roster/timer for that room are cleared at the same time.
-- [x] **Teacher dashboard hydration + live progress** — see [Teacher dashboard hydration](#teacher-dashboard-hydration-attendance--progress) and [Live progress broadcasts](#live-progress-broadcasts-server--teacher-observers-in-the-room). Contract decided (3 `GET`s + `AttendanceUpdated`/`ProgressUpdated`, superseding `StudentJoined`/`RosterUpdated`); none implemented yet (STORIES.md S10).
+- [x] **Teacher dashboard hydration + live progress** — see [Teacher dashboard hydration](#teacher-dashboard-hydration-attendance--submissions) and [Live progress broadcasts](#live-progress-broadcasts-server--teacher-observers-in-the-room). Contract decided (2 `GET`s — `/attendance` = ever-joined roll + `/submissions` — + `SubmissionRecorded` for live grading; green/gray presence and live roll growth stay on `ObserveSession` + `RosterUpdated` only; Leave ≡ disconnect for presence, neither deletes `Attendance`; per-cell status is frontend-derived, no `/progress`). **Both `GET`s are implemented** (branch `feat/teacher-dashboard`), each 404-ing on an unknown *or ended* room; `SubmissionRecorded` is not built yet, and neither is any of the frontend (STORIES.md S10).
 - [x] **Submission detail (code + result replay)** — see [`GET /api/submissions/{subId}`](#get-apisubmissionssubid-shared--full-detail-for-one-submission). One shared, unscoped-by-role endpoint for both the student's own "My Progress" review and the teacher's Col 4 replay; both `GET .../submissions` list endpoints stay thin (`subId` + outcome only) and hand off to this one. Not implemented yet.
 
 See [SCHEMA.md → Open decisions](SCHEMA.md#open-decisions) for persistence-layer

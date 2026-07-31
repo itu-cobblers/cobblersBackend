@@ -32,6 +32,13 @@ public record SubmissionDetailDto(
     [property: JsonPropertyName("passed")]       bool? Passed,
     [property: JsonPropertyName("submittedAt")]  DateTimeOffset SubmittedAt);
 
+public record SessionSubmissionDto(
+    [property: JsonPropertyName("subId")] Guid SubId,
+    [property: JsonPropertyName("studentId")] string StudentId,
+    [property: JsonPropertyName("assignmentId")] int AssignmentId,
+    [property: JsonPropertyName("passed")] bool? Passed,
+    [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt);
+    
 /// <summary>
 /// `GET /api/assignments/{assignmentId}/solution` — passthrough of
 /// <see cref="Data.Entities.Assignment.SampleSolutionJson"/> (CONTRACT.md

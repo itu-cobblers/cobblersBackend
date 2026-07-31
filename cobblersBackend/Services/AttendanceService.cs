@@ -51,9 +51,14 @@ public class AttendanceService : IAttendanceService
     /// Historical roster: everyone who has ever joined this session, in join
     /// order. This is *not* the live roster (SessionStore owns "connected now").
     /// </summary>
-    public async Task<IReadOnlyList<StudentDto>> GetAttendanceAsync(string code)
+    public async Task<IReadOnlyList<StudentDto>?> GetAttendanceAsync(string code)
     {
         code = SessionCode.Normalize(code);
+
+        var isActive = await _db.Session
+            .AsNoTracking()
+            .AnyAsync(s => s.Code == code && s.Status == SessionStatus.Active);
+        if (!isActive) return null;
 
         return await _db.Attendance
                 .AsNoTracking()
