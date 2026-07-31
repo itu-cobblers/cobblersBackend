@@ -2,7 +2,9 @@ using System.Text.Json;
 using cobblersBackend.Data;
 using cobblersBackend.Data.Entities;
 using cobblersBackend.DTOs;
+using cobblersBackend.Hubs;
 using cobblersBackend.Models;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace cobblersBackend.Services;
@@ -12,28 +14,34 @@ public class SubmissionService : ISubmissionService
     private readonly CobblersDbContext _db;
     private readonly IExecutorService _executor;
     private readonly IAssignmentGrader _grader;
-    private static readonly JsonSerializerOptions ResultJsonOptions = 
+    private readonly IHubContext<SessionHub> _hub;
+    private readonly ILogger<SubmissionService> _logger;
+    private static readonly JsonSerializerOptions ResultJsonOptions =
         new() { PropertyNameCaseInsensitive = true };
 
-    public SubmissionService(CobblersDbContext db, IExecutorService executor, IAssignmentGrader grader)
+    public SubmissionService(CobblersDbContext db, IExecutorService executor, IAssignmentGrader grader,
+                             IHubContext<SessionHub> hub, ILogger<SubmissionService> logger)
     {
         _db = db;
         _executor = executor;
         _grader = grader;
+        _hub = hub;
+        _logger = logger;
     }
-    
+
     public async Task<SubmissionResponseDto?> SubmitAsync(int assignmentId, SubmissionRequestDto request)
     {
         var assignment = await _db.Assignment.AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == assignmentId);
         if(assignment is null)
             return null;
-        
+
         if (!await _db.Student.AnyAsync(s => s.Id == request.StudentId))
             throw new InvalidOperationException($"No student '{request.StudentId}'");
-        
+
 
         string? sessionId = null;
+        string? roomCode = null;   // = the SignalR group name, normalized
         if (request.SessionId is not null)
         {
             var code = SessionCode.Normalize(request.SessionId);
@@ -41,6 +49,7 @@ public class SubmissionService : ISubmissionService
                 .FirstOrDefaultAsync(s => s.Code == code)
                 ?? throw new InvalidOperationException($"No session with code '{request.SessionId}'");
             sessionId = session.SessionId;
+            roomCode = session.Code;
         }
 
         var (result, passed) = await RunAndGradeAsync(assignment, request.Content);
@@ -59,8 +68,43 @@ public class SubmissionService : ISubmissionService
         _db.Submission.Add(submission);
         await _db.SaveChangesAsync();
 
+        await BroadcastSubmissionRecordedAsync(assignment, submission, roomCode);
+
         return new SubmissionResponseDto(
             submission.SubId, submission.Passed, result, submission.SubmittedAt);
+    }
+
+    /// <summary>
+    /// Live delta for the teacher dashboard (CONTRACT.md, "SubmissionRecorded"): after a
+    /// submission is graded and saved, push the new attempt to everyone observing the room so
+    /// the dashboard patches its hydrated list instead of re-polling
+    /// <c>GET /api/sessions/{code}/submissions</c>. The payload is deliberately one row of that
+    /// endpoint — same DTO, so the frontend prepends it with no special-casing.
+    ///
+    /// Silent when there's no room (solo practice broadcasts to nobody) and for
+    /// <c>project</c> submissions, which are VS-Code-only and never appear in the room list.
+    /// </summary>
+    private async Task BroadcastSubmissionRecordedAsync(Assignment assignment, Submission submission, string? roomCode)
+    {
+        if (roomCode is null || assignment.Kind == AssignmentKind.Project) return;
+
+        var row = new SessionSubmissionDto(
+            submission.SubId, submission.StudentId, submission.AssignmentId,
+            submission.Passed, submission.SubmittedAt);
+
+        try
+        {
+            await _hub.Clients.Group(roomCode).SendAsync("SubmissionRecorded", row);
+        }
+        catch (Exception ex)
+        {
+            // Best-effort by design. The submission is already committed, so failing the
+            // request here would tell a student their work was lost and invite a duplicate
+            // resubmit — a worse outcome than a teacher's dot updating late. The dashboard
+            // recovers on its next hydrate.
+            _logger.LogWarning(ex, "SubmissionRecorded broadcast failed for room {RoomCode}, submission {SubId}",
+                roomCode, submission.SubId);
+        }
     }
 
     private async Task<(ExecuteResponseDto? Result, bool? Passed)> RunAndGradeAsync(Assignment assignment, JsonElement content)

@@ -1,10 +1,12 @@
 using cobblersBackend.DTOs;
 using cobblersBackend.Data;
 using cobblersBackend.Data.Entities;
+using cobblersBackend.Hubs;
 using cobblersBackend.Services;
 using cobblersBackend.Tests.Infrastructure;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace cobblersBackend.Tests;
 
@@ -35,7 +37,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
         var result = await service.SubmitAsync(assignmentId, request);
 
@@ -64,7 +66,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
         var result = await service.SubmitAsync(assignmentId, request);
 
@@ -93,7 +95,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
         var result = await service.SubmitAsync(assignmentId, request);
 
@@ -121,7 +123,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("42"));
         var result = await service.SubmitAsync(assignmentId, request);
 
@@ -151,7 +153,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("42"));
         var result = await service.SubmitAsync(assignmentId, request);
 
@@ -181,7 +183,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
         var result = await service.SubmitAsync(assignmentId, request);
 
@@ -212,7 +214,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
         var result = await service.SubmitAsync(assignmentId, request);
 
@@ -238,7 +240,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         }
 
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var service = NewService(ctx);
         var result = await service.GetSolutionAsync(assignmentId);
 
         Assert.NotNull(result);
@@ -260,7 +262,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         }
 
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var service = NewService(ctx);
         var result = await service.GetSolutionAsync(assignmentId);
 
         Assert.NotNull(result);
@@ -280,7 +282,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         }
 
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var service = NewService(ctx);
         var result = await service.GetSolutionAsync(assignmentId);
 
         Assert.NotNull(result);
@@ -291,7 +293,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     public async Task GetSolutionAsync_UnknownAssignment_ReturnsNull()
     {
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")), new AssignmentGrader());
+        var service = NewService(ctx);
         var result = await service.GetSolutionAsync(999_999);
 
         Assert.Null(result);
@@ -316,7 +318,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
         var result = await service.SubmitAsync(9999, request);
 
@@ -345,7 +347,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-2", null, JsonSerializer.SerializeToElement("ignored"));
 
         // Then
@@ -378,7 +380,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", "ZZZZ", JsonSerializer.SerializeToElement("ignored"));
 
         // Then
@@ -414,7 +416,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto("student-1", sessionCode, JsonSerializer.SerializeToElement("ignored"));
         var result = service.SubmitAsync(assignmentId,request);
 
@@ -454,7 +456,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request1 = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("x"));
         await service.SubmitAsync(expectedOrder[0], request1);
         await service.SubmitAsync(expectedOrder[1], request1);
@@ -486,7 +488,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request1 = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("x"));
         await service.SubmitAsync(assignmentId, request1);
 
@@ -526,7 +528,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request = new SubmissionRequestDto(studentId, sessionCode, JsonSerializer.SerializeToElement("ignored"));
         await service.SubmitAsync(assignmentId, request);
 
@@ -558,7 +560,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         var request1 = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("x"));
         await service.SubmitAsync(assignmentId, request1);
 
@@ -588,7 +590,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
         var request1 = new SubmissionRequestDto(studentId, null, content);
         var response = await service.SubmitAsync(assignmentId, request1);
@@ -623,7 +625,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         JsonElement content = JsonSerializer.SerializeToElement("42");
         var request1 = new SubmissionRequestDto(studentId, null, content);
         var response = await service.SubmitAsync(assignmentId, request1);
@@ -666,7 +668,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
         var request1 = new SubmissionRequestDto(studentId, sessionCode, content);
         var response = await service.SubmitAsync(assignmentId, request1);
@@ -702,7 +704,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
 
         // When
         await using var ctx = _fixture.CreateContext();
-        var service = new SubmissionService(ctx, executor, new AssignmentGrader());
+        var service = NewService(ctx, executor);
         JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
         var request1 = new SubmissionRequestDto(studentId, null, content);
         var response = await service.SubmitAsync(assignmentId, request1);
@@ -761,9 +763,18 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     private sealed record RoomSeed(
         string Code, int AssignmentA, int AssignmentB, Guid Oldest, Guid Middle, Guid Newest);
 
-    private SubmissionService NewService(CobblersDbContext ctx) =>
-        new(ctx, new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")),
-            new AssignmentGrader());
+    /// <summary>
+    /// Captures the SubmissionRecorded broadcasts every `NewService` in this class emits.
+    /// xUnit builds a fresh test-class instance per test, so this is per-test state.
+    /// </summary>
+    private readonly RecordingHubContext<SessionHub> _hub = new();
+
+    private SubmissionService NewService(CobblersDbContext ctx, IExecutorService? executor = null) =>
+        new(ctx,
+            executor ?? new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "", "")),
+            new AssignmentGrader(),
+            _hub.Object,
+            NullLogger<SubmissionService>.Instance);
 
     [Fact]
     public async Task GetSessionSubmissionsAsync_UnknownCode_ReturnsNull()
@@ -999,5 +1010,195 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         // Then — Col 4's replay must keep working after the class is over.
         Assert.NotNull(detail);
         Assert.Equal(seed.Code, detail.SessionId);
+    }
+
+    // ── SubmissionRecorded — the live delta for the teacher dashboard ─────────
+    // CONTRACT.md "Live progress broadcasts": one thin attempt row, pushed to the
+    // room's observers so the dashboard patches instead of re-polling.
+
+    /// <summary>A live room, one student, and one assignment of the given kind.</summary>
+    private async Task<(string Code, int AssignmentId)> SeedSubmittableRoomAsync(
+        AssignmentKind kind = AssignmentKind.Predict, string? grading = null)
+    {
+        await using var setup = _fixture.CreateContext();
+        var assignmentSet = TestData.MakeAssignmentSet();
+        setup.AssignmentSet.Add(assignmentSet);
+        await setup.SaveChangesAsync();
+
+        var session = TestData.MakeSession(assignmentSet.AssignmentSetId);
+        setup.Session.Add(session);
+        var assignment = TestData.MakeAssignment(kind);
+        // Default the grading rules per kind, so an explicit `grading: null` really does mean
+        // "this assignment has no grader" rather than silently inheriting the predict doc.
+        assignment.GradingJson = grading ?? (kind == AssignmentKind.Predict
+            ? """{"predict":{"compare":"normalized","expectedOutput":"42"}}"""
+            : null);
+        setup.Assignment.Add(assignment);
+        setup.Student.Add(TestData.MakeStudent("student-maria", "Maria"));
+        await setup.SaveChangesAsync();
+
+        return (session.Code, assignment.Id);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_RoomSubmission_BroadcastsSubmissionRecordedToThatRoom()
+    {
+        // Given
+        var seed = await SeedSubmittableRoomAsync();
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", seed.Code, JsonSerializer.SerializeToElement("42"));
+        await NewService(ctx).SubmitAsync(seed.AssignmentId, request);
+
+        // Then — the group is the room code, so only that room's observers get it.
+        var broadcast = _hub.Single();
+        Assert.Equal(seed.Code, broadcast.Group);
+        Assert.Equal("SubmissionRecorded", broadcast.Method);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_BroadcastPayloadIsOneSubmissionsRow()
+    {
+        // Given
+        var seed = await SeedSubmittableRoomAsync();
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = NewService(ctx);
+        var request = new SubmissionRequestDto("student-maria", seed.Code, JsonSerializer.SerializeToElement("42"));
+        var response = await service.SubmitAsync(seed.AssignmentId, request);
+
+        // Then — same DTO the hydration endpoint returns, so the frontend can prepend it
+        // to the hydrated list with no special-casing. Assert it field-for-field against
+        // what GET /api/sessions/{code}/submissions actually serves for the same attempt.
+        var row = Assert.IsType<SessionSubmissionDto>(_hub.Single().Args[0]);
+        var hydrated = await service.GetSessionSubmissionsAsync(seed.Code);
+        Assert.Equal(Assert.Single(hydrated!), row);
+
+        // …and it's the submission the caller was just told about.
+        Assert.Equal(response!.SubId, row.SubId);
+        Assert.Equal("student-maria", row.StudentId);
+        Assert.Equal(seed.AssignmentId, row.AssignmentId);
+        Assert.True(row.Passed);
+        Assert.NotEqual(default, row.SubmittedAt);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_SoloSubmission_BroadcastsNothing()
+    {
+        // Given — same assignment, but no sessionId on the request.
+        var seed = await SeedSubmittableRoomAsync();
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", null, JsonSerializer.SerializeToElement("42"));
+        await NewService(ctx).SubmitAsync(seed.AssignmentId, request);
+
+        // Then — solo practice belongs to no room; there is nobody to tell.
+        Assert.Empty(_hub.Sent);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ProjectKind_BroadcastsNothing()
+    {
+        // Given
+        var seed = await SeedSubmittableRoomAsync(AssignmentKind.Project);
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", seed.Code, JsonSerializer.SerializeToElement("{}"));
+        await NewService(ctx).SubmitAsync(seed.AssignmentId, request);
+
+        // Then — mini-projects are VS-Code-only and never appear in the room list, so a
+        // broadcast would put a row on the dashboard that a re-hydrate then removes.
+        Assert.Empty(_hub.Sent);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_FailedAttempt_StillBroadcasts()
+    {
+        // Given — a wrong answer is still progress the teacher wants to see.
+        var seed = await SeedSubmittableRoomAsync();
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", seed.Code, JsonSerializer.SerializeToElement("99"));
+        await NewService(ctx).SubmitAsync(seed.AssignmentId, request);
+
+        // Then — only `project` is excluded, not failures.
+        var row = Assert.IsType<SessionSubmissionDto>(_hub.Single().Args[0]);
+        Assert.False(row.Passed);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_UngradedCodeKind_StillBroadcastsWithNullPassed()
+    {
+        // Given — a code assignment with no grading rules: passed stays null.
+        var seed = await SeedSubmittableRoomAsync(AssignmentKind.Code);
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", seed.Code,
+                                               JsonSerializer.SerializeToElement("class Main {}"));
+        await NewService(ctx).SubmitAsync(seed.AssignmentId, request);
+
+        // Then — `passed: null` reaches the frontend as null, which derives to neither
+        // passed nor failed (same rule as the hydrated list).
+        var row = Assert.IsType<SessionSubmissionDto>(_hub.Single().Args[0]);
+        Assert.Null(row.Passed);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_LowercaseSessionCode_BroadcastsToTheNormalizedGroup()
+    {
+        // Given
+        var seed = await SeedSubmittableRoomAsync();
+
+        // When — the client sends the code however the student typed it.
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", seed.Code.ToLowerInvariant(),
+                                               JsonSerializer.SerializeToElement("42"));
+        await NewService(ctx).SubmitAsync(seed.AssignmentId, request);
+
+        // Then — SignalR group names are case-sensitive, so a raw code here would broadcast
+        // into a group nobody is subscribed to and the dashboard would silently never update.
+        Assert.Equal(seed.Code, _hub.Single().Group);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_BroadcastThrows_SubmissionStillSucceedsAndPersists()
+    {
+        // Given — the hub is down / the send faults.
+        var seed = await SeedSubmittableRoomAsync();
+        _hub.ThrowOnSend = new InvalidOperationException("hub is gone");
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", seed.Code, JsonSerializer.SerializeToElement("42"));
+        var response = await NewService(ctx).SubmitAsync(seed.AssignmentId, request);
+
+        // Then — best-effort by design: the row is already committed, so failing the request
+        // would tell a student their work was lost and invite a duplicate resubmit. The
+        // teacher's dashboard catches up on its next hydrate.
+        Assert.NotNull(response);
+        await using var read = _fixture.CreateContext();
+        Assert.Equal(response.SubId, (await read.Submission.SingleAsync()).SubId);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_UnknownAssignment_BroadcastsNothing()
+    {
+        // Given
+        await SeedSubmittableRoomAsync();
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", null, JsonSerializer.SerializeToElement("42"));
+        var response = await NewService(ctx).SubmitAsync(999999, request);
+
+        // Then — nothing was recorded, so nothing is announced.
+        Assert.Null(response);
+        Assert.Empty(_hub.Sent);
     }
 }
