@@ -286,7 +286,9 @@ public sealed class AttendanceServiceTests : IAsyncLifetime
 
         // Then
         Assert.NotNull(roster);
-        Assert.Equal(["Maria"], roster.Select(s => s.DisplayName).ToArray());
+        var attendee = Assert.Single(roster);
+        Assert.Equal("student-a", attendee.StudentId);
+        Assert.Equal("Maria", attendee.DisplayName);
     }
 
     [Fact]
