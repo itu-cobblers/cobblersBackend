@@ -1452,7 +1452,7 @@ $java$)
 -- day3 folders, package declarations stripped (students never declare one).
 (
   'build-a-tree', 'project', 'Build a Tree',
-  $txt$Mini-project: model a growing (and eventually dying, occasionally blooming) tree.$txt$,
+  $txt$Pick a project to start with! Choose any of the 4 options and complete as many as youd like. Please write and test your code in VS Code, then drag and drop your files here to submit.$txt$,
   NULL,
   NULL,
   jsonb_build_object(
@@ -1550,8 +1550,8 @@ $sol$)
 ),
 (
   'grandpas-time-machine', 'project', 'Grandpa''s Time Machine',
-  $txt$Mini-project: a text-based time machine that travels between years.$txt$,
-  $txt$Model the machine as an object — store the current year as a field, with one method for each direction (or a single smart loop that handles both).$txt$,
+  $txt$Pick a project to start with! Choose any of the 4 options and complete as many as youd like. Please write and test your code in VS Code, then drag and drop your files here to submit.$txt$,
+  NULL,
   NULL,
   jsonb_build_object(
     'brief', $txt$Grandpa's Time Machine
@@ -1637,8 +1637,8 @@ $sol$)
 ),
 (
   'grandmas-blackmarket-kitchen', 'project', 'Grandma''s Blackmarket Kitchen',
-  $txt$Mini-project: a catering planner that assigns menus and dodges the police.$txt$,
-  $txt$Use if-else for the impossible orders. Subtract the picky eaters from the total, then loop through the rest for the random pick: int r = (new Random()).nextInt(6);$txt$,
+  $txt$Pick a project to start with! Choose any of the 4 options and complete as many as youd like. Please write and test your code in VS Code, then drag and drop your files here to submit.$txt$,
+  NULL,
   NULL,
   jsonb_build_object(
     'brief', $txt$Grandma's Blackmarket Kitchen
@@ -1752,8 +1752,8 @@ $sol$)
 ),
 (
   'seat-selector', 'project', 'Seat Selector',
-  $txt$Mini-project: tell students which auditorium rows must stay free.$txt$,
-  $txt$A Scanner reads the input; the modulo operator (%) finds every third row. It can be solved with loops (or, for a challenge, without).$txt$,
+  $txt$Pick a project to start with! Choose any of the 4 options and complete as many as youd like. Please write and test your code in VS Code, then drag and drop your files here to submit.$txt$,
+  NULL,
   NULL,
   jsonb_build_object(
     'brief', $txt$Seat Selector
