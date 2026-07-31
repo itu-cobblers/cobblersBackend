@@ -263,6 +263,20 @@ public sealed class SessionHubTests
         Assert.Equal(101, sentEvent.Args[0]);
     }
 
+    [Fact]
+    public async Task JoinSession_AfterTeacherFocusedAssignment_RepliesWithThatFocus()
+    {
+        var (hub, _, sent, _, _, _) = BuildHub();
+
+        await hub.FocusAssignment("abcd", 101);
+        sent.Clear();
+
+        // Student joins late sees FocusedAssignment
+        var state = await hub.JoinSession(Join());
+        
+        Assert.Equal(101, state.FocusedAssignmentId);
+    }
+
     // ── OnDisconnectedAsync ──────────────────────────────────────────────────
 
     [Fact]
