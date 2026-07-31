@@ -154,10 +154,9 @@ can prove a route exists, that a service's `null` becomes a 404, and that the JS
 matches CONTRACT.md — a service test asserting `null` proves nothing about the status code, which
 is exactly how `/attendance` shipped answering `200 []` for an unknown room.
 
-`scripts/apiSmoke.sh` is the manual counterpart: curl every endpoint against a locally running
-API (`BASE_URL`, `SKIP_PISTON=1`, `VERBOSE=1`; needs `jq`). It exercises the real Piston and the
-real seeded data, which the test suite deliberately does not. Point it at a **freshly restarted**
-API — it caught the `/end` 204 quirk, and it will just as happily report a stale binary's bugs.
+None of these layers touch a real Piston or real seeded data — that gap is covered manually by
+a curl smoke script the team keeps **outside this repo**, in the shared workspace root. Ask
+before assuming it isn't there; it caught the `/end` 204 quirk that no unit test would have.
 
 **DB-backed tests use a real Postgres via Testcontainers** (`cobblersBackend.Tests/Infrastructure/`)
 — not SQLite, not EF InMemory, so unique/check/FK constraints and jsonb behave exactly
