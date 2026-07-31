@@ -27,6 +27,14 @@ public class AssignmentsController : ControllerBase
         {
             return BadRequest(new { error = ex.Message});
         }
+        catch (HttpRequestException)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Executor is unreachable." });
+        }
+        catch (TaskCanceledException)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "Executor did not respond in time." });
+        }
     }
 
     [HttpGet("{assignmentId}/solution")]
