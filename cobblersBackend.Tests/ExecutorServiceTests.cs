@@ -93,4 +93,39 @@ public sealed class ExecutorServiceTests
         Assert.Equal(ExecuteStatus.RUNTIME_ERROR, result.Status);
         Assert.Equal("killed",result.Stderr);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenPistonKillsAnInfiniteLoop_StudentGetsRuntimeErrorWithNoExplanation()
+    {
+        // Arrange — exactly what Piston returns for `while (true) {}`: it enforces its own
+        // run timeout, kills the process, and reports code=null + signal=SIGKILL with
+        // nothing on either stream (a SIGKILLed JVM gets no chance to print).
+        var fakePiston = new Mock<IPistonClient>();
+        fakePiston.Setup(p => p.ExecuteAsync("java", It.IsAny<string>()))
+            .ReturnsAsync(new PistonExecuteResponse
+            {
+                Run = new PistonStage("", "", "", null, "SIGKILL")
+            });
+
+        var fakeMetrics = new Mock<IExecutionMetrics>();
+        var service = new ExecutorService(fakePiston.Object, new JavaExecuteResultClassifier(), fakeMetrics.Object);
+
+        // Act
+        var result = await service.ExecuteAsync("public class Main { public static void main(String[] a){ while(true){} } }");
+
+        // Assert — CHARACTERIZATION of a known UX gap, not an endorsement. `code` isn't 0
+        // so the classifier falls through its `// sigkill fallback` to RUNTIME_ERROR, and
+        // both streams are empty, so the terminal renders "(no output)". A beginner who
+        // wrote an infinite loop sees a blank panel and the word "error" with nothing
+        // saying their program ran too long — arguably the single most likely mistake on
+        // day 1. Fixing it means a distinct status (or at least a synthesized stderr
+        // message) when signal is SIGKILL; flip this test then.
+        Assert.Equal(ExecuteStatus.RUNTIME_ERROR, result.Status);
+        Assert.Equal("", result.Stdout);
+        Assert.Equal("", result.Stderr);
+    }
+
+    // two timeout tests in the executor test 
+    // student supplied code cause timeout returned.
+    // http timeout simulate the error path where the executor errors because piston is slow needs to be pinged to wake up or something 
 }
