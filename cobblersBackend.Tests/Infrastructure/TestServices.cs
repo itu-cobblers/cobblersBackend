@@ -14,6 +14,11 @@ namespace cobblersBackend.Tests.Infrastructure;
 /// </summary>
 public static class TestServices
 {
+    public static AssignmentService Assignments(CobblersDbContext ctx) => new(ctx);
+
+    public static AssignmentSetService AssignmentSets(CobblersDbContext ctx) =>
+        new(ctx, Assignments(ctx));
+
     /// <param name="executor">Defaults to one that always reports a silent success.</param>
     /// <param name="hub">
     /// Pass a <see cref="RecordingHubContext{THub}"/>'s <c>Object</c> to assert on

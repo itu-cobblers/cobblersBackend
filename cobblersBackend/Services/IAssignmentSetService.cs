@@ -6,13 +6,6 @@ namespace cobblersBackend.Services;
 public interface IAssignmentSetService
 {
     Task<IReadOnlyList<AssignmentSetSummaryDto>> ListAssignmentSetsAsync();
-
+    Task<IReadOnlyList<AssignmentDto>?> GetAssignmentsAsync(string assignmentSetId, bool includeSolution = false);
     Task<bool> ExistsAsync(string assignmentSetId);
-
-    /// <summary>
-    /// The set's assignments sorted by OrderIndex (the array index IS the
-    /// assignment's position — see CONTRACT.md). Null when the set doesn't
-    /// exist, distinguishing "unknown set" (404) from "empty set" (200 []).
-    /// </summary>
-    Task<IReadOnlyList<AssignmentDto>?> GetAssignmentsAsync(string assignmentSetId);
 }

@@ -19,7 +19,7 @@ public class AssignmentSetServiceTests : IAsyncLifetime
     {
         await _fixture.ResetAsync();
         _db = _fixture.CreateContext();
-        _service = new AssignmentSetService(_db);
+        _service = TestServices.AssignmentSets(_db);
     }
 
     public Task DisposeAsync()
@@ -138,11 +138,34 @@ public class AssignmentSetServiceTests : IAsyncLifetime
 
         Assert.DoesNotContain("slug", json);
         Assert.DoesNotContain("secret answer", json);   // SampleSolutionJson
+        Assert.DoesNotContain("\"solution\"", json);    // omitted unless includeSolution
         Assert.DoesNotContain("nonEmptyStdout", json);  // GradingJson
         Assert.DoesNotContain("hint", json);            // null hint omitted entirely
         Assert.Contains("\"content\":", json);
         Assert.Contains("\"lesson\":", json);
         Assert.Contains("\"kind\":\"code\"", json);
+    }
+
+    [Fact]
+    public async Task GetAssignments_IncludeSolution_True_AttachesParsedSolution()
+    {
+        var assignment = AddAssignment("with-sol");
+        AddSet("day1", (assignment, 0));
+
+        var dto = Assert.Single((await _service.GetAssignmentsAsync("day1", includeSolution: true))!);
+
+        Assert.Equal("the secret answer", dto.Solution!.Value.GetString());
+    }
+
+    [Fact]
+    public async Task GetAssignments_IncludeSolution_False_OmitsSolution()
+    {
+        var assignment = AddAssignment("with-sol");
+        AddSet("day1", (assignment, 0));
+
+        var dto = Assert.Single((await _service.GetAssignmentsAsync("day1"))!);
+
+        Assert.Null(dto.Solution);
     }
 
     [Fact]

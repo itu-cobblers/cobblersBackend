@@ -111,15 +111,117 @@ public sealed class ApiEndpointTests : IAsyncLifetime
         Assert.True(row.TryGetProperty("description", out _));
         Assert.True(row.TryGetProperty("content", out _));
 
-        // Never served to students: grading rules and the reference answer.
+        // Never served to students by default: grading rules and the reference answer.
         Assert.False(row.TryGetProperty("gradingJson", out _));
         Assert.False(row.TryGetProperty("grading_json", out _));
         Assert.False(row.TryGetProperty("sampleSolutionJson", out _));
+        Assert.False(row.TryGetProperty("solution", out _));
         Assert.False(row.TryGetProperty("slug", out _));
 
         // Optional fields are omitted entirely rather than sent as null.
         Assert.False(row.TryGetProperty("hint", out _));
         Assert.False(row.TryGetProperty("lesson", out _));
+    }
+
+    [Fact]
+    public async Task GetAssignments_IncludeSolutionTrue_AttachesSolution()
+    {
+        var seed = await SeedRoomAsync();
+        await using (var ctx = _fixture.CreateContext())
+        {
+            var assignment = await ctx.Assignment.SingleAsync(a => a.Id == seed.AssignmentId);
+            assignment.SampleSolutionJson = "\"public class Main {}\"";
+            await ctx.SaveChangesAsync();
+        }
+
+        var response = await _client.GetAsync(
+            $"/api/assignmentsets/{seed.SetId}/assignments?includeSolution=true");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var row = (await ReadJson(response)).EnumerateArray().Single();
+        Assert.Equal("public class Main {}", row.GetProperty("solution").GetString());
+    }
+
+    // ── Assignments (batch by id) ────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetAssignmentsByIds_NoIds_Is400()
+    {
+        var response = await _client.GetAsync("/api/assignments");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAssignmentsByIds_KnownIds_Is200PreservesOrderAndOmitsSolution()
+    {
+        int firstId, secondId;
+        await using (var ctx = _fixture.CreateContext())
+        {
+            var first = TestData.MakeAssignment(AssignmentKind.Code);
+            first.Title = "First";
+            first.SampleSolutionJson = "\"secret\"";
+            var second = TestData.MakeAssignment(AssignmentKind.Predict);
+            second.Title = "Second";
+            ctx.Assignment.AddRange(first, second);
+            await ctx.SaveChangesAsync();
+            firstId = first.Id;
+            secondId = second.Id;
+        }
+
+        // Request second before first — response order must follow the query, not insert order.
+        var response = await _client.GetAsync(
+            $"/api/assignments?ids={secondId}&ids={firstId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var rows = (await ReadJson(response)).EnumerateArray().ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.Equal(secondId, rows[0].GetProperty("id").GetInt32());
+        Assert.Equal("predict", rows[0].GetProperty("kind").GetString());
+        Assert.Equal(firstId, rows[1].GetProperty("id").GetInt32());
+        Assert.False(rows[1].TryGetProperty("solution", out _));
+        Assert.False(rows[1].TryGetProperty("slug", out _));
+    }
+
+    [Fact]
+    public async Task GetAssignmentsByIds_IncludeSolutionTrue_AttachesSolution()
+    {
+        int assignmentId;
+        await using (var ctx = _fixture.CreateContext())
+        {
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.SampleSolutionJson = """[{"name":"Main.java","content":"class Main {}"}]""";
+            ctx.Assignment.Add(assignment);
+            await ctx.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var response = await _client.GetAsync(
+            $"/api/assignments?ids={assignmentId}&includeSolution=true");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var row = (await ReadJson(response)).EnumerateArray().Single();
+        Assert.Equal(JsonValueKind.Array, row.GetProperty("solution").ValueKind);
+        Assert.Equal("Main.java", row.GetProperty("solution")[0].GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task GetAssignmentsByIds_UnknownIds_AreSkipped()
+    {
+        int knownId;
+        await using (var ctx = _fixture.CreateContext())
+        {
+            var assignment = TestData.MakeAssignment();
+            ctx.Assignment.Add(assignment);
+            await ctx.SaveChangesAsync();
+            knownId = assignment.Id;
+        }
+
+        var response = await _client.GetAsync(
+            $"/api/assignments?ids=999999&ids={knownId}&ids=888888");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(knownId, (await ReadJson(response)).EnumerateArray().Single().GetProperty("id").GetInt32());
     }
 
     // ── Sessions ─────────────────────────────────────────────────────────────

@@ -8,17 +8,23 @@ namespace cobblersBackend.Controllers;
 [Route("api/assignments")]
 public class AssignmentsController : ControllerBase
 {
-    private readonly ISubmissionService _service;
+    private readonly ISubmissionService _submissionService;
+    private readonly IAssignmentService _assignmentService;
 
-    public AssignmentsController(ISubmissionService service) => _service = service;
+    public AssignmentsController(
+        ISubmissionService submissionService, 
+        IAssignmentService assignmentService)
+    {
+        _submissionService = submissionService;
+        _assignmentService = assignmentService;
+    }
 
     [HttpPost("{assignmentId}/submissions")]
     public async Task<IActionResult> Submit(int assignmentId, [FromBody] SubmissionRequestDto request)
     {
-
         try
         {
-            var result = await _service.SubmitAsync(assignmentId,request);
+            var result = await _submissionService.SubmitAsync(assignmentId, request);
             return result is null
                 ? NotFound(new { error = $"Assignment '{assignmentId}' not found."})
                 : Ok(result);
@@ -40,9 +46,23 @@ public class AssignmentsController : ControllerBase
     [HttpGet("{assignmentId}/solution")]
     public async Task<IActionResult> GetSolution(int assignmentId)
     {
-        var result = await _service.GetSolutionAsync(assignmentId);
+        var result = await _submissionService.GetSolutionAsync(assignmentId);
         return result is null
             ? NotFound(new { error = $"Assignment '{assignmentId}' not found." })
             : Ok(result);
+    }
+    
+    // GET /api/assignments?ids=1&ids=2&ids=5&includeSolution=true
+    [HttpGet]
+    public async Task<IActionResult> GetAssignmentsByIds(
+        [FromQuery] int[] ids, 
+        [FromQuery] bool includeSolution = false)
+    {
+        if (ids is null || ids.Length == 0)
+            return BadRequest(new { error = "No assignment IDs provided." });
+
+        var assignments = await _assignmentService.GetAssignmentsByIdsAsync(ids, includeSolution);
+    
+        return Ok(assignments);
     }
 }
