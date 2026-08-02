@@ -11,10 +11,11 @@ public record AssignmentSetSummaryDto(
     [property: JsonPropertyName("displayTitle")] string DisplayTitle);
 
 /// <summary>
-/// One assignment as served to students. Deliberately excludes the sample
-/// solution, grading rules, and slug (see SCHEMA.md) — Lesson and Content are
-/// the stored jsonb passed through verbatim, so their camelCase keys survive
-/// the serializer policy.
+/// One assignment as served to students. Grading rules and slug never leave
+/// the DB (see SCHEMA.md). <c>solution</c> is omitted unless the caller
+/// opts in via <c>includeSolution</c>. Lesson and Content are the stored
+/// jsonb passed through verbatim, so their camelCase keys survive the
+/// serializer policy.
 /// </summary>
 public record AssignmentDto(
     [property: JsonPropertyName("id")] int Id,
@@ -23,4 +24,6 @@ public record AssignmentDto(
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("lesson"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? Lesson,
     [property: JsonPropertyName("hint"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Hint,
-    [property: JsonPropertyName("content")] JsonElement Content);
+    [property: JsonPropertyName("content")] JsonElement Content,
+    [property: JsonPropertyName("solution"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? Solution = null
+);

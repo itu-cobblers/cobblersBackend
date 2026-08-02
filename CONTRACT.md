@@ -21,7 +21,7 @@ missing; **not implemented** = no backend implementation exists yet.
 | End session — `POST /api/sessions/{code}/end` + `SessionEnded` | **Partial** | First end persists `ended`, clears live state, broadcasts, and returns `204`. **Missing:** ending an already-ended session currently returns `404`; the contract requires idempotent `204`. |
 | Join/observe/live roster — `JoinSession`, `ObserveSession`, `StudentJoined`, `RosterUpdated` | **Partial** | Join, attendance persistence, group membership, observer hydration, join events, and disconnect events exist. **Missing:** `JoinSession` does not reject an ended session. Multiple simultaneous connections for one `studentId` are not reference-counted, so one disconnect can incorrectly mark the student offline. `ObserveSession` also accepts unknown/ended room codes. |
 | Join reply — `SessionState` | **Partial** | Timer and focused assignment are returned. **Missing:** absent `activeTimer` / `focusedAssignmentId` values serialize as `null`; the contract says to omit them. |
-| Assignment sets/content — both `/api/assignmentsets` GET routes | **Complete** | New Assignment naming, camel-case DTO fields, ordering, lesson/content passthrough, and exclusion of grading/solution data are implemented. |
+| Assignment sets/content — `/api/assignmentsets` GET routes + batch `GET /api/assignments` | **Complete** | Assignment naming, camel-case DTO fields, set ordering, lesson/content passthrough, optional `includeSolution`, and exclusion of grading/slug are implemented. Batch fetch preserves request order and skips unknown ids. |
 | Execute — `POST /api/execute` | **Partial** | Single-file Java execution and result classification exist. **Missing:** `files` + `entryClass`, multi-file Piston payloads, and explicit mapping of executor infrastructure failures to `502`/`503`. (`stdin` is intentionally defined but not wired today.) |
 | Timer — `POST /api/sessions/{code}/timer` + `TimerStarted` | **Complete** | Active-room validation, absolute `endsAt`, in-memory late-join state, and group broadcast are implemented. |
 | Follow — `FocusAssignment` + `AssignmentFocused` | **Partial** | State and broadcast exist. **Missing:** the hub method accepts unknown/ended rooms. |
@@ -30,7 +30,7 @@ missing; **not implemented** = no backend implementation exists yet.
 | Submit — `POST /api/assignments/{assignmentId}/submissions` | **Partial** | Student/session validation, single-file code grading, predict grading, persistence, response, and live broadcast exist. **Missing:** multi-file `content` currently fails because grading assumes a JSON string; ended sessions are also accepted. |
 | Student submission history — `GET /api/students/{studentId}/submissions` | **Complete** | Thin, newest-first history with room code or `null` is implemented. |
 | Submission detail — `GET /api/submissions/{subId}` | **Complete** | Full content/result replay and `404` for an unknown UUID are implemented. |
-| Solution — `GET /api/assignments/{assignmentId}/solution` | **Complete** | Stored JSON is returned unchanged, including `null`; unknown assignments return `404`. |
+| Solution — `GET /api/assignments/{assignmentId}/solution` + inline via `includeSolution` | **Complete** | Stored JSON is returned unchanged on the dedicated route, including explicit `null`; unknown assignments return `404`. The same payload is available inline on assignment-content routes when `includeSolution=true`. |
 | Retired resume suggestion | **Complete (no implementation intended)** | The retired personalized endpoint is absent; `today-latest` is its implemented replacement. |
 
 ### Remaining backend work
@@ -281,7 +281,12 @@ roll and bumps `totalNum` — no separate attendance event. See
 Two populations need assignment content (see [Sessions](#sessions-rooms)): the live
 cohort (in a room, `code` resolves to an `assignmentSetId`) and the solo cohort (the
 frontend hardcodes `assignmentSetId: "all-assignments-for-solo-2026"`). Both hit
-the same endpoint — there's no session-scoped variant.
+the set endpoint below — there's no session-scoped variant.
+
+When the caller already knows specific assignment ids (teacher preview, cross-set
+lookups), use [`GET /api/assignments?ids=…`](#get-apiassignmentsids-batch-fetch-by-id)
+instead. Both routes share the same assignment DTO and the same optional
+`includeSolution` query flag.
 
 ### `GET /api/assignmentsets` (teacher — list available assignment sets)
 
@@ -298,12 +303,12 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 `AssignmentSet.DisplayTitle` (see [SCHEMA.md](SCHEMA.md)).
 
 > **Implemented on the backend using the Assignment naming** (along with
-> `GET /api/sessions/{code}` and `GET /api/assignmentsets/{assignmentSetId}/assignments`
-> below); content is loaded by `scripts/seed-tasks.sql`. The frontend already
-> calls the real endpoints (`@lib/assignmentSetApi`, branch `feat/taskAPI`) —
-> no mock remains (see [STORIES.md](STORIES.md) S6). Note `POST /api/sessions`
-> **requires** the `assignmentSetId` body shown above and rejects unknown ids
-> with `400`.
+> `GET /api/sessions/{code}`, `GET /api/assignmentsets/{assignmentSetId}/assignments`,
+> and batch `GET /api/assignments?ids=…` below); content is loaded by
+> `scripts/seed-tasks.sql`. The frontend already calls the real endpoints
+> (`@lib/assignmentSetApi`, branch `feat/taskAPI`) — no mock remains
+> (see [STORIES.md](STORIES.md) S6). Note `POST /api/sessions` **requires**
+> the `assignmentSetId` body shown above and rejects unknown ids with `400`.
 
 ### `GET /api/sessions/{code}` (room cohort — resolve the room's assignment set)
 
@@ -318,6 +323,14 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 > `SessionEnded` broadcast, not by this endpoint 404-ing on the next call.
 
 ### `GET /api/assignmentsets/{assignmentSetId}/assignments` (both cohorts — fetch content)
+
+```
+GET /api/assignmentsets/{assignmentSetId}/assignments?includeSolution=false
+```
+
+| Query param        | Type    | Default | Notes |
+| ------------------ | ------- | ------- | ----- |
+| `includeSolution`  | boolean | `false` | When `true`, each row may include a `solution` field (see below). Same passthrough shape as [`GET /api/assignments/{assignmentId}/solution`](#get-apiassignmentsassignmentidsolution). **Reveal gating is a frontend concern** — the backend honors the flag whenever it is sent. |
 
 ```json
 // → 200 OK
@@ -347,16 +360,23 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 ]
 ```
 
-| Field     | Type                                   | Notes                                                                                                                    |
-| --------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `id`      | number                                 | Server-assigned. **Not** the frontend's current 0–33 numbering — see [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).  |
-| `kind`    | `"code"` \| `"predict"` \| `"project"` | `"project"` is content-only for now — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). The frontend should render its `brief`/`lesson` but **no editor, no Run, no Submit**. |
-| `lesson`  | `({kind:"text",text}\| {kind:"code",code})[]`? | Optional teaching blocks shown above the task. Omit when absent. Sibling of `hint`/`content` — not inside `content`. See [SCHEMA.md](SCHEMA.md). |
-| `content` | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeAssignment` / `PredictAssignment` / `ProjectAssignment` fields, minus grading logic / `lesson` / `check`. |
+`404 Not Found` when `assignmentSetId` does not exist. `200 []` for an empty set.
 
-> This response never includes a sample/reference solution. That's a
-> deliberate omission, not an oversight — see [SCHEMA.md](SCHEMA.md#sample-solution-is-a-separate-column).
-> `check()` logic also does not travel over the wire anymore — grading moved server-side (see [Submission](#submission) below).
+| Field      | Type                                   | Notes                                                                                                                    |
+| ---------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `id`       | number                                 | Server-assigned. **Not** the frontend's current 0–33 numbering — see [SCHEMA.md](SCHEMA.md#assignmentid-is-a-fresh-identity).  |
+| `kind`     | `"code"` \| `"predict"` \| `"project"` | `"project"` is content-only for now — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). The frontend should render its `brief`/`lesson` but **no editor, no Run, no Submit**. |
+| `lesson`   | `({kind:"text",text}\| {kind:"code",code})[]`? | Optional teaching blocks shown above the task. Omit when absent. Sibling of `hint`/`content` — not inside `content`. See [SCHEMA.md](SCHEMA.md). |
+| `hint`     | string?                                | Optional. Omit when absent. |
+| `content`  | object                                 | Shape depends on `kind` — mirrors the frontend's `CodeAssignment` / `PredictAssignment` / `ProjectAssignment` fields, minus grading logic / `lesson` / `check`. |
+| `solution` | string \| `{name, content}[]`?         | **Omitted by default.** Present only when `includeSolution=true` _and_ the assignment has a stored reference answer. Same shape as [Solution](#solution). Omit entirely when `includeSolution=false` or when no answer is stored — never sent as `null` in those cases. |
+
+> **Solution is opt-in on this route.** By default the response excludes
+> `SampleSolutionJson` — see [SCHEMA.md](SCHEMA.md#sample-solution-is-a-separate-column).
+> Pass `includeSolution=true` when the caller needs reference answers inline
+> (e.g. teacher preview). Student-facing loads should leave the default.
+> `check()` logic also does not travel over the wire — grading moved
+> server-side (see [Submission](#submission) below).
 
 > **Order matters.** The array comes back sorted by each assignment's position within
 > the set (`AssignmentSetAssignment.OrderIndex`, 0-based) — so the array index _is_ the
@@ -365,6 +385,38 @@ Feeds the teacher's session-creation picker — pick an `assignmentSetId`, pass 
 > [SCHEMA.md](SCHEMA.md#assignmentsetassignment-carries-an-explicit-orderindex).
 
 This replaces the frontend's hardcoded assignment bundle as the source of truth for assignment content going forward.
+
+### `GET /api/assignments?ids=…` (batch fetch by id)
+
+Fetch one or more assignments when the caller already knows their server ids —
+without going through an assignment set. Same DTO as the set route above.
+
+```
+GET /api/assignments?ids=101&ids=118&includeSolution=false
+```
+
+| Query param        | Type    | Default | Notes |
+| ------------------ | ------- | ------- | ----- |
+| `ids`              | number  | —       | **Required.** Repeat the param for each id (`ids=1&ids=2&ids=5`). At least one must be present — omitting `ids` entirely is `400`. |
+| `includeSolution`  | boolean | `false` | Same semantics as on the [set route](#get-apiassignmentsetsassignmentsetidassignments-both-cohorts--fetch-content). |
+
+```json
+// → 200 OK — order follows the ids query params, not insert order or numeric id
+[
+  { "id": 118, "kind": "predict", "title": "…", "description": "…", "content": { "…": "…" } },
+  { "id": 101, "kind": "code", "title": "…", "description": "…", "content": { "…": "…" } }
+]
+```
+
+| Status | When |
+| ------ | ---- |
+| `400 Bad Request` | No `ids` query param was sent (`{ "error": "No assignment IDs provided." }`). |
+| `200 OK` | Always, for a non-empty `ids` list — even when every id is unknown (`[]`), or only some ids match (unknown ids are **skipped silently**, not `404`). |
+
+> **Order follows the request, not the database.** The response array is built
+> in the same order as the `ids` params. This differs from the set route, which
+> sorts by `AssignmentSetAssignment.OrderIndex`. Use the set route when loading
+> a whole bundle; use this route when you already have a specific id list.
 
 ---
 
@@ -909,6 +961,17 @@ Returns an assignment's sample/reference solution from `SampleSolutionJson`.
 "Show solution" after at least one submission; the teacher preview can reveal
 at any time. See [SCHEMA.md](SCHEMA.md#sample-solution-reveal-uses-one-rule-for-both-solo-and-classroom).
 
+Three ways to fetch a reference answer:
+
+1. **Dedicated route (below)** — one assignment at a time; always wraps the
+   answer in `{ "solution": … }`, including explicit `null` when none is stored.
+2. **`includeSolution=true` on the [set route](#get-apiassignmentsetsassignmentsetidassignments-both-cohorts--fetch-content)**
+   — inline on each assignment row; field omitted when absent.
+3. **`includeSolution=true` on the [batch route](#get-apiassignmentsids-batch-fetch-by-id)**
+   — same inline shape as (2).
+
+All three are ungated server-side — the frontend decides when to call them.
+
 ### `GET /api/assignments/{assignmentId}/solution`
 
 ```json
@@ -970,7 +1033,8 @@ Resolve each _in this file_ before the relevant feature is built.
       grading ownership, and persistence are decided; schema detail in
       [SCHEMA.md](SCHEMA.md).
 - [x] **Assignments** — see [Assignments](#assignments). `GET /api/assignmentsets/{assignmentSetId}/assignments`
-      replaces the frontend's static bundle.
+      replaces the frontend's static bundle; batch `GET /api/assignments?ids=…` and
+      optional `includeSolution` on both routes are implemented.
 - [x] **SignalR hub path** — `/hub` (see Sessions).
 - [x] **Roster → teacher** — `ObserveSession` + `StudentJoined` / `RosterUpdated`
       (see Sessions). Live attempt deltas are `SubmissionRecorded` (see
@@ -979,7 +1043,7 @@ Resolve each _in this file_ before the relevant feature is built.
       [SCHEMA.md](SCHEMA.md)). Replaces the in-memory skeleton.
 - [x] **Teacher picks an assignment set when creating a session** — see [`POST /api/sessions`](#sessions-rooms) and [`GET /api/assignmentsets`](#assignments). Backend endpoints and Assignment naming are implemented; frontend calls the real API (STORIES.md S6).
 - [x] **Solo Practice entry point** — join-bar UI decision made and built; no new contract beyond S4's existing `sessionId`-omitted submission (STORIES.md S7).
-- [x] **Sample solution reveal** — see [Solution](#solution). Gating in the frontend; backend returns `SampleSolutionJson` on request (STORIES.md S8).
+- [x] **Sample solution reveal** — see [Solution](#solution). Gating in the frontend; backend returns `SampleSolutionJson` on request via the dedicated route or `includeSolution=true` on assignment-content routes (STORIES.md S8).
 - [x] **Mini-projects are VS-Code-only** — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only). `execute`/`submission` are never called for `kind: "project"`, at all, not per-assignment.
 - [x] **Multi-file execution for Day-3 single-class assignments** — see the [harness note](#post-apiexecute) under `execute`. No new wire shape (`files`/`entryClass` was already documented); the open work is `PistonClient` actually sending Piston more than one file (see CLAUDE.md, "Java-only, single-class assumption").
 - [x] **Resume suggestion** — **retired**, see [Resume suggestion (retired)](#resume-suggestion-retired). Replaced end-to-end by [`GET /api/sessions/today-latest`](#get-apisessionstoday-latest-student-entry-screen--is-a-session-live-today) (STORIES.md S9).

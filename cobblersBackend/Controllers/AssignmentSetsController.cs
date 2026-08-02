@@ -24,13 +24,15 @@ public class AssignmentSetsController : ControllerBase
         Ok(await _assignmentSets.ListAssignmentSetsAsync());
 
     /// <summary>
-    /// GET /api/assignmentsets/{assignmentSetId}/assignments — the set's assignments,
-    /// sorted by their position in the set (the response array index is the position).
+    /// GET /api/assignmentsets/{assignmentSetId}/assignments?includeSolution=true
     /// </summary>
     [HttpGet("{assignmentSetId}/assignments")]
-    public async Task<IActionResult> GetAssignments(string assignmentSetId)
+    public async Task<IActionResult> GetAssignments(
+        string assignmentSetId, 
+        [FromQuery] bool includeSolution = false)
     {
-        var assignments = await _assignmentSets.GetAssignmentsAsync(assignmentSetId);
+        var assignments = await _assignmentSets.GetAssignmentsAsync(assignmentSetId, includeSolution);
+        
         if (assignments is null)
             return NotFound(new { error = $"Assignment set '{assignmentSetId}' not found." });
 
