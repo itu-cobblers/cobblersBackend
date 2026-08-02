@@ -471,23 +471,27 @@ public sealed class ApiEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Execute_FilesOnlyMultiFileRequest_Is400ForNow()
+    public async Task Execute_FilesPlusEntryClass_Is200()
     {
         var response = await _client.PostAsync("/api/execute", Json("""
             {"files":[{"name":"Main.java","content":"public class Main {}"},
                       {"name":"Person.java","content":"public class Person {}"}],
-             "entry_class":"Main"}
+             "entryClass":"Main"}
             """));
 
-        // Pins the temporary guard in ExecutorController. The Day-3 single-class
-        // assignments need multi-file execution (CONTRACT.md harness note), so
-        // this test should flip to 200 as part of that work — right now a
-        // multi-file payload would silently lose every file but the first if the
-        // guard were removed without also touching PistonClient's hardcoded
-        // Main.java (see PistonClientTests).
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("success", (await ReadJson(response)).GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Execute_FilesWithoutEntryClass_Is400()
+    {
+        var response = await _client.PostAsync("/api/execute", Json("""
+            {"files":[{"name":"Main.java","content":"public class Main {}"}]}
+            """));
+
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        // Asserting the guard fired, not that model binding rejected the payload.
-        Assert.Contains("single-file", await response.Content.ReadAsStringAsync());
+        Assert.Contains("entryClass", await response.Content.ReadAsStringAsync());
     }
 
     // ── Metrics ──────────────────────────────────────────────────────────────

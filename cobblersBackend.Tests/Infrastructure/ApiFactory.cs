@@ -48,7 +48,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         private readonly ApiFactory _factory;
         public StubPistonClient(ApiFactory factory) => _factory = factory;
 
-        public Task<PistonExecuteResponse> ExecuteAsync(string language, string code) =>
+        public Task<PistonExecuteResponse> ExecuteAsync(string language, IReadOnlyList<PistonFile> files) =>
             Task.FromResult(_factory.PistonResponse);
     }
 }

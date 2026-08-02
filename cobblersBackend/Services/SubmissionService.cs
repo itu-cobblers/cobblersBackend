@@ -120,17 +120,35 @@ public class SubmissionService : ISubmissionService
 
     private async Task<(ExecuteResponseDto? Result, bool? Passed)> GradeCodeAsync(Assignment assignment, JsonElement content)
     {
-        var executed = await _executor.ExecuteAsync(content.GetString()!);
+        var (files, codeForGrading) = ParseCodeContent(content);
+        var executed = await _executor.ExecuteAsync(files, "Main");
 
         bool? passed = assignment.GradingJson is null
             ? null
             : _grader.Grade(assignment.GradingJson, new CheckResult(
-                content.GetString()!,
+                codeForGrading,
                 executed.Stdout,
                 executed.Stderr,
                 executed.Status == ExecuteStatus.SUCCESS ? 0 : 1)).Passed;
 
         return (executed, passed);
+    }
+
+    private static (IReadOnlyList<FileDto> Files, string CodeForGrading) ParseCodeContent(JsonElement content)
+    {
+        if (content.ValueKind == JsonValueKind.Array)
+        {
+            var files = content.EnumerateArray()
+                .Select(f => new FileDto(
+                    f.GetProperty("name").GetString(),
+                    f.GetProperty("content").GetString()))
+                .ToList();
+            var codeForGrading = string.Join("\n", files.Select(f => f.Content));
+            return (files, codeForGrading);
+        }
+
+        var code = content.GetString() ?? "";
+        return (new List<FileDto> { new("Main.java", code) }, code);
     }
 
     public async Task<SolutionResponseDto?> GetSolutionAsync(int assignmentId)

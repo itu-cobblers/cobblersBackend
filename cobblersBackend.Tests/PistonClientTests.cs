@@ -80,7 +80,7 @@ public sealed class PistonClientTests
     {
         var handler = StubHandler.Json(OkResponse);
 
-        await Build(handler).ExecuteAsync("java", "class Main {}");
+        await Build(handler).ExecuteAsync("java", Files("class Main {}"));
 
         Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
         Assert.Equal("http://piston.test:2000/api/v2/execute", handler.LastRequest.RequestUri!.ToString());
@@ -91,7 +91,7 @@ public sealed class PistonClientTests
     {
         var handler = StubHandler.Json(OkResponse);
 
-        await Build(handler).ExecuteAsync("java", "class Main { }");
+        await Build(handler).ExecuteAsync("java", Files("class Main { }"));
 
         var sent = JsonSerializer.Deserialize<JsonElement>(handler.LastBody!);
         Assert.Equal("java", sent.GetProperty("language").GetString());
@@ -101,20 +101,22 @@ public sealed class PistonClientTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_AlwaysSendsExactlyOneFileNamedMainJava()
+    public async Task ExecuteAsync_SendsProvidedFileNamesUnchanged()
     {
         var handler = StubHandler.Json(OkResponse);
 
-        await Build(handler).ExecuteAsync("java", "public class Person {}");
+        await Build(handler).ExecuteAsync("java",
+        [
+            new PistonFile { Name = "Main", Content = "public class Main {}" },
+            new PistonFile { Name = "Person.java", Content = "class Person {}" },
+        ]);
 
-        // Pins the documented single-file limitation (CLAUDE.md, "Java-only,
-        // single-class assumption"): the filename is hardcoded, so a submission
-        // whose public class isn't Main will not compile. Multi-file execution
-        // for the Day-3 class assignments has to change this — when it does,
-        // this test is the one that should fail first.
+        // PistonClient is a thin HTTP adapter — filename policy lives in ExecutorService
+        // (bare entry name for Piston Java 15.0.2's `mv $1 $1.java` run script).
         var files = JsonSerializer.Deserialize<JsonElement>(handler.LastBody!).GetProperty("files");
-        Assert.Equal(1, files.GetArrayLength());
-        Assert.Equal("Main.java", files[0].GetProperty("name").GetString());
+        Assert.Equal(2, files.GetArrayLength());
+        Assert.Equal("Main", files[0].GetProperty("name").GetString());
+        Assert.Equal("Person.java", files[1].GetProperty("name").GetString());
     }
 
     [Fact]
@@ -124,7 +126,7 @@ public sealed class PistonClientTests
             {"run":{"stdout":"hi\n","stderr":"boom","output":"hi\n","code":1,"signal":"SIGKILL"}}
             """);
 
-        var result = await Build(handler).ExecuteAsync("java", "class Main {}");
+        var result = await Build(handler).ExecuteAsync("java", Files("class Main {}"));
 
         Assert.Equal("hi\n", result.Run.Stdout);
         Assert.Equal("boom", result.Run.Stderr);
@@ -137,7 +139,7 @@ public sealed class PistonClientTests
     {
         var handler = StubHandler.Json(OkResponse);
 
-        var result = await Build(handler).ExecuteAsync("java", "class Main {}");
+        var result = await Build(handler).ExecuteAsync("java", Files("class Main {}"));
 
         // The deployed Java runtime collapses compile+run into one stage, which
         // is why JavaExecuteResultClassifier ignores Compile entirely.
@@ -152,7 +154,7 @@ public sealed class PistonClientTests
         // Known gotcha: no error wrapping yet, EnsureSuccessStatusCode throws
         // straight out to the caller. Pinned so adding a wrapper is a deliberate
         // change and not an accident.
-        await Assert.ThrowsAsync<HttpRequestException>(() => Build(handler).ExecuteAsync("java", "class Main {}"));
+        await Assert.ThrowsAsync<HttpRequestException>(() => Build(handler).ExecuteAsync("java", Files("class Main {}")));
     }
 
     [Fact]
@@ -162,7 +164,7 @@ public sealed class PistonClientTests
         var handler = StubHandler.Json("{}", HttpStatusCode.BadGateway);
 
         await Assert.ThrowsAsync<HttpRequestException>(
-            () => Build(handler, metrics.Object).ExecuteAsync("java", "class Main {}"));
+            () => Build(handler, metrics.Object).ExecuteAsync("java", Files("class Main {}")));
 
         // A 502 is not filed as a success…
         metrics.Verify(m => m.ObservePistonDuration("success", It.IsAny<double>()), Times.Never);
@@ -182,7 +184,7 @@ public sealed class PistonClientTests
         var metrics = new Mock<IExecutionMetrics>();
         var handler = StubHandler.Json(OkResponse);
 
-        await Build(handler, metrics.Object).ExecuteAsync("java", "class Main {}");
+        await Build(handler, metrics.Object).ExecuteAsync("java", Files("class Main {}"));
 
         metrics.Verify(m => m.ObservePistonDuration("success", It.Is<double>(d => d >= 0)), Times.Once);
     }
@@ -210,7 +212,7 @@ public sealed class PistonClientTests
 
         var ex = await Assert.ThrowsAsync<TaskCanceledException>(
             () => Build(handler, metrics.Object, timeout: TimeSpan.FromMilliseconds(100))
-                      .ExecuteAsync("java", "class Main {}"));
+                      .ExecuteAsync("java", Files("class Main {}")));
 
         // Provoked by a real HttpClient.Timeout rather than a hand-thrown exception, so
         // this proves the catch actually sits in the path a timeout takes. .NET marks a
@@ -236,7 +238,7 @@ public sealed class PistonClientTests
             {"run":{"stdout":"","stderr":"","output":"","code":null,"signal":"SIGKILL"}}
             """);
 
-        var result = await Build(handler, metrics.Object).ExecuteAsync("java", "class Main {}");
+        var result = await Build(handler, metrics.Object).ExecuteAsync("java", Files("class Main {}"));
 
         // The student's infinite loop is Piston's problem, not our HTTP client's — this is
         // a completed request. Filing it as a timeout would hide a code bug inside an
@@ -255,7 +257,10 @@ public sealed class PistonClientTests
         var handler = StubHandler.Json("null");
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => Build(handler).ExecuteAsync("java", "class Main {}"));
+            () => Build(handler).ExecuteAsync("java", Files("class Main {}")));
         Assert.Contains("empty response", ex.Message);
     }
+
+    private static List<PistonFile> Files(string content) =>
+        [new PistonFile { Name = "Main", Content = content }];
 }
