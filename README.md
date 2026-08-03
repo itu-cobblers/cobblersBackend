@@ -10,7 +10,7 @@ The frontend lives in the sibling repo [`cobblersFrontend`](../cobblersFrontend)
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - **PostgreSQL** (local install or Docker) — the API **refuses to start** without a connection string
-- A reachable [Piston](https://github.com/engineer-man/piston) instance — either local (`http://localhost:2000/`) or the shared dev droplet (see [Remote Piston](#remote-piston-shared-dev-droplet))
+- A reachable [Piston](https://github.com/engineer-man/piston) instance — run locally via Docker (`docker-compose.yml`, `http://localhost:2000/`)
 - `psql` (Postgres client) for the seed script
 
 ## First-time setup
@@ -19,12 +19,11 @@ Do these once after cloning, **in order** — the API throws at startup if step 
 
 ### 1. Create a local Postgres database
 
-Any Postgres works. For example with Docker:
+Any Postgres works. Easiest is the repo's `docker-compose.yml`, which also brings up Piston
+(see [One-shot local dev](#one-shot-local-dev) below):
 
 ```bash
-docker run -d --name bootit-postgres \
-  -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=bootit \
-  -p 5432:5432 postgres:17
+docker compose up -d postgres
 ```
 
 Or with Homebrew: `brew install postgresql@17 && brew services start postgresql@17`, then `createdb bootit`.
@@ -38,8 +37,8 @@ Config comes from **environment variables**, not `appsettings.json` (which holds
 export ConnectionStrings__DefaultConnection="Host=localhost;Port=5432;Database=bootit;Username=postgres;Password=postgres"
 
 # Required for real code execution — where Piston lives.
-# Omit it only if you run Piston locally on the default http://localhost:2000/
-export Piston__BaseUrl=http://<piston-host>:2000/
+# Omit it if you run Piston locally on the default http://localhost:2000/ (e.g. via docker-compose.yml)
+export Piston__BaseUrl=http://localhost:2000/
 ```
 
 Add both `export` lines to your shell profile (`~/.zshrc`) so every new terminal has them — forgetting `ConnectionStrings__DefaultConnection` is the most common "backend won't start" cause:
@@ -88,20 +87,19 @@ curl http://localhost:5046/api/assignmentsets
 
 Then start the frontend (`npm run dev` in `../cobblersFrontend` — see its README) and click **Run**: real output in its terminal panel means the whole chain (frontend → API → Piston) works.
 
-## Remote Piston (shared dev droplet)
+## One-shot local dev
 
-A DigitalOcean droplet runs Piston so you don't have to host it locally.
-
-- **Host:** `164.92.244.173`
-- **Piston API:** listening on port `2000` (`http://164.92.244.173:2000/`)
-- **Access:** SSH — your public key must be added to the droplet first (ask the team).
-
-Point the API at the droplet via the env var (double underscore maps to the `Piston:BaseUrl` config key):
+`scripts/run-dev.sh` does steps 1–2 and 5 for you: it starts Postgres + Piston via
+`docker-compose.yml`, exports `ConnectionStrings__DefaultConnection` and `Piston__BaseUrl`
+pointing at those local containers, and runs the API. When you stop the API (Ctrl+C), it
+stops (not removes) the containers too — data persists in the `bootit_postgres_data` volume,
+so the next run picks up where you left off.
 
 ```bash
-export Piston__BaseUrl=http://164.92.244.173:2000/
-dotnet run --project cobblersBackend
+./scripts/run-dev.sh
 ```
+
+You still need to run migrations (step 3) and seed (step 4) the first time, or after a schema change.
 
 ## Testing
 
