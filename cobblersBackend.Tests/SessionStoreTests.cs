@@ -235,4 +235,152 @@ public sealed class SessionStoreTests
 
         Assert.Equal(30, store.GetRoster("ABCD").Count);
     }
+
+    // ── Raise hand: the live queue, oldest-raised first ─────────────────────
+
+    [Fact]
+    public void GetRaisedHands_UnknownRoom_ReturnsEmptyNotNull()
+    {
+        var store = new SessionStore();
+        Assert.Empty(store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void RaiseHand_ThenGet_ReturnsIt()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-maria");
+
+        Assert.Equal(["student-maria"], store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void RaiseHand_ReturnValue_MatchesGetRaisedHands()
+    {
+        var store = new SessionStore();
+
+        // The hub broadcasts this return value directly — it has to match what
+        // a later GetRaisedHands (e.g. a late joiner's SessionState) would see.
+        var order = store.RaiseHand("ABCD", "student-maria");
+
+        Assert.Equal(store.GetRaisedHands("ABCD"), order);
+    }
+
+    [Fact]
+    public void RaiseHand_MultipleStudents_OrderedOldestRaisedFirst()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-maria");
+        store.RaiseHand("ABCD", "student-jonas");
+
+        Assert.Equal(["student-maria", "student-jonas"], store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void RaiseHand_AlreadyRaised_DoesNotBumpItsPlaceInTheQueue()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-maria");
+        store.RaiseHand("ABCD", "student-jonas");
+
+        // Maria re-clicking the button must not jump her ahead of Jonas, who
+        // was already waiting.
+        store.RaiseHand("ABCD", "student-maria");
+
+        Assert.Equal(["student-maria", "student-jonas"], store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void LowerHand_RemovesFromTheQueue()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-maria");
+        store.RaiseHand("ABCD", "student-jonas");
+
+        var order = store.LowerHand("ABCD", "student-maria");
+
+        Assert.Equal(["student-jonas"], order);
+        Assert.Equal(["student-jonas"], store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void LowerHand_UnknownRoom_ReturnsEmptyNotNull()
+    {
+        var store = new SessionStore();
+        Assert.Empty(store.LowerHand("ABCD", "student-maria"));
+    }
+
+    [Fact]
+    public void LowerHand_StudentNotRaised_IsANoOp()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-jonas");
+
+        var order = store.LowerHand("ABCD", "student-maria");
+
+        Assert.Equal(["student-jonas"], order);
+    }
+
+    [Fact]
+    public void RemoveStudent_AlsoLowersTheirRaisedHand()
+    {
+        var store = new SessionStore();
+        store.AddStudent("ABCD", Maria);
+        store.RaiseHand("ABCD", "student-maria");
+
+        store.RemoveStudent("ABCD", "student-maria");
+
+        // A disconnecting student's hand must not linger for the teacher to
+        // lower manually.
+        Assert.Empty(store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void RemoveStudent_DoesNotAffectOtherStudentsRaisedHands()
+    {
+        var store = new SessionStore();
+        store.AddStudent("ABCD", Maria);
+        store.AddStudent("ABCD", Jonas);
+        store.RaiseHand("ABCD", "student-maria");
+        store.RaiseHand("ABCD", "student-jonas");
+
+        store.RemoveStudent("ABCD", "student-maria");
+
+        Assert.Equal(["student-jonas"], store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void RemoveRoom_DropsRaisedHandsToo()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-maria");
+
+        store.RemoveRoom("ABCD");
+
+        Assert.Empty(store.GetRaisedHands("ABCD"));
+    }
+
+    [Fact]
+    public void RaisedHands_AreIsolatedPerRoom()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-maria");
+        store.RaiseHand("WXYZ", "student-jonas");
+
+        Assert.Equal(["student-maria"], store.GetRaisedHands("ABCD"));
+        Assert.Equal(["student-jonas"], store.GetRaisedHands("WXYZ"));
+    }
+
+    [Fact]
+    public async Task RaiseHand_IsSafeUnderConcurrentRaises()
+    {
+        var store = new SessionStore();
+
+        // Thirty students raising a hand at once is the real "who wants to
+        // answer" moment — the dictionary underneath has to survive it.
+        await Task.WhenAll(Enumerable.Range(0, 30).Select(i =>
+            Task.Run(() => store.RaiseHand("ABCD", $"student-{i}"))));
+
+        Assert.Equal(30, store.GetRaisedHands("ABCD").Count);
+    }
 }

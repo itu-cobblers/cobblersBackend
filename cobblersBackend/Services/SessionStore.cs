@@ -86,6 +86,10 @@ public class SessionStore
             Students.Values.ToList();
 
         public IReadOnlyList<string> RaisedHandOrder() =>
-            RaisedHands.OrderBy(kv => kv.Value).Select(kv => kv.Key).ToList();
+            // ConcurrentDictionary's own ToArray() is the thread-safe snapshot;
+            // LINQ's OrderBy directly over the dictionary hits its explicit
+            // ICollection<T>.CopyTo fast path instead, which can throw under a
+            // concurrent add (count is sampled before the copy runs).
+            RaisedHands.ToArray().OrderBy(kv => kv.Value).Select(kv => kv.Key).ToList();
     }
 }
