@@ -20,8 +20,7 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore cobblersBackend.Tests/cobblersBackend.Tests.csproj
       - name: Run tests
-        run: dotnet test cobblersBackend.Tests/cobblersBackend.Tests.csproj --no-restore
-        continue-on-error: true #just for now while tests are failing, remove later 
+        run: dotnet test cobblersBackend.Tests/cobblersBackend.Tests.csproj --no-restore 
 
   build-and-push:
     needs: test
