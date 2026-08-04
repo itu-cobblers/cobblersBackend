@@ -19,6 +19,10 @@ services:
     privileged: true
     ports:
       - "2000:2000"
+    environment:
+      # Default run_timeout/run_cpu_time (3s) is too tight for a JVM cold start
+      # under amd64-on-arm64 emulation (e.g. Apple Silicon) — java-only override.
+      PISTON_LIMIT_OVERRIDES: '{"java":{"run_timeout":10000,"run_cpu_time":10000,"compile_timeout":15000,"compile_cpu_time":15000}}'
     volumes:
       - ./data/piston/packages:/piston/packages
     tmpfs:
