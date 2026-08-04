@@ -25,6 +25,7 @@ missing; **not implemented** = no backend implementation exists yet.
 | Execute — `POST /api/execute` | **Partial** | Single-file Java execution and result classification exist. **Missing:** `files` + `entryClass`, multi-file Piston payloads, and explicit mapping of executor infrastructure failures to `502`/`503`. (`stdin` is intentionally defined but not wired today.) |
 | Timer — `POST /api/sessions/{code}/timer` + `TimerStarted` | **Complete** | Active-room validation, absolute `endsAt`, in-memory late-join state, and group broadcast are implemented. |
 | Follow — `FocusAssignment` + `AssignmentFocused` | **Partial** | State and broadcast exist. **Missing:** the hub method accepts unknown/ended rooms. |
+| Raise hand — `RaiseHand` + `LowerHand` + `HandsUpdated` | **Complete** | Ephemeral, in-memory only (no DB/REST) — same `SessionStore` pattern as Follow. Either the student or the teacher may lower a hand; a disconnecting student's hand is dropped automatically. |
 | Teacher hydration — `/attendance`, session `/submissions` | **Complete** | Both active-room-only endpoints, persisted attendance, thin attempt DTOs, and newest-first submission order are implemented. |
 | Live progress — `SubmissionRecorded` | **Complete** | A thin attempt is broadcast after a room submission is saved; solo submissions are not broadcast and broadcast failure is best-effort. |
 | Submit — `POST /api/assignments/{assignmentId}/submissions` | **Partial** | Student/session validation, single-file code grading, predict grading, persistence, response, and live broadcast exist. **Missing:** multi-file `content` currently fails because grading assumes a JSON string; ended sessions are also accepted. |
@@ -225,8 +226,8 @@ JoinSession({ code, studentId, displayName })
 
 ```json
 // SessionState (reply to caller only)
-{ "activeTimer": { "endsAt": "2026-06-19T14:30:00Z" }, "focusedAssignmentId": 101 }
- // activeTimer / focusedAssignmentId omitted if none — see Follow below
+{ "activeTimer": { "endsAt": "2026-06-19T14:30:00Z" }, "focusedAssignmentId": 101, "raisedHandStudentIds": ["stu-1", "stu-2"] }
+ // activeTimer / focusedAssignmentId omitted if none — see Follow below; raisedHandStudentIds is [] if none, oldest-raised first — see Raise hand below
 ```
 
 - On a successful join the server also **broadcasts** `StudentJoined` to the group
@@ -596,6 +597,42 @@ The student side is **non-coercive**, same spirit as the timer: it shows a
 "teacher is on _X_ — Follow?" banner rather than force-navigating. The student
 decides whether to jump. Solo (off-site) students never receive this — no room,
 no group.
+
+## Raise hand (student ↔ room broadcast)
+
+Ephemeral, in-memory state on `SessionStore` — same pattern as Follow above,
+no persistence and no REST endpoint. Either the raising student or the
+teacher may lower a hand with the same hub method; there's no permission
+check, consistent with `FocusAssignment`.
+
+### `RaiseHand` / `LowerHand` — SignalR hub methods
+
+```
+RaiseHand(code, studentId)
+LowerHand(code, studentId)
+```
+
+- `RaiseHand` is idempotent: raising an already-raised hand does not change
+  its place in the queue.
+- Server stores/removes `studentId` in the room's raised-hand queue (ordered
+  by when each hand went up — see `raisedHandStudentIds` on `SessionState`
+  above, for late joiners / reconnects), then **broadcasts** `HandsUpdated`
+  to every connection in Group `code`.
+- No reply value — fire-and-forget from the caller's point of view.
+- A disconnecting student's raised hand is dropped automatically (see
+  `OnDisconnectedAsync`), followed by a `HandsUpdated` broadcast so the
+  teacher's queue doesn't wait on a stale entry.
+
+### `HandsUpdated` — SignalR event (server → everyone in the room)
+
+```json
+["stu-1", "stu-2"]
+```
+
+The full raised-hand queue as a bare array of `studentId`, oldest-raised
+first — not a diff. Sent to the whole group (student and teacher
+connections alike), so a student's own raised state and the teacher's
+ordered roster both stay in sync from the same broadcast.
 
 ---
 

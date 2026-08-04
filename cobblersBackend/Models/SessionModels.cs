@@ -18,7 +18,8 @@ public record TimerInfo(
 /// <summary>Replied to a student on join so a late joiner / reconnect syncs.</summary>
 public record SessionState(
     [property: JsonPropertyName("activeTimer")] TimerInfo? ActiveTimer,
-    [property: JsonPropertyName("focusedAssignmentId")] int? FocusedAssignmentId);
+    [property: JsonPropertyName("focusedAssignmentId")] int? FocusedAssignmentId,
+    [property: JsonPropertyName("raisedHandStudentIds")] IReadOnlyList<string> RaisedHandStudentIds);
 
 /// <summary>Args a student sends with JoinSession over the hub.</summary>
 public record JoinArgs(

@@ -52,7 +52,7 @@ public class SessionHub : Hub
         await Clients.Group(code).SendAsync("StudentJoined", student);
         await Clients.Group(code).SendAsync("RosterUpdated", roster);
 
-        return new SessionState(_store.GetTimer(code), _store.GetFocusedAssignment(code));
+        return new SessionState(_store.GetTimer(code), _store.GetFocusedAssignment(code), _store.GetRaisedHands(code));
     }
 
     /// <summary>Teacher observes a room. Returns the current roster to the caller.</summary>
@@ -71,13 +71,37 @@ public class SessionHub : Hub
         await Clients.Group(code).SendAsync("AssignmentFocused", assignmentId);
     }
 
+    /// <summary>Student raises their hand, or a teacher/the student themselves lowers one — broadcasts the ordered queue to the room so both sides stay in sync.</summary>
+    public async Task RaiseHand(string code, string studentId)
+    {
+        code = SessionCode.Normalize(code);
+        var order = _store.RaiseHand(code, studentId);
+        await Clients.Group(code).SendAsync("HandsUpdated", order);
+    }
+
+    /// <summary>See <see cref="RaiseHand"/> — same broadcast, opposite direction.</summary>
+    public async Task LowerHand(string code, string studentId)
+    {
+        code = SessionCode.Normalize(code);
+        var order = _store.LowerHand(code, studentId);
+        await Clients.Group(code).SendAsync("HandsUpdated", order);
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (Context.Items["code"] is string code && Context.Items["studentId"] is string studentId)
         {
+            var hadRaisedHand = _store.GetRaisedHands(code).Contains(studentId);
             var roster = _store.RemoveStudent(code, studentId);
             if (roster is not null)
+            {
                 await Clients.Group(code).SendAsync("RosterUpdated", roster);
+
+                // RemoveStudent already dropped this student's raised hand (if any) —
+                // tell the room so a lingering entry doesn't wait for someone else's click.
+                if (hadRaisedHand)
+                    await Clients.Group(code).SendAsync("HandsUpdated", _store.GetRaisedHands(code));
+            }
         }
         await base.OnDisconnectedAsync(exception);
     }
