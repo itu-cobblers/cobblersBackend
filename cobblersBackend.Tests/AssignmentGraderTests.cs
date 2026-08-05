@@ -177,6 +177,133 @@ public class AssignmentGraderTests
         Assert.False(Grader.Grade(rule, WithCode("10\n9\n")).Passed);
     }
 
+    // ── per-rule feedback messages ──────────────────────────────────────────
+
+    [Fact]
+    public void Leaf_FailureWithMessage_SurfacesItAsFeedback()
+    {
+        var rule = """{"target": "stdout", "op": "contains", "value": "2024", "message": "Print the year 2024."}""";
+        var verdict = Grader.Grade(rule, WithStdout("no year here"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Print the year 2024." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Leaf_FailureWithoutMessage_HasNullFeedback()
+    {
+        var rule = """{"target": "stdout", "op": "contains", "value": "2024"}""";
+        var verdict = Grader.Grade(rule, WithStdout("no year here"));
+        Assert.False(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void Leaf_Passing_HasNullFeedback()
+    {
+        var rule = """{"target": "stdout", "op": "contains", "value": "2024", "message": "Print the year 2024."}""";
+        var verdict = Grader.Grade(rule, WithStdout("2024"));
+        Assert.True(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void All_BubblesEveryFailingChildsMessage()
+    {
+        var rule = """
+            {"all": [
+              {"target": "stdout", "op": "contains", "value": "2024", "message": "Missing the year."},
+              {"target": "stdout", "op": "contains", "value": "-273.15", "message": "Missing absolute zero."},
+              {"target": "stdout", "op": "contains", "value": "hello"}
+            ]}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("nothing relevant"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Missing the year.", "Missing absolute zero." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void All_OnePassingChild_OnlyBubblesTheFailingOnes()
+    {
+        var rule = """
+            {"all": [
+              {"target": "stdout", "op": "contains", "value": "2024", "message": "Missing the year."},
+              {"target": "stdout", "op": "contains", "value": "-273.15", "message": "Missing absolute zero."}
+            ]}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("2024"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Missing absolute zero." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Any_AllFail_PrefersItsOwnMessageOverChildren()
+    {
+        var rule = """
+            {"any": [
+              {"target": "stdout", "op": "containsLine", "value": "Hello World!", "message": "child a"},
+              {"target": "stdout", "op": "containsLine", "value": "Hello, World!", "message": "child b"}
+            ], "message": "Print either \"Hello World!\" or \"Hello, World!\"."}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("hello world"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Print either \"Hello World!\" or \"Hello, World!\"." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Any_AllFail_NoOwnMessage_FallsBackToChildren()
+    {
+        var rule = """
+            {"any": [
+              {"target": "stdout", "op": "containsLine", "value": "Hello World!", "message": "child a"},
+              {"target": "stdout", "op": "containsLine", "value": "Hello, World!", "message": "child b"}
+            ]}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("hello world"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "child a", "child b" }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Any_OneChildPasses_HasNullFeedback()
+    {
+        var rule = """
+            {"any": [
+              {"target": "stdout", "op": "containsLine", "value": "Hello World!", "message": "child a"},
+              {"target": "stdout", "op": "containsLine", "value": "Hello, World!", "message": "child b"}
+            ], "message": "own message"}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("Hello World!"));
+        Assert.True(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void Not_UnexpectedlyTrue_SurfacesItsOwnMessage()
+    {
+        var rule = """{"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}, "message": "Price must never go negative."}""";
+        var verdict = Grader.Grade(rule, WithStdout("CPH --> JFK (-3000 DKK)"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Price must never go negative." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Not_Passing_HasNullFeedback()
+    {
+        var rule = """{"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}, "message": "Price must never go negative."}""";
+        var verdict = Grader.Grade(rule, WithStdout("CPH --> JFK (0 DKK)"));
+        Assert.True(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void Grade_NonZeroExitCode_HasNullFeedbackEvenWithMessages()
+    {
+        var rule = """{"op": "nonEmptyStdout", "message": "should never be seen"}""";
+        var verdict = Grader.Grade(rule, WithStdout("plenty of output", exitCode: 1));
+        Assert.False(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
     // ── misconfiguration is loud, not a silent verdict ──────────────────────
 
     [Theory]

@@ -203,6 +203,39 @@ public sealed class SubmissionHistoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetSubmissionAsync_FailingCodeWithMessage_RoundTripsFeedback()
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"hello","message":"Print hello, not goodbye."}""";
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "goodbye", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = TestServices.Submissions(ctx, executor);
+        JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
+        var request1 = new SubmissionRequestDto(studentId, null, content);
+        var response = await service.SubmitAsync(assignmentId, request1);
+
+        var result = await service.GetSubmissionAsync(response!.SubId);
+
+        // Then
+        Assert.NotNull(result);
+        Assert.False(result.Passed);
+        Assert.Equal(new[] { "Print hello, not goodbye." }, result.Feedback);
+    }
+
+    [Fact]
     public async Task GetSubmissionAsync_PredictKind_RoundTripsContent_ResultIsNull()
     {
         // Given

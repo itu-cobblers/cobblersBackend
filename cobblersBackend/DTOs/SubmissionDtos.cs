@@ -12,6 +12,7 @@ public record SubmissionResponseDto(
     [property: JsonPropertyName("subId")]       Guid SubId,
     [property: JsonPropertyName("passed")]      bool? Passed,
     [property: JsonPropertyName("result")]      ExecuteResponseDto? Result,
+    [property: JsonPropertyName("feedback")]    IReadOnlyList<string>? Feedback,
     [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt
 );
 
@@ -29,6 +30,7 @@ public record SubmissionDetailDto(
     [property: JsonPropertyName("sessionId")]    string? SessionId,          // =Session.Code, null for solo
     [property: JsonPropertyName("content")]      JsonElement Content,        // raw ContentJson, string | {name,content}[]
     [property: JsonPropertyName("result")]       ExecuteResponseDto? Result, // null for predict
+    [property: JsonPropertyName("feedback")]     IReadOnlyList<string>? Feedback,
     [property: JsonPropertyName("passed")]       bool? Passed,
     [property: JsonPropertyName("submittedAt")]  DateTimeOffset SubmittedAt);
 

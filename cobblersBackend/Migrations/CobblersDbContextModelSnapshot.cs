@@ -243,6 +243,10 @@ namespace cobblersBackend.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("content_json");
 
+                    b.Property<string>("FeedbackJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("feedback_json");
+
                     b.Property<bool?>("Passed")
                         .HasColumnType("boolean")
                         .HasColumnName("passed");

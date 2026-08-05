@@ -52,7 +52,7 @@ public class SubmissionService : ISubmissionService
             roomCode = session.Code;
         }
 
-        var (result, passed) = await RunAndGradeAsync(assignment, request.Content);
+        var (result, passed, feedback) = await RunAndGradeAsync(assignment, request.Content);
 
         var submission = new Submission
         {
@@ -62,6 +62,7 @@ public class SubmissionService : ISubmissionService
             SessionId = sessionId,
             ContentJson = request.Content.GetRawText(),
             ResultJson = result is null ? null : JsonSerializer.Serialize(result),
+            FeedbackJson = feedback is null ? null : JsonSerializer.Serialize(feedback),
             Passed = passed,
             // SubmittedAt: DB-owned left unset
         };
@@ -71,7 +72,7 @@ public class SubmissionService : ISubmissionService
         await BroadcastSubmissionRecordedAsync(assignment, submission, roomCode);
 
         return new SubmissionResponseDto(
-            submission.SubId, submission.Passed, result, submission.SubmittedAt);
+            submission.SubId, submission.Passed, result, feedback, submission.SubmittedAt);
     }
 
     /// <summary>
@@ -107,31 +108,36 @@ public class SubmissionService : ISubmissionService
         }
     }
 
-    private async Task<(ExecuteResponseDto? Result, bool? Passed)> RunAndGradeAsync(Assignment assignment, JsonElement content)
+    private async Task<(ExecuteResponseDto? Result, bool? Passed, IReadOnlyList<string>? Feedback)> RunAndGradeAsync(Assignment assignment, JsonElement content)
     {
-        return assignment.Kind switch
+        switch (assignment.Kind)
         {
-            AssignmentKind.Code => await GradeCodeAsync(assignment, content),
-            AssignmentKind.Predict => (null, GradePredict(assignment, content)),
-            // Project: no automated grader yet (CONTRACT.md / SCHEMA.md).
-            _ => (null, null),
-        };
+            case AssignmentKind.Code:
+                return await GradeCodeAsync(assignment, content);
+            case AssignmentKind.Predict:
+                var (predictPassed, predictFeedback) = GradePredict(assignment, content);
+                return (null, predictPassed, predictFeedback);
+            default:
+                // Project: no automated grader yet (CONTRACT.md / SCHEMA.md).
+                return (null, null, null);
+        }
     }
 
-    private async Task<(ExecuteResponseDto? Result, bool? Passed)> GradeCodeAsync(Assignment assignment, JsonElement content)
+    private async Task<(ExecuteResponseDto? Result, bool? Passed, IReadOnlyList<string>? Feedback)> GradeCodeAsync(Assignment assignment, JsonElement content)
     {
         var (files, codeForGrading) = ParseCodeContent(content);
         var executed = await _executor.ExecuteAsync(files, "Main");
 
-        bool? passed = assignment.GradingJson is null
-            ? null
-            : _grader.Grade(assignment.GradingJson, new CheckResult(
-                codeForGrading,
-                executed.Stdout,
-                executed.Stderr,
-                executed.Status == ExecuteStatus.SUCCESS ? 0 : 1)).Passed;
+        if (assignment.GradingJson is null)
+            return (executed, null, null);
 
-        return (executed, passed);
+        var verdict = _grader.Grade(assignment.GradingJson, new CheckResult(
+            codeForGrading,
+            executed.Stdout,
+            executed.Stderr,
+            executed.Status == ExecuteStatus.SUCCESS ? 0 : 1));
+
+        return (executed, verdict.Passed, verdict.Feedback);
     }
 
     private static (IReadOnlyList<FileDto> Files, string CodeForGrading) ParseCodeContent(JsonElement content)
@@ -169,19 +175,20 @@ public class SubmissionService : ISubmissionService
     /// Grade a predict answer from GradingJson `{ "predict": { compare, expectedOutput, accept? } }`.
     /// Nothing is executed — result stays null.
     /// </summary>
-    private bool? GradePredict(Assignment assignment, JsonElement content)
+    private (bool? Passed, IReadOnlyList<string>? Feedback) GradePredict(Assignment assignment, JsonElement content)
     {
-        if (assignment.GradingJson is null) return null;
+        if (assignment.GradingJson is null) return (null, null);
 
         var answer = content.ValueKind == JsonValueKind.String
             ? content.GetString() ?? ""
             : content.GetRawText();
 
-        return _grader.Grade(assignment.GradingJson, new CheckResult(
+        var verdict = _grader.Grade(assignment.GradingJson, new CheckResult(
             answer,
             Stdout: "",
             Stderr: "",
-            ExitCode: 0)).Passed;
+            ExitCode: 0));
+        return (verdict.Passed, verdict.Feedback);
     }
 
     public async Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId) =>
@@ -202,7 +209,7 @@ public class SubmissionService : ISubmissionService
             .Select(s => new {
                 s.SubId, s.StudentId, s.AssignmentId,
                 SessionCode = s.Session != null ? s.Session.Code : null,
-                s.ContentJson, s.ResultJson, s.Passed, s.SubmittedAt})
+                s.ContentJson, s.ResultJson, s.FeedbackJson, s.Passed, s.SubmittedAt})
             .FirstOrDefaultAsync();
         if (row is null) return null;
 
@@ -210,6 +217,7 @@ public class SubmissionService : ISubmissionService
             row.SubId, row.StudentId, row.AssignmentId, row.SessionCode,
             JsonSerializer.Deserialize<JsonElement>(row.ContentJson),
             row.ResultJson is null ? null : JsonSerializer.Deserialize<ExecuteResponseDto>(row.ResultJson, ResultJsonOptions),
+            row.FeedbackJson is null ? null : JsonSerializer.Deserialize<IReadOnlyList<string>>(row.FeedbackJson, ResultJsonOptions),
             row.Passed, row.SubmittedAt);
     }
 

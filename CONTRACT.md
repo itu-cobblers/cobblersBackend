@@ -893,16 +893,18 @@ frontend's `check()` no longer decides `passed`.
 ```json
 {
   "subId": "uuid",
-  "passed": true,
-  "result": { "status": "success", "stdout": "Hello World!\n", "stderr": "" },
+  "passed": false,
+  "result": { "status": "success", "stdout": "Not allowed\n", "stderr": "" },
+  "feedback": ["With hasMembership=false and isFreeTrialTuesday=true, output should be exactly \"Accessed\" — check your || condition."],
   "submittedAt": "2026-06-19T14:30:00Z"
 }
 ```
 
-| Field    | Type     | Notes                                                                                                          |
-| -------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `passed` | boolean? | Server-computed. `null` for any assignment without an automated grader. (`project` never reaches this response at all — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only).) |
-| `result` | object?  | Present for `code` (same shape as `execute`'s response). `null` for `predict` — nothing is executed. |
+| Field      | Type      | Notes                                                                                                          |
+| ---------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| `passed`   | boolean?  | Server-computed. `null` for any assignment without an automated grader. (`project` never reaches this response at all — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only).) |
+| `result`   | object?   | Present for `code` (same shape as `execute`'s response). `null` for `predict` — nothing is executed. |
+| `feedback` | string[]? | Present only when `passed` is `false` **and** the failing grading rule(s) authored a `"message"` (see [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine)). `null`/absent otherwise — including every passing submission, and any failing one where no rule had a message to give. Never a substitute for `result.stdout`/`stderr`; it explains *which requirement* wasn't met, not the raw execution output. |
 
 Submission history — used for the resume flow (a student returning across the
 3 days, in or out of a room) and for reviewing a solo student's practice:
@@ -952,6 +954,7 @@ a full replay of each attempt.
   "sessionId": "ABCD",
   "content": "public class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello ITU!\");\n  }\n}",
   "result": { "status": "success", "stdout": "Hello ITU!\n", "stderr": "" },
+  "feedback": null,
   "passed": true,
   "submittedAt": "2026-06-19T14:28:00Z"
 }
@@ -961,6 +964,7 @@ a full replay of each attempt.
 | ----------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `content`   | string \| `{name, content}[]`   | Same shape as the [submission request's `content`](#post-apiassignmentsassignmentidsubmissions).                |
 | `result`    | object?                          | Same shape as `execute`'s response. `null` for `predict` (nothing executed).                                    |
+| `feedback`  | string[]?                       | Same as on the submit response above — the per-rule failure messages for this attempt, replayed back. `null` when the attempt passed or no rule authored a message. |
 | `sessionId` | string \| null                  | The room's join code, same convention as [`GET /api/students/{studentId}/submissions`](#get-apistudentsstudentidsubmissions). `null` for a solo submission. |
 
 **One endpoint, two callers.** `subId` is a globally unique surrogate key

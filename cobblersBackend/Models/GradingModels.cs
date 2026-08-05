@@ -6,5 +6,9 @@ namespace cobblersBackend.Models;
 /// </summary>
 public record CheckResult(string Code, string Stdout, string Stderr, int? ExitCode);
 
-/// <summary>Server-computed grading verdict (feeds Submission.Passed).</summary>
-public record Verdict(bool Passed);
+/// <summary>
+/// Server-computed grading verdict (feeds Submission.Passed). Feedback carries the
+/// "message" text of every failing rule node that authored one — empty/null when
+/// passed, or when the failing rule(s) didn't author a message.
+/// </summary>
+public record Verdict(bool Passed, IReadOnlyList<string>? Feedback = null);

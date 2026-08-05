@@ -75,12 +75,19 @@ $java$::text),
   $j${"target": "stdout", "op": "containsLine", "value": "Hello ITU!"}$j$::jsonb
 ),
 (
-  'print-three-values', 'code', 'Print three values',
-  $txt$Print three things, each on its own line:
-1. A greeting with your name, like "Hello, my name is Aiting!"
-2. The year you were born — a whole number
-3. How many years you have lived in Copenhagen — with a decimal point (1.0 for exactly one year, 3.5 for three and a half)$txt$,
-  $txt$Three println statements. 1996 is an int, 3.5 is a double, "Hello!" is a String.$txt$,
+  'print-three-values', 'code', 'Self introduction',
+  $txt$Your new friend is interested to know you better. Here are 3 questions from them, in order:
+1. What's your name? — print it as text
+2. Where do you live, in Danish zip code? — print it as a whole number
+3. How long have you been here, in decimal years? — print it as a decimal number (1.0 for exactly one year, 3.5 for three and a half)
+
+Print your three answers in that exact order, each on its own line. Example:
+IT University of Copenhagen
+2300
+26.9
+
+Note: if you don't feel like answering with your actual info, that's fine — just print any 1. text, 2. whole number, 3. number with a decimal point, in that order.$txt$,
+  $txt$Three println statements, in order: a String, then an int, then a double.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$println can print more than text — whole numbers and decimal numbers work too. Notice that numbers need no quotes:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$System.out.println("Hello World!");
@@ -90,20 +97,20 @@ System.out.println(3.14);$txt$)
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        // 1) a greeting  2) your birth year  3) years in Copenhagen (with a decimal)
+        // 1) your name (text)  2) Danish zip code (whole number)  3) years here (with a decimal)
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
-        System.out.println("Hello, my name is Aiting!");
-        System.out.println(1996);
-        System.out.println(1.95);
+        System.out.println("IT University of Copenhagen");
+        System.out.println(2300);
+        System.out.println(26.9);
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+$"}, {"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+\\.\\d+$"}, {"target": "stdout", "op": "regex", "pattern": "[A-Za-z]{2,}"}]}$j$::jsonb
+  $j${"all": [{"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)[^\\n]*[A-Za-z]{2,}[^\\n]*(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+\\.\\d+(?=\\n|$)"}]}$j$::jsonb
 ),
 (
   'use-variables', 'code', 'Use variables',
@@ -148,7 +155,11 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bString\\s+\\w+\\s*="}, {"target": "code", "op": "regex", "pattern": "\\bint\\s+\\w+\\s*="}, {"target": "code", "op": "regex", "pattern": "\\bdouble\\s+\\w+\\s*="}, {"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+$"}, {"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+\\.\\d+$"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bString\\s+(\\w+)\\s*=\\s*\"[^\"]*\"[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare a String variable holding your greeting, then print that same variable back with println — don't print a hardcoded string."},
+    {"target": "code", "op": "regex", "pattern": "\\bint\\s+(\\w+)\\s*=\\s*-?\\d+\\b[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare an int variable for your birth year, then print that same variable back with println — don't print a hardcoded number."},
+    {"target": "code", "op": "regex", "pattern": "\\bdouble\\s+(\\w+)\\s*=\\s*-?\\d+\\.\\d+\\b[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare a double variable (with a decimal point) for years in Copenhagen, then print that same variable back with println — don't print a hardcoded number."}
+  ]}$j$::jsonb
 ),
 (
   'variable-assignment', 'code', 'Variable assignment',
@@ -184,7 +195,11 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "contains", "value": "ITU is 27 years old."}, {"target": "stdout", "op": "contains", "value": "Next year ITU will be 28 years old."}, {"target": "code", "op": "regex", "pattern": "\\bage\\s*=\\s*age\\s*\\+\\s*1\\b|\\bage\\s*\\+\\+|\\bage\\s*\\+=\\s*1\\b"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "containsLine", "value": "ITU is 27 years old.", "message": "Print the sentence \"ITU is 27 years old.\" exactly, on its own line."},
+    {"target": "stdout", "op": "containsLine", "value": "Next year ITU will be 28 years old.", "message": "Print the sentence \"Next year ITU will be 28 years old.\" exactly, on its own line."},
+    {"target": "code", "op": "regex", "pattern": "\\bint\\s+age\\s*=\\s*27\\b[\\s\\S]*?\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b", "message": "Reassign the same age variable that started at 27 — age = age + 1, age++, or age += 1 — don't declare a second variable or hardcode 28."}
+  ]}$j$::jsonb
 ),
 (
   'operators', 'code', 'Operators',
@@ -263,7 +278,10 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "regex", "pattern": "Hello my friend, .+!"}, {"target": "code", "op": "contains", "value": "+"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "regex", "pattern": "Hello my friend, .+!", "message": "Print \"Hello my friend, {Name}!\" — make sure there's a comma after friend, before the name."},
+    {"target": "code", "op": "regex", "pattern": "\\bString\\s+(?!first\\b|second\\b|third\\b)(\\w+)\\s*=\\s*\"[^\"]*\"[\\s\\S]*?\\bprintln\\s*\\([^)]*\\b\\1\\b[^)]*\\)", "message": "Declare a new String variable holding your friend's name, then include it via concatenation in the println call — reusing first/second/third doesn't count."}
+  ]}$j$::jsonb
 ),
 (
   'kroner-to-euro', 'code', 'Kroner to euro',
@@ -357,7 +375,11 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "static\\s+void\\s+\\w+\\s*\\(\\s*(?:int|double)\\s+\\w+\\s*\\)"}, {"target": "stdout", "op": "regex", "pattern": "corresponds to", "flags": "i"}, {"target": "stdout", "op": "contains", "value": "euro"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+dkk2eur\\s*\\(\\s*double\\s+\\w+\\s*\\)", "message": "Change dkk2eur to take one double parameter (the amount in dkk) instead of a fixed 100."},
+    {"target": "code", "op": "regex", "pattern": "dkk2eur\\s*\\(\\s*(-?\\d+(?:\\.\\d+)?)\\s*\\)[\\s\\S]*?dkk2eur\\s*\\(\\s*(?!\\1\\s*\\))-?\\d+(?:\\.\\d+)?\\s*\\)", "message": "Call dkk2eur twice with two different prices (e.g. 20 and 15), not the same value twice."},
+    {"target": "stdout", "op": "regex", "pattern": "(-?\\d+(?:\\.\\d+)?)\\s*kr corresponds to\\s*-?\\d+(?:\\.\\d+)?\\s*euro[\\s\\S]*?(?!\\1\\s*kr corresponds to)-?\\d+(?:\\.\\d+)?\\s*kr corresponds to\\s*-?\\d+(?:\\.\\d+)?\\s*euro", "message": "Your output should show two different \"... kr corresponds to ... euro\" lines — one per price you called dkk2eur with."}
+  ]}$j$::jsonb
 ),
 (
   'your-semester-in-ects', 'code', 'Your semester in ECTS',
@@ -396,7 +418,13 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "static\\s+void\\s+\\w+\\s*\\(\\s*String\\s+\\w+\\s*,\\s*(?:int|double)\\s+\\w+\\s*,\\s*int\\s+\\w+\\s*\\)"}, {"target": "stdout", "op": "regex", "pattern": ".+ \\(.+ ECTS\\) is in semester \\d+\\."}, {"target": "stdout", "op": "contains", "value": "Introductory Programming"}, {"target": "stdout", "op": "contains", "value": "Discrete Mathematics"}, {"target": "stdout", "op": "contains", "value": "Software Engineering"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+\\w+\\s*\\(\\s*String\\s+\\w+\\s*,\\s*double\\s+\\w+\\s*,\\s*int\\s+\\w+\\s*\\)", "message": "printCourse needs three parameters in order (String, double, int) — ects must be a double so 7.5 doesn't get truncated to 7."},
+    {"target": "stdout", "op": "regex", "pattern": ".+ \\(.+ ECTS\\) is in semester \\d+\\.", "message": "Each line should read \"{name} ({ects} ECTS) is in semester {semester}.\""},
+    {"target": "stdout", "op": "contains", "value": "Introductory Programming", "message": "Call printCourse for Introductory Programming."},
+    {"target": "stdout", "op": "contains", "value": "Discrete Mathematics", "message": "Call printCourse for Discrete Mathematics."},
+    {"target": "stdout", "op": "contains", "value": "Software Engineering", "message": "Call printCourse for Software Engineering."}
+  ]}$j$::jsonb
 ),
 
 -- ─────────────────────────── DAY 2 — conditionals, loops, input ───────────────────────────
@@ -428,7 +456,10 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bif\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Welcome to ITU!"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*atItu\\s*\\)", "message": "Guard the print with if (atItu) — the print must be conditional on atItu, not unconditional."},
+    {"target": "stdout", "op": "containsLine", "value": "Welcome to ITU!", "message": "Print exactly \"Welcome to ITU!\"."}
+  ]}$j$::jsonb
 ),
 (
   'scrollbar-friday', 'code', 'Scrollbar Friday',
@@ -475,7 +506,13 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "==\\s*\"Friday\""}, {"target": "stdout", "op": "regex", "pattern": "Yes|No", "flags": "i"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*weekday\\s*==\\s*\"Friday\"\\s*\\)", "message": "Branch on if (weekday == \"Friday\") { ... } else { ... }."},
+    {"any": [
+      {"target": "stdout", "op": "containsLine", "value": "Yes, it is Friday, Scrollbar will open today!"},
+      {"target": "stdout", "op": "containsLine", "value": "No, Scrollbar is closed."}
+    ], "message": "Print the exact sentence for whichever branch runs — \"Yes, it is Friday, Scrollbar will open today!\" or \"No, Scrollbar is closed.\""}
+  ]}$j$::jsonb
 ),
 (
   'is-friday-boolean', 'code', 'Is Friday? (boolean)',
@@ -519,7 +556,14 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bboolean\\s+\\w+\\s*="}, {"target": "code", "op": "regex", "pattern": "if\\s*\\(\\s*\\w+\\s*\\)"}, {"target": "stdout", "op": "regex", "pattern": "Yes|No", "flags": "i"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bboolean\\s+isFriday\\s*=\\s*\\(?\\s*weekday\\s*==\\s*\"Friday\"\\s*\\)?", "message": "Declare boolean isFriday = (weekday == \"Friday\");"},
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*isFriday\\s*\\)", "message": "Branch with if (isFriday) { ... } else { ... } — not if (isFriday == true)."},
+    {"any": [
+      {"target": "stdout", "op": "containsLine", "value": "Yes, it is Friday, Scrollbar will open today!"},
+      {"target": "stdout", "op": "containsLine", "value": "No, Scrollbar is closed."}
+    ], "message": "Print the exact sentence for whichever branch runs — \"Yes, it is Friday, Scrollbar will open today!\" or \"No, Scrollbar is closed.\""}
+  ]}$j$::jsonb
 ),
 (
   'canteen-lunch', 'code', 'Canteen lunch hours',
@@ -579,7 +623,13 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "if"}, {"target": "stdout", "op": "contains", "value": "Lunch is being served."}, {"target": "stdout", "op": "contains", "value": "Late lunch discount applies!"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\btime\\s*<\\s*11\\.0\\b", "message": "Check time < 11.0 for the too-early case."},
+    {"target": "code", "op": "regex", "pattern": "\\btime\\s*>=\\s*14\\.0\\b", "message": "Check time >= 14.0 for the too-late case."},
+    {"target": "code", "op": "regex", "pattern": "\\btime\\s*>=\\s*13\\.75\\b", "message": "Check time >= 13.75 for the late-lunch discount."},
+    {"target": "stdout", "op": "containsLine", "value": "Lunch is being served.", "message": "For time = 13.75, print \"Lunch is being served.\" as its own line."},
+    {"target": "stdout", "op": "containsLine", "value": "Late lunch discount applies!", "message": "For time = 13.75, print \"Late lunch discount applies!\" as its own line."}
+  ]}$j$::jsonb
 ),
 (
   'fitness-access', 'code', 'Fitness access',
@@ -619,7 +669,10 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "||"}, {"target": "stdout", "op": "regex", "pattern": "Accessed|Not allowed"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*(?:hasMembership\\s*\\|\\|\\s*isFreeTrialTuesday|isFreeTrialTuesday\\s*\\|\\|\\s*hasMembership)\\s*\\)", "message": "Branch with if (hasMembership || isFreeTrialTuesday) { ... } else { ... }."},
+    {"target": "stdout", "op": "containsLine", "value": "Accessed", "message": "With hasMembership=false and isFreeTrialTuesday=true, output should be exactly \"Accessed\" — check your || condition."}
+  ]}$j$::jsonb
 ),
 (
   'student-day-place', 'code', 'A common day as an ITU student',
@@ -669,7 +722,11 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "static\\s+String\\s+\\w+\\s*\\(\\s*String\\s+\\w+\\s*\\)"}, {"target": "code", "op": "contains", "value": "return"}, {"target": "stdout", "op": "regex", "pattern": "During .+, an ITU student is probably at .+"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+String\\s+place\\s*\\(\\s*String\\s+\\w+\\s*\\)", "message": "Declare static String place(String period) — a function that returns a String."},
+    {"target": "code", "op": "contains", "value": "return", "message": "place(...) must return a value, not print it directly."},
+    {"target": "stdout", "op": "containsLine", "value": "During morning, an ITU student is probably at lectures, exercises, or a group room", "message": "For period = \"morning\", place(period) should describe lectures/exercises/group room — check your morning branch."}
+  ]}$j$::jsonb
 ),
 (
   'while-five-lines', 'code', 'While loop — five lines',
@@ -720,7 +777,12 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "while"}, {"target": "stdout", "op": "contains", "value": "Line 0:"}, {"target": "stdout", "op": "contains", "value": "Line 4:"}, {"not": {"target": "stdout", "op": "contains", "value": "Line 5:"}}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(\\s*i\\s*(?:<\\s*5|<=\\s*4)\\s*\\)", "message": "Change the loop condition on i to stop after exactly 5 lines — while (i < 5) (or i <= 4)."},
+    {"target": "stdout", "op": "containsLine", "value": "Line 0: I will push my code before the deadline!", "message": "The first line should read \"Line 0: I will push my code before the deadline!\""},
+    {"target": "stdout", "op": "containsLine", "value": "Line 4: I will push my code before the deadline!", "message": "The last (5th) line should read \"Line 4: I will push my code before the deadline!\""},
+    {"not": {"target": "stdout", "op": "contains", "value": "Line 5:"}, "message": "There should be no \"Line 5:\" — that would be a 6th line."}
+  ]}$j$::jsonb
 ),
 (
   'while-loop-quiz-1', 'predict', 'While Loop Quiz 1',
@@ -920,7 +982,10 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "while"}, {"target": "stdout", "op": "containsLine", "value": "50"}, {"target": "stdout", "op": "containsLine", "value": "45"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(", "message": "Use a while loop."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)5(?=\\n|$)[\\s\\S]*?(?:^|\\n)10(?=\\n|$)[\\s\\S]*?(?:^|\\n)15(?=\\n|$)[\\s\\S]*?(?:^|\\n)20(?=\\n|$)[\\s\\S]*?(?:^|\\n)25(?=\\n|$)[\\s\\S]*?(?:^|\\n)30(?=\\n|$)[\\s\\S]*?(?:^|\\n)35(?=\\n|$)[\\s\\S]*?(?:^|\\n)40(?=\\n|$)[\\s\\S]*?(?:^|\\n)45(?=\\n|$)[\\s\\S]*?(?:^|\\n)50(?=\\n|$)", "message": "Print the running total after every pack, in order: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 — one per line."}
+  ]}$j$::jsonb
 ),
 (
   'analog-tickets-for', 'code', 'Analog tickets (for)',
@@ -959,7 +1024,11 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"not": {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\("}}, {"target": "stdout", "op": "containsLine", "value": "50"}, {"target": "stdout", "op": "containsLine", "value": "45"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(", "message": "Use a for loop."},
+    {"not": {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\("}, "message": "Rewrite this with a for loop — don't keep a while loop around."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)5(?=\\n|$)[\\s\\S]*?(?:^|\\n)10(?=\\n|$)[\\s\\S]*?(?:^|\\n)15(?=\\n|$)[\\s\\S]*?(?:^|\\n)20(?=\\n|$)[\\s\\S]*?(?:^|\\n)25(?=\\n|$)[\\s\\S]*?(?:^|\\n)30(?=\\n|$)[\\s\\S]*?(?:^|\\n)35(?=\\n|$)[\\s\\S]*?(?:^|\\n)40(?=\\n|$)[\\s\\S]*?(?:^|\\n)45(?=\\n|$)[\\s\\S]*?(?:^|\\n)50(?=\\n|$)", "message": "Print the running total after every pack, in order: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 — one per line."}
+  ]}$j$::jsonb
 ),
 (
   'for-loop-quiz-1', 'predict', 'For Loop Quiz 1',
@@ -1132,7 +1201,15 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Set 1 Rep 1"}, {"target": "stdout", "op": "containsLine", "value": "Set 4 Rep 12"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "for\\s*\\([^)]*\\)\\s*\\{[^{}]*for\\s*\\([^)]*\\)", "message": "Nest a for loop inside another for loop — one outer for per set, one inner for per rep."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 1 Rep 1", "message": "Missing \"Set 1 Rep 1\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 1 Rep 12", "message": "Missing \"Set 1 Rep 12\" — set 1 should log all 12 reps."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 2 Rep 1", "message": "Missing \"Set 2 Rep 1\" — the outer loop should move on to set 2."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 3 Rep 1", "message": "Missing \"Set 3 Rep 1\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 4 Rep 1", "message": "Missing \"Set 4 Rep 1\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 4 Rep 12", "message": "Missing \"Set 4 Rep 12\" — the last rep of the last set."}
+  ]}$j$::jsonb
 ),
 (
   'analog-reusable-cup-stamps', 'code', 'Help Analog go sustainable',
@@ -1176,7 +1253,13 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bif\\s*\\("}, {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(|\\bwhile\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Free cup! Here's a new stamp card."}, {"target": "stdout", "op": "containsLine", "value": "Brought my own cup, got a stamp! (4/10)"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(", "message": "Use if/else to tell a normal stamp apart from the 10th (free-cup) stamp."},
+    {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(|\\bwhile\\s*\\(", "message": "Use a for or while loop over the 24 drinks."},
+    {"target": "stdout", "op": "containsLine", "value": "Brought my own cup, got a stamp! (4/10)", "message": "Missing \"Brought my own cup, got a stamp! (4/10)\" — check your stamp message and counter."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:Free cup! Here's a new stamp card\\.[\\s\\S]*){2}", "message": "The stamp card should reset and fill up twice in 24 drinks (10 + 10 + 4) — \"Free cup! Here's a new stamp card.\" should appear twice."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "(?:Free cup! Here's a new stamp card\\.[\\s\\S]*){3}"}, "message": "24 drinks should only fill the stamp card twice — a third \"Free cup!\" means your reset logic is off."}
+  ]}$j$::jsonb
 ),
 (
   'beerpong-at-scrollbar', 'code', 'Beer pong at Scrollbar',
@@ -1302,8 +1385,10 @@ $java$),
 $java$)
   )),
   $j${"all": [
-    {"target": "stdout", "op": "containsLine", "value": "Niek (25 years old)"},
-    {"target": "stdout", "op": "containsLine", "value": "Niek (26 years old)"}
+    {"target": "code", "op": "regex", "pattern": "\\bclass\\s+Person\\b", "message": "Define a Person class (in Person.java) — don't just hardcode the output directly in Main."},
+    {"target": "code", "op": "regex", "pattern": "\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b", "message": "birthday() should increment the age field — age = age + 1, age++, or age += 1."},
+    {"target": "stdout", "op": "containsLine", "value": "Niek (25 years old)", "message": "The first display() call should print \"Niek (25 years old)\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Niek (26 years old)", "message": "After birthday(), the second display() call should print \"Niek (26 years old)\"."}
   ]}$j$::jsonb
 ),
 (
@@ -1371,14 +1456,18 @@ $java$),
 $java$)
   )),
   $j${"all": [
-    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7500 DKK)"},
-    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7000 DKK)"},
-    {"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}}
+    {"target": "code", "op": "regex", "pattern": "\\bclass\\s+FlightTicket\\b", "message": "Define a FlightTicket class (in FlightTicket.java) — don't just hardcode the output directly in Main."},
+    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7500 DKK)", "message": "The first show() call should print \"CPH --> JFK (7500 DKK)\"."},
+    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7000 DKK)", "message": "After one discount(), show() should print \"CPH --> JFK (7000 DKK)\"."},
+    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (0 DKK)", "message": "After 21 discount() calls the price should floor at exactly 0 — \"CPH --> JFK (0 DKK)\" — not stop early or wrap negative."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}, "message": "Price must never go negative — guard discount() so it doesn't subtract past 0."}
   ]}$j$::jsonb
 ),
 (
   'container-class', 'code', 'Container class',
-  $txt$Make a Container class: fields id, amount, max; constructor Container(String i, int max) (amount starts at 0); show() prints "Container: AX35 (23/30)"; addCargo(int a) adds boxes. Make sure the container can't be over-filled.$txt$,
+  $txt$Make a Container class: fields id, amount, max; constructor Container(String i, int max) (amount starts at 0); show() prints "Container: AX35 (23/30)"; addCargo(int a) adds boxes. Make sure the container can't be over-filled.
+
+Be strict about what "can't be over-filled" means: if an addCargo(a) would push amount past max, reject that addition in full — amount stays exactly what it was before the call. Don't partially fill up to max instead (e.g. addCargo(40) on a 23/30 container must leave it at 23/30, not jump to 30/30).$txt$,
   $txt$In addCargo, only add if amount + a <= max (mirror the Account guard pattern).$txt$,
   NULL,
   jsonb_build_object(
@@ -1439,8 +1528,9 @@ $java$),
 $java$)
   )),
   $j${"all": [
-    {"target": "stdout", "op": "containsLine", "value": "Container: AX35 (23/30)"},
-    {"not": {"target": "stdout", "op": "regex", "pattern": "\\((?:3[1-9]|[4-9]\\d|\\d{3,})/30\\)"}}
+    {"target": "code", "op": "regex", "pattern": "\\bclass\\s+Container\\b", "message": "Define a Container class (in Container.java) — don't just hardcode the output directly in Main."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:Container: AX35 \\(23/30\\)[\\s\\S]*){2}", "message": "show() should print \"Container: AX35 (23/30)\" both before and after the rejected addCargo(40) — a full addition over max must be rejected entirely, leaving amount unchanged at 23."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "\\((?:3[1-9]|[4-9]\\d|\\d{3,})/30\\)"}, "message": "amount must never exceed max (30) — addCargo(40) should be rejected in full, not partially applied."}
   ]}$j$::jsonb
 ),
 

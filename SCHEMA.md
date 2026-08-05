@@ -294,12 +294,25 @@ A rule node is one of:
 { "op": "custom", "key": "<slug>" }                             // escape hatch — see below
 ```
 
+Any node above may also carry an optional `"message"` string — pure authoring
+metadata, never read by the pass/fail logic itself. When that node is the (or a)
+reason a submission fails, its message is bubbled into `Verdict.Feedback` and
+returned to the student as `feedback` on the submission response, so a failure
+reads as "you declared the variable but printed a hardcoded value instead of
+printing it back," not just `false`. `"all"` bubbles every failing child's
+message (independent requirements, worth surfacing together); `"any"` prefers
+its own message over dumping every branch's when all branches fail; `"not"`
+uses its own message if the forbidden pattern is found. Messages are optional —
+a rule with no `"message"` simply contributes nothing to `Feedback` on failure.
+
 Grading only runs on a successful execution — a non-zero exit code fails
-before any rule is evaluated. The current frontend `check()` functions
-decompose into these primitives (or a close approximation stored in
-`scripts/seed-tasks.sql`, verified against the frontend's `assignments.ts` +
-`lib/grade.ts`); the frontend's `signals` side-channel stays a client-side
-nicety derived from stdout — the server verdict is just `passed`.
+before any rule is evaluated (and produces no `Feedback` — the execution
+result's `status`/`stderr` already say the code didn't compile/run). The
+current frontend `check()` functions decompose into these primitives (or a
+close approximation stored in `scripts/seed-tasks.sql`, verified against the
+frontend's `assignments.ts` + `lib/grade.ts`); the frontend's `signals`
+side-channel stays a client-side nicety derived from stdout — the server
+verdict is `passed` plus, when available, the `feedback` explaining why.
 
 - `Predict` assignments use a dedicated `GradingJson` document (not the code
   rule tree):
