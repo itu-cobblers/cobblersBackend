@@ -192,6 +192,21 @@ public sealed class SessionHubTests
 
         Assert.Null(state.ActiveTimer);
         Assert.Null(state.FocusedAssignmentId);
+        Assert.Empty(state.RaisedHandStudentIds);
+    }
+
+    [Fact]
+    public async Task JoinSession_RepliesWithTheRaisedHandQueue()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-jonas");
+        var (hub, _, _, _, _, _) = BuildHub(store: store);
+
+        // A late joiner syncs to who's already waiting — same reasoning as the
+        // timer and focused-assignment replies above.
+        var state = await hub.JoinSession(Join());
+
+        Assert.Equal(["student-jonas"], state.RaisedHandStudentIds);
     }
 
     [Fact]
@@ -273,8 +288,74 @@ public sealed class SessionHubTests
 
         // Student joins late sees FocusedAssignment
         var state = await hub.JoinSession(Join());
-        
+
         Assert.Equal(101, state.FocusedAssignmentId);
+    }
+
+    // ── RaiseHand / LowerHand ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RaiseHand_StoresItAndBroadcastsIt()
+    {
+        var (hub, store, sent, _, _, groupsAddressed) = BuildHub();
+
+        await hub.RaiseHand("abcd", "student-maria");
+
+        // Stored so late joiners sync (JoinSession's raisedHandStudentIds),
+        // broadcast so the teacher and the raising student's own tab update.
+        Assert.Equal(["student-maria"], store.GetRaisedHands("ABCD"));
+        Assert.Equal("ABCD", Assert.Single(groupsAddressed));
+        var sentEvent = Assert.Single(sent);
+        Assert.Equal("HandsUpdated", sentEvent.Method);
+        var order = Assert.IsAssignableFrom<IReadOnlyList<string>>(sentEvent.Args[0]);
+        Assert.Equal(["student-maria"], order);
+    }
+
+    [Fact]
+    public async Task LowerHand_StoresItAndBroadcastsIt()
+    {
+        var store = new SessionStore();
+        store.RaiseHand("ABCD", "student-maria");
+        var (hub, _, sent, _, _, groupsAddressed) = BuildHub(store: store);
+
+        await hub.LowerHand("abcd", "student-maria");
+
+        Assert.Empty(store.GetRaisedHands("ABCD"));
+        Assert.Equal("ABCD", Assert.Single(groupsAddressed));
+        var sentEvent = Assert.Single(sent);
+        Assert.Equal("HandsUpdated", sentEvent.Method);
+        var order = Assert.IsAssignableFrom<IReadOnlyList<string>>(sentEvent.Args[0]);
+        Assert.Empty(order);
+    }
+
+    [Fact]
+    public async Task RaiseHand_ThenLowerHand_BroadcastsTheQueueBothTimes()
+    {
+        var (hub, _, sent, _, _, _) = BuildHub();
+
+        await hub.RaiseHand("ABCD", "student-maria");
+        await hub.LowerHand("ABCD", "student-maria");
+
+        // The student's own button and the teacher's roster both listen for
+        // the same event on the way up and on the way down.
+        Assert.Equal(["HandsUpdated", "HandsUpdated"], sent.Select(b => b.Method).ToArray());
+        Assert.Equal(["student-maria"], Assert.IsAssignableFrom<IReadOnlyList<string>>(sent[0].Args[0]));
+        Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<string>>(sent[1].Args[0]));
+    }
+
+    [Fact]
+    public async Task JoinSession_AfterHandRaised_RepliesWithThatQueue()
+    {
+        var (hub, _, sent, _, _, _) = BuildHub();
+
+        await hub.RaiseHand("abcd", "student-jonas");
+        sent.Clear();
+
+        // Same shape as the focused-assignment analog above — the hub method
+        // that raises a hand needs no REST step, mirroring FocusAssignment.
+        var state = await hub.JoinSession(Join());
+
+        Assert.Equal(["student-jonas"], state.RaisedHandStudentIds);
     }
 
     // ── OnDisconnectedAsync ──────────────────────────────────────────────────
@@ -352,5 +433,54 @@ public sealed class SessionHubTests
         await hub.OnDisconnectedAsync(new IOException("connection reset"));
 
         Assert.Empty(store.GetRoster("ABCD"));
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_StudentWithRaisedHand_AlsoBroadcastsHandsUpdated()
+    {
+        var (hub, store, sent, _, _, _) = BuildHub();
+        await hub.JoinSession(Join());
+        await hub.RaiseHand("ABCD", "student-maria");
+        sent.Clear();
+
+        await hub.OnDisconnectedAsync(null);
+
+        // Disconnecting must drop the stale raised hand immediately — the
+        // teacher's queue can't wait on someone noticing and clicking it down.
+        Assert.Empty(store.GetRaisedHands("ABCD"));
+        Assert.Equal(["RosterUpdated", "HandsUpdated"], sent.Select(b => b.Method).ToArray());
+        var handsOrder = Assert.IsAssignableFrom<IReadOnlyList<string>>(sent[1].Args[0]);
+        Assert.Empty(handsOrder);
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_StudentWithoutRaisedHand_DoesNotBroadcastHandsUpdated()
+    {
+        var (hub, _, sent, _, _, _) = BuildHub();
+        await hub.JoinSession(Join());
+        sent.Clear();
+
+        await hub.OnDisconnectedAsync(null);
+
+        // No raised hand to clear — an extra HandsUpdated on every ordinary
+        // disconnect would just be broadcast noise.
+        Assert.Equal(["RosterUpdated"], sent.Select(b => b.Method).ToArray());
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_OtherStudentsRaisedHands_AreUnaffected()
+    {
+        var store = new SessionStore();
+        store.AddStudent("ABCD", new StudentDto("student-jonas", "Jonas"));
+        store.RaiseHand("ABCD", "student-jonas");
+        var (hub, _, sent, _, _, _) = BuildHub(store: store);
+        await hub.JoinSession(Join());
+        sent.Clear();
+
+        // Maria — who never raised her hand — disconnects.
+        await hub.OnDisconnectedAsync(null);
+
+        Assert.Equal(["RosterUpdated"], sent.Select(b => b.Method).ToArray());
+        Assert.Equal(["student-jonas"], store.GetRaisedHands("ABCD"));
     }
 }
