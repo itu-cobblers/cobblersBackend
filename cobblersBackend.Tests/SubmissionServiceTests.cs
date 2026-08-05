@@ -350,7 +350,7 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
         await using var ctx = _fixture.CreateContext();
         var service = TestServices.Submissions(ctx, executor);
         var request = new SubmissionRequestDto("student-1", sessionCode, JsonSerializer.SerializeToElement("ignored"));
-        var result = service.SubmitAsync(assignmentId,request);
+        await service.SubmitAsync(assignmentId,request);
 
         // Then
         await using var read = _fixture.CreateContext();
