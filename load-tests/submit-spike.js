@@ -13,16 +13,18 @@ import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js'
 //   ASSIGNMENT_ID  - the assignment to submit to (e.g. 1)
 //
 // Optional environment variables:
-//   BASE_URL       - defaults to http://localhost:5046
-//   SESSION_ID     - room code to attach to the submission; omit for solo submissions
-//   VUS            - number of virtual users, defaults to 65
-//   ITERATIONS     - submissions per virtual user, defaults to 1
+//   BASE_URL        - defaults to http://localhost:5046
+//   SESSION_ID      - room code to attach to the submission; omit for solo submissions
+//   VUS             - number of virtual users, defaults to 65
+//   ITERATIONS      - submissions per virtual user, defaults to 1
+//   LOOP_ITERATIONS - workload size for the inner loop, defaults to 50_000_000
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:5046'
 const ASSIGNMENT_ID = __ENV.ASSIGNMENT_ID
 const SESSION_ID = __ENV.SESSION_ID
 const VUS = parseInt(__ENV.VUS || '65', 10)
 const ITERATIONS = parseInt(__ENV.ITERATIONS || '1', 10)
+const LOOP_ITERATIONS = parseInt(__ENV.LOOP_ITERATIONS || '50000000', 10)
 
 if (!ASSIGNMENT_ID) {
   throw new Error('ASSIGNMENT_ID environment variable is required')
@@ -66,7 +68,11 @@ export default function () {
     studentId,
     content: `public class Main {
   public static void main(String[] args) {
-    System.out.println("Hello from ${displayName}");
+    long sum = 0;
+    for (int i = 0; i < ${LOOP_ITERATIONS}; i++) {
+      sum += i;
+    }
+    System.out.println("Done ${displayName}: " + sum);
   }
 }`,
   }
