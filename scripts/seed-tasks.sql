@@ -48,7 +48,7 @@ INSERT INTO assignment (slug, kind, title, description, hint, lesson_json, conte
 -- ─────────────────────────── DAY 1 — basics ───────────────────────────
 (
   'hello-itu', 'code', 'Hello ITU',
-  $txt$Now it is your turn: print a sentence to say hello to your new university. Print exactly: Hello ITU!$txt$,
+  $txt$Now it is your turn: **print a sentence** to say hello to your new university. For example: Hello ITU!$txt$,
   $txt$System.out.println("Hello ITU!");$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Printing a message is the most basic thing every programming language can do. In Java it takes a class, a main method, and one print statement:$txt$),
@@ -72,16 +72,16 @@ $java$
     }
 }
 $java$::text),
-  $j${"target": "stdout", "op": "containsLine", "value": "Hello ITU!"}$j$::jsonb
+  $j${"op": "nonEmptyStdout", "message": "Print something to say hello — any message works, just make sure it prints."}$j$::jsonb
 ),
 (
   'print-three-values', 'code', 'Self introduction',
   $txt$Your new friend is interested to know you better. Here are 3 questions from them, in order:
-1. What's your name? — print it as text
-2. Where do you live, in Danish zip code? — print it as a whole number
-3. How long have you been here, in decimal years? — print it as a decimal number (1.0 for exactly one year, 3.5 for three and a half)
+1. What's your name? — print it as **text**
+2. Where do you live, in Danish zip code? — print it as a **whole number**
+3. How long have you been here, in decimal years? — print it as a **decimal number** (1.0 for exactly one year, 3.5 for three and a half)
 
-Print your three answers in that exact order, each on its own line. Example:
+**Print your three answers** in that exact order, each on its own line. Example:
 IT University of Copenhagen
 2300
 26.9
@@ -110,12 +110,25 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)[^\\n]*[A-Za-z]{2,}[^\\n]*(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+\\.\\d+(?=\\n|$)"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)[^\\n]*[A-Za-z]{2,}[^\\n]*(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+\\.\\d+(?=\\n|$)", "message": "Print three lines in order — text (your name), then a whole number (zip code), then a decimal number (years here) — each on its own line."},
+    {"target": "code", "op": "regex", "pattern": "println\\s*\\(\\s*\"[^\"]*[A-Za-z][^\"]*\"\\s*\\)[\\s\\S]*?println\\s*\\(\\s*-?\\d+\\s*\\)[\\s\\S]*?println\\s*\\(\\s*-?\\d+\\.\\d+\\s*\\)", "message": "The zip code and years-here values must be printed as actual numbers, not text in quotes — println(2300), not println(\"2300\")."}
+  ]}$j$::jsonb
 ),
 (
-  'use-variables', 'code', 'Use variables',
-  $txt$Print the same three values as before, but this time store each one in a variable first, then print the variable. Pick the right type: String for the greeting, int for the year, double for the years in Copenhagen.$txt$,
-  $txt$String greeting = "Hello, my name is …!"; then System.out.println(greeting);$txt$,
+  'use-variables', 'code', 'Self introduction (variables)',
+  $txt$Another new friend is asking you the same 3 questions:
+1. What's your name? — as **text**
+2. Where do you live, in Danish zip code? — as a **whole number**
+3. How long have you been here, in decimal years? — as a **decimal number** (1.0 for exactly one year, 3.5 for three and a half)
+
+This time, **store each answer in a variable** first, so you can reuse it easily instead of repeating yourself. **Then print the three variables** in that exact order, each on its own line. Example:
+IT University of Copenhagen
+2300
+26.9
+
+Note: if you don't feel like answering with your actual info, that's fine — just store any 1. text, 2. whole number, 3. number with a decimal point, in that order.$txt$,
+  $txt$String name = "…"; then System.out.println(name);$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$The same values can be stored in variables first. A variable has a type, a name, and a value:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$int x = 42;
@@ -145,28 +158,28 @@ $java$
   ),
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
-        String greeting = "Hello, my name is Aiting!";
-        int birthYear = 1996;
-        double yearsInCopenhagen = 1.95;
+        String name = "IT University of Copenhagen";
+        int zipCode = 2300;
+        double yearsHere = 26.9;
 
-        System.out.println(greeting);
-        System.out.println(birthYear);
-        System.out.println(yearsInCopenhagen);
+        System.out.println(name);
+        System.out.println(zipCode);
+        System.out.println(yearsHere);
     }
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "\\bString\\s+(\\w+)\\s*=\\s*\"[^\"]*\"[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare a String variable holding your greeting, then print that same variable back with println — don't print a hardcoded string."},
+    {"target": "code", "op": "regex", "pattern": "\\bString\\s+(\\w+)\\s*=\\s*\"[^\"]*\"[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare a String variable holding your name, then print that same variable back with println — don't print a hardcoded string."},
     {"target": "code", "op": "regex", "pattern": "\\bint\\s+(\\w+)\\s*=\\s*-?\\d+\\b[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare an int variable for your birth year, then print that same variable back with println — don't print a hardcoded number."},
     {"target": "code", "op": "regex", "pattern": "\\bdouble\\s+(\\w+)\\s*=\\s*-?\\d+\\.\\d+\\b[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare a double variable (with a decimal point) for years in Copenhagen, then print that same variable back with println — don't print a hardcoded number."}
   ]}$j$::jsonb
 ),
 (
   'variable-assignment', 'code', 'Variable assignment',
-  $txt$Use one int variable called age (starting at 27) to print "ITU is 27 years old." Then update the SAME variable with age = age + 1 and use it again to print "Next year ITU will be 28 years old."$txt$,
-  $txt$Build each sentence with String +, or use print/println.$txt$,
+  $txt$Use one **int** variable called **age** (starting at 27) to print "ITU has been open for 27", then print the variable value after. Then **update** the **SAME variable**, and print "Next year, ITU will have been open for 28".$txt$,
+  $txt$Build each line with two statements: System.out.print for the text, then System.out.println for the number.$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$A variable can be given a new value later — that is why it is called a variable. The same variable then prints a different value:$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$A variable can be given a new value later — that is why it is called a variable. The same variable then represents a different value:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$int year = 2026;
 System.out.print("The year is ");
 System.out.println(year);   // The year is 2026
@@ -180,7 +193,7 @@ System.out.println(year);   // The year is now 2027$txt$),
     'starter', $java$public class Main {
     public static void main(String[] args) {
         int age = 27;
-        // Print both sentences — update age in between
+        // Print both lines — update age in between
     }
 }
 $java$
@@ -188,26 +201,26 @@ $java$
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
         int age = 27;
-        System.out.println("ITU is " + age + " years old.");
+        System.out.print("ITU has been open for ");
+        System.out.println(age);
 
         age = age + 1;
-        System.out.println("Next year ITU will be " + age + " years old.");
+        System.out.print("ITU will have been open for ");
+        System.out.println(age);
     }
 }
 $java$::text),
   $j${"all": [
-    {"target": "stdout", "op": "containsLine", "value": "ITU is 27 years old.", "message": "Print the sentence \"ITU is 27 years old.\" exactly, on its own line."},
-    {"target": "stdout", "op": "containsLine", "value": "Next year ITU will be 28 years old.", "message": "Print the sentence \"Next year ITU will be 28 years old.\" exactly, on its own line."},
-    {"target": "code", "op": "regex", "pattern": "\\bint\\s+age\\s*=\\s*27\\b[\\s\\S]*?\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b", "message": "Reassign the same age variable that started at 27 — age = age + 1, age++, or age += 1 — don't declare a second variable or hardcode 28."}
+    {"target": "code", "op": "regex", "pattern": "\\bint\\s+age\\s*=\\s*27\\b[\\s\\S]*?\\b(?:print|println)\\s*\\(\\s*age\\s*\\)", "message": "Print the age variable itself (print or println(age)) — don't print a hardcoded number."},
+    {"target": "code", "op": "regex", "pattern": "\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b", "message": "Reassign the same age variable that started at 27 — age = age + 1, age++, or age += 1 — don't declare a second variable or hardcode 28."},
+    {"target": "code", "op": "regex", "pattern": "\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b[\\s\\S]*?\\b(?:print|println)\\s*\\(\\s*age\\s*\\)", "message": "After reassigning age, print the variable again (print or println(age)) — don't print a hardcoded number."}
   ]}$j$::jsonb
 ),
 (
   'operators', 'code', 'Operators',
-  $txt$Fun facts from ITU Key figures 2025: about 23.4% of students are international. The Master of Software Design intake is around 130 students in recent years.
-
-Print how many of those ~130 Soft Design masters students are international (approximately): 130 * 23.4 / 100.0 → 30.42
-
-Use * and / in your code.$txt$,
+  $txt$Fun fact: According to ITU's 2025 figures, about 23.4% of students are international. The Master in Software Design program admits around 130 students per year.' ||
+                            '
+Write code to **calculate and print** the estimated number of international students in this program. $txt$,
   $txt$Use a double for 23.4 and divide by 100.0 so you keep the decimals.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Java can calculate with + (plus), - (minus), * (multiply) and / (divide):$txt$),
@@ -240,11 +253,16 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "contains", "value": "30.42"}, {"target": "code", "op": "contains", "value": "*"}, {"target": "code", "op": "contains", "value": "/"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "regex", "pattern": "^30\\.42\\s*$", "message": "Output should be exactly 30.42 — only the number, nothing else before or after it."},
+    {"target": "code", "op": "regex", "pattern": "\\d+\\.\\d+", "message": "Use a decimal (double) literal like 23.4 or 100.0 somewhere in your calculation — don't rely on pure integer math."},
+    {"target": "code", "op": "contains", "value": "*", "message": "Use * (multiply) in your calculation."},
+    {"target": "code", "op": "contains", "value": "/", "message": "Use / (divide) in your calculation."}
+  ]}$j$::jsonb
 ),
 (
   'string-concatenation', 'code', 'String concatenation',
-  $txt$The starter prints "Hello my friend!". Ask the person sitting next to you for their name, then modify the code to greet them personally: Hello my friend, {Name}!$txt$,
+  $txt$Ask the person sitting next to you for their name, then modify the code to greet them personally: Hello my friend, {Name}! **Declare a variable** to hold the name, and print the **concatenated sentence**.$txt$,
   $txt$Add a String name = "…"; and concatenate it after "friend, ".$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$+ between Strings glues them together — this is called concatenation:$txt$),
@@ -260,32 +278,31 @@ System.out.println("The year is " + year);$txt$)
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        String first = "Hello";
-        String second = "my";
-        String third = "friend";
-        System.out.println(first + " " + second + " " + third + "!");
+        String greet = "Hello my friend, ";
+        // Declare a variable to hold the name, and print the concatenated sentence.
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
-        String first = "Hello";
-        String second = "my";
-        String third = "friend";
+        String greet = "Hello my friend, ";
         String name = "Aiting";
-        System.out.println(first + " " + second + " " + third + ", " + name + "!");
+        System.out.println(greet + name + "!");
     }
 }
 $java$::text),
   $j${"all": [
-    {"target": "stdout", "op": "regex", "pattern": "Hello my friend, .+!", "message": "Print \"Hello my friend, {Name}!\" — make sure there's a comma after friend, before the name."},
-    {"target": "code", "op": "regex", "pattern": "\\bString\\s+(?!first\\b|second\\b|third\\b)(\\w+)\\s*=\\s*\"[^\"]*\"[\\s\\S]*?\\bprintln\\s*\\([^)]*\\b\\1\\b[^)]*\\)", "message": "Declare a new String variable holding your friend's name, then include it via concatenation in the println call — reusing first/second/third doesn't count."}
+    {"target": "code", "op": "contains", "value": "+", "message": "Use + to concatenate the strings."},
+    {"target": "code", "op": "regex", "pattern": "\\b(?:print|println)\\s*\\(", "message": "Print the concatenated sentence with print/println."}
   ]}$j$::jsonb
 ),
 (
   'kroner-to-euro', 'code', 'Kroner to euro',
-  $txt$Modify the code so it converts the opposite way: from kroner to euro. For a 20 dkk coffee, print: "20 dkk corresponds to 2.6845637583892616 euro." (All the decimals are fine — that is just how doubles print.)$txt$,
+  $txt$Modify the code so it **converts** the opposite way: **from kroner to euro**. 
+  For a 20 dkk coffee, print: "20 dkk corresponds to {eur} euro." 
+
+ Note: All the decimals are fine, that is just how doubles print.$txt$,
   $txt$Divide instead of multiply: dkk / 7.45$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$During the break you meet a friend at ITU's own café, Cafe Analog. A coffee costs 20 dkk. Your friend says that is cheap — but you want to see it in euro. This code converts the other way, from euro to kroner:$txt$),
@@ -300,9 +317,11 @@ $java$::text),
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        int eur = 100;
-        double dkk = eur * 7.45;
-        System.out.println(eur + " euro corresponds to " + dkk + " kr.");
+        /*
+         * DKK = Danish Crown, abbreviated as kr
+         * EUR = Euros
+         * The exchange rate is 1 eur = 7.45 dkk
+         */
     }
 }
 $java$
@@ -315,92 +334,193 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "contains", "value": "20"}, {"target": "stdout", "op": "contains", "value": "corresponds to"}, {"target": "stdout", "op": "contains", "value": "euro"}, {"target": "stdout", "op": "regex", "pattern": "2\\.68"}, {"target": "code", "op": "regex", "pattern": "/\\s*7\\.45"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "contains", "value": "20", "message": "Print the dkk amount, 20, in your output line."},
+    {"target": "stdout", "op": "contains", "value": "corresponds to", "message": "Use the phrase \"corresponds to\" in your output line."},
+    {"target": "stdout", "op": "contains", "value": "euro", "message": "Say \"euro\" (not \"eur\") in your output line."},
+    {"target": "stdout", "op": "regex", "pattern": "2\\.68", "message": "Print 20 dkk converted to euro — should come out to approximately 2.68."},
+    {"target": "code", "op": "regex", "pattern": "/\\s*7\\.45", "message": "Divide by 7.45 to convert dkk to euro (don't multiply)."}
+  ]}$j$::jsonb
 ),
 (
-  'functions', 'code', 'Functions',
-  $txt$The no-parameter version always converts 100 kr. Rewrite it so dkk2eur takes one parameter — the amount in dkk — and prints "{dkk} kr corresponds to {eur} euro". Call it twice from main: once with 20 (your Analog coffee) and once with another price, e.g. 15.$txt$,
-  $txt$static void dkk2eur(double dkk) { … }$txt$,
+  'functions', 'code', 'Methods',
+  $txt$Declare a new **method eurToDkk()** that converts 100 euro to dkk and **prints** "{eur} euro corresponds to {dkk} kr". **Call** it from main, after dkkToEur().$txt$,
+  $txt$static void eurToDkk() { double eur = 100; double dkk = eur * 7.45; … }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Functions let us reuse code and give a snippet a clear responsibility. This does exactly the same as the previous exercise, wrapped in a function:$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$A method wraps a snippet of code and gives it a name, so it can be reused just by calling that name:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
-    static void dkk2eur() {
+    static void dkkToEur() {
         double dkk = 100;
         double eur = dkk / 7.45;
         System.out.println(dkk + " kr corresponds to " + eur + " euro");
     }
 
     public static void main(String[] args) {
-        dkk2eur();
+        dkkToEur();
     }
 }$txt$),
-    jsonb_build_object('kind', 'text', 'text', $txt$But this function always converts 100 kr. With a parameter, the same function works for any value:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$static void dkk2eur(double dkk) {
-    double eur = dkk / 7.45;
-    System.out.println(dkk + " kr corresponds to " + eur + " euro");
-}
-
-public static void main(String[] args) {
-    dkk2eur(100);
-    dkk2eur(20);
-}$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Converting the other way (euro to dkk) is another method, with its own body — multiply instead of divide.$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
 
-    // Change this to take one parameter: static void dkk2eur(double dkk)
-    static void dkk2eur() {
+    static void dkkToEur() {
         double dkk = 100;
         double eur = dkk / 7.45;
         System.out.println(dkk + " kr corresponds to " + eur + " euro");
     }
 
+    // Declare eurToDkk() here
+
     public static void main(String[] args) {
-        // Call dkk2eur twice with different prices
-        dkk2eur();
+        dkkToEur();
+        // call eurToDkk() here
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
 
-    static void dkk2eur(double dkk) {
+    static void dkkToEur() {
+        double dkk = 100;
+        double eur = dkk / 7.45;
+        System.out.println(dkk + " kr corresponds to " + eur + " euro");
+    }
+
+    static void eurToDkk() {
+        double eur = 100;
+        double dkk = eur * 7.45;
+        System.out.println(eur + " euro corresponds to " + dkk + " kr");
+    }
+
+    public static void main(String[] args) {
+        dkkToEur();
+        eurToDkk();
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+eurToDkk\\s*\\(\\s*\\)", "message": "Declare static void eurToDkk() with no parameters."},
+    {"target": "code", "op": "regex", "pattern": "eurToDkk\\s*\\(\\s*\\)\\s*;", "message": "Call eurToDkk() from main."},
+    {"target": "code", "op": "regex", "pattern": "\\*\\s*7\\.45", "message": "Multiply by 7.45 to convert eur to dkk (don't divide)."},
+    {"target": "stdout", "op": "contains", "value": "100.0 euro corresponds to 745.0 kr", "message": "Print \"100.0 euro corresponds to 745.0 kr\" from eurToDkk()."}
+  ]}$j$::jsonb
+),
+(
+  'functions-with-parameters', 'code', 'Methods with Parameters',
+  $txt$The previous dkkToEur and eurToDkk always convert a fixed 100. **Rewrite** both so they take a **parameter** instead:
+
+- dkkToEur(double dkk) — prints "{dkk} kr corresponds to {eur} euro"
+- eurToDkk(double eur) — prints "{eur} euro corresponds to {dkk} kr"
+
+**Call** dkkToEur(100) and eurToDkk(100) from main — the output should match the previous exercise, but now the same methods work for any amount.$txt$,
+  $txt$static void dkkToEur(double dkk) { … }   static void eurToDkk(double eur) { … }$txt$,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A parameter goes inside the parentheses in the method's declaration, with a type and a name. Whatever value the caller passes in is bound to that name inside the method body:$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
+    static void dkkToEur(double dkk) {
         double eur = dkk / 7.45;
         System.out.println(dkk + " kr corresponds to " + eur + " euro");
     }
 
     public static void main(String[] args) {
-        dkk2eur(20);
-        dkk2eur(15);
+        dkkToEur(100);
+        dkkToEur(20);
     }
-}
-$java$::text),
-  $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+dkk2eur\\s*\\(\\s*double\\s+\\w+\\s*\\)", "message": "Change dkk2eur to take one double parameter (the amount in dkk) instead of a fixed 100."},
-    {"target": "code", "op": "regex", "pattern": "dkk2eur\\s*\\(\\s*(-?\\d+(?:\\.\\d+)?)\\s*\\)[\\s\\S]*?dkk2eur\\s*\\(\\s*(?!\\1\\s*\\))-?\\d+(?:\\.\\d+)?\\s*\\)", "message": "Call dkk2eur twice with two different prices (e.g. 20 and 15), not the same value twice."},
-    {"target": "stdout", "op": "regex", "pattern": "(-?\\d+(?:\\.\\d+)?)\\s*kr corresponds to\\s*-?\\d+(?:\\.\\d+)?\\s*euro[\\s\\S]*?(?!\\1\\s*kr corresponds to)-?\\d+(?:\\.\\d+)?\\s*kr corresponds to\\s*-?\\d+(?:\\.\\d+)?\\s*euro", "message": "Your output should show two different \"... kr corresponds to ... euro\" lines — one per price you called dkk2eur with."}
-  ]}$j$::jsonb
-),
-(
-  'your-semester-in-ects', 'code', 'Your semester in ECTS',
-  $txt$Write a function printCourse(String name, double ects, int semester) that prints "{name} ({ects} ECTS) is in semester {semester}."
-
-You are starting Software Design. Call it from main for all three semester-1 courses:
-- Introductory Programming (15 ECTS)
-- Discrete Mathematics (7.5 ECTS)
-- Software Engineering (7.5 ECTS)
-all in semester 1.$txt$,
-  $txt$Three parameters: static void printCourse(String name, double ects, int semester)$txt$,
-  jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$At ITU every course is worth ECTS points, and a full semester adds up to 30 ECTS. A function with several parameters can print any course the same way. Software Design semester 1: Introductory Programming (15), Discrete Mathematics (7.5), Software Engineering (7.5).$txt$)
+}$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$Now the same method works for any amount, instead of always converting a fixed 100.$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
 
-    // Declare printCourse here
+    // Declare dkkToEur(double dkk) here
+    // Declare eurToDkk(double eur) here
 
     public static void main(String[] args) {
-        // Print all three Soft Design semester-1 courses
+        // call dkkToEur(100) here
+        // call eurToDkk(100) here
+    }
+
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static void dkkToEur(double dkk) {
+        double eur = dkk / 7.45;
+        System.out.println(dkk + " kr corresponds to " + eur + " euro");
+    }
+
+    static void eurToDkk(double eur) {
+        double dkk = eur * 7.45;
+        System.out.println(eur + " euro corresponds to " + dkk + " kr");
+    }
+
+    public static void main(String[] args) {
+        dkkToEur(100);
+        eurToDkk(100);
+    }
+
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+dkkToEur\\s*\\(\\s*double\\s+\\w+\\s*\\)", "message": "Declare dkkToEur to take one double parameter (the amount in dkk)."},
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+eurToDkk\\s*\\(\\s*double\\s+\\w+\\s*\\)", "message": "Declare eurToDkk to take one double parameter (the amount in eur)."},
+    {"target": "code", "op": "regex", "pattern": "dkkToEur\\s*\\(\\s*100\\s*\\)\\s*;", "message": "Call dkkToEur(100) from main."},
+    {"target": "code", "op": "regex", "pattern": "eurToDkk\\s*\\(\\s*100\\s*\\)\\s*;", "message": "Call eurToDkk(100) from main."},
+    {"target": "stdout", "op": "contains", "value": "100.0 kr corresponds to", "message": "dkkToEur(100) should print \"100.0 kr corresponds to ... euro\"."},
+    {"target": "stdout", "op": "contains", "value": "100.0 euro corresponds to 745.0 kr", "message": "eurToDkk(100) should print \"100.0 euro corresponds to 745.0 kr\"."}
+  ]}$j$::jsonb
+),
+(
+  'your-semester-in-ects', 'code', 'Your semester in ECTS',
+  $txt$At ITU every course is worth ECTS points, and a full semester adds up to 30 ECTS. You are starting Software Design. **Write printCourse(String name, double ects, int semester)**, to print one course's line: "{name} ({ects} ECTS) is in {semester} semester".
+
+Then **build one layer on top of it**: a method per semester that calls printCourse for each of that semester's courses.
+- printFirstSemester() calls printCourse(): Introductory Programming (15 ECTS), Discrete Mathematics (7.5 ECTS), Software Engineering (7.5 ECTS)
+- printSecondSemester() calls printCourse(): Introduction to Database System (7.5 ECTS), Algorithm and Data Structures (7.5 ECTS)
+
+**main** calls **printFirstSemester()** and **printSecondSemester()**.$txt$, null,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A method with several parameters can print many different values the same way.$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$A method isn't only called from main — it can call another method too.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $java$public class Main {
+    static void dkkToEur(double dkk) {
+        double eur = dkk / 7.45;
+        System.out.println(dkk + " kr corresponds to " + eur + " euro");
+    }
+
+    static void buyFilterAtAnalog() {
+        System.out.println("A cup of filter coffee cost " + 15 + " dkk");
+        dkkToEur(15);
+    }
+
+    static void buyCapuccianoAtAnalog() {
+        System.out.println("A cup of capucciano cost " + 20 + " dkk");
+        dkkToEur(20);
+    }
+
+    public static void main(String[] args) {
+        buyFilterAtAnalog();
+        buyCapuccianoAtAnalog();
+    }
+}$java$),
+    jsonb_build_object('kind', 'text', 'text', $txt$That builds layers: a low-level method that does one small thing, and a higher-level method that reuses it several times. The caller of a layer only needs to know what it does, not how.$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // Declare printCourse(String name, double ects, int semester) here — same as before
+
+    // Declare printFirstSemester() here
+    // It takes no parameters — call printCourse for each semester-1 course
+
+    // Declare printSecondSemester() here
+    // It takes no parameters — call printCourse for each semester-2 course
+
+    public static void main(String[] args) {
+        // Call printFirstSemester() and printSecondSemester() here
+        // Don't call printCourse directly from main
     }
 }
 $java$
@@ -408,22 +528,43 @@ $java$
   to_jsonb($java$public class Main {
 
     static void printCourse(String name, double ects, int semester) {
-        System.out.println(name + " (" + ects + " ECTS) is in semester " + semester + ".");
+        System.out.println(name + " (" + ects + " ECTS) is in " + semester + " semester");
     }
 
-    public static void main(String[] args) {
+    static void printFirstSemester() {
         printCourse("Introductory Programming", 15, 1);
         printCourse("Discrete Mathematics", 7.5, 1);
         printCourse("Software Engineering", 7.5, 1);
     }
+
+    static void printSecondSemester() {
+        printCourse("Introduction to Database System", 7.5, 2);
+        printCourse("Algorithm and Data Structures", 7.5, 2);
+    }
+
+    public static void main(String[] args) {
+        printFirstSemester();
+        printSecondSemester();
+    }
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+\\w+\\s*\\(\\s*String\\s+\\w+\\s*,\\s*double\\s+\\w+\\s*,\\s*int\\s+\\w+\\s*\\)", "message": "printCourse needs three parameters in order (String, double, int) — ects must be a double so 7.5 doesn't get truncated to 7."},
-    {"target": "stdout", "op": "regex", "pattern": ".+ \\(.+ ECTS\\) is in semester \\d+\\.", "message": "Each line should read \"{name} ({ects} ECTS) is in semester {semester}.\""},
-    {"target": "stdout", "op": "contains", "value": "Introductory Programming", "message": "Call printCourse for Introductory Programming."},
-    {"target": "stdout", "op": "contains", "value": "Discrete Mathematics", "message": "Call printCourse for Discrete Mathematics."},
-    {"target": "stdout", "op": "contains", "value": "Software Engineering", "message": "Call printCourse for Software Engineering."}
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+printCourse\\s*\\(\\s*String\\s+\\w+\\s*,\\s*double\\s+\\w+\\s*,\\s*int\\s+\\w+\\s*\\)", "message": "printCourse needs three parameters in order (String, double, int) — ects must be a double so 7.5 doesn't get truncated to 7."},
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+printFirstSemester\\s*\\(\\s*\\)", "message": "Declare static void printFirstSemester() with no parameters."},
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+printSecondSemester\\s*\\(\\s*\\)", "message": "Declare static void printSecondSemester() with no parameters."},
+    {"target": "code", "op": "regex", "pattern": "\\bprintFirstSemester\\s*\\(\\s*\\)\\s*;", "message": "Call printFirstSemester() from main."},
+    {"target": "code", "op": "regex", "pattern": "\\bprintSecondSemester\\s*\\(\\s*\\)\\s*;", "message": "Call printSecondSemester() from main."},
+    {"target": "code", "op": "regex", "pattern": "public\\s+static\\s+void\\s+main\\s*\\([^)]*\\)\\s*\\{(?:(?!printCourse\\()[\\s\\S])*\\}", "message": "main should only call printFirstSemester() and printSecondSemester() — let those methods call printCourse, not main directly."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Introductory Programming\"", "message": "printFirstSemester should call printCourse for Introductory Programming."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Discrete Mathematics\"", "message": "printFirstSemester should call printCourse for Discrete Mathematics."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Software Engineering\"", "message": "printFirstSemester should call printCourse for Software Engineering."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Introduction to Database System\"", "message": "printSecondSemester should call printCourse for Introduction to Database System."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Algorithm and Data Structures\"", "message": "printSecondSemester should call printCourse for Algorithm and Data Structures."},
+    {"target": "stdout", "op": "contains", "value": "Introductory Programming", "message": "Your output should include a line for Introductory Programming."},
+    {"target": "stdout", "op": "contains", "value": "Discrete Mathematics", "message": "Your output should include a line for Discrete Mathematics."},
+    {"target": "stdout", "op": "contains", "value": "Software Engineering", "message": "Your output should include a line for Software Engineering."},
+    {"target": "stdout", "op": "contains", "value": "Introduction to Database System", "message": "Your output should include a line for Introduction to Database System."},
+    {"target": "stdout", "op": "contains", "value": "Algorithm and Data Structures", "message": "Your output should include a line for Algorithm and Data Structures."}
   ]}$j$::jsonb
 ),
 
@@ -676,7 +817,7 @@ $java$::text),
 ),
 (
   'student-day-place', 'code', 'A common day as an ITU student',
-  $txt$Write a function place(String period) that returns where a student probably is:
+  $txt$Write a method place(String period) that returns where a student probably is:
 
 - morning → lectures, exercises, or a group room
 - break → the Cafe Analog coffee queue
@@ -687,7 +828,7 @@ From main, set a period and print:
 System.out.println("During " + period + ", an ITU student is probably at " + place(period));$txt$,
   $txt$static String place(String period) { return ...; }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Previous functions were mostly void (they printed). A function can also return a value to the caller with return. The return type goes where void used to be (String, int, boolean, …).$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Previous methods were mostly void (they printed). A method can also return a value to the caller with return. The return type goes where void used to be (String, int, boolean, …).$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
@@ -723,7 +864,7 @@ $java$
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "static\\s+String\\s+place\\s*\\(\\s*String\\s+\\w+\\s*\\)", "message": "Declare static String place(String period) — a function that returns a String."},
+    {"target": "code", "op": "regex", "pattern": "static\\s+String\\s+place\\s*\\(\\s*String\\s+\\w+\\s*\\)", "message": "Declare static String place(String period) — a method that returns a String."},
     {"target": "code", "op": "contains", "value": "return", "message": "place(...) must return a value, not print it directly."},
     {"target": "stdout", "op": "containsLine", "value": "During morning, an ITU student is probably at lectures, exercises, or a group room", "message": "For period = \"morning\", place(period) should describe lectures/exercises/group room — check your morning branch."}
   ]}$j$::jsonb
@@ -1324,7 +1465,15 @@ public class Main {
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\("}, {"target": "code", "op": "contains", "value": "Random"}, {"target": "code", "op": "contains", "value": "nextInt"}, {"target": "stdout", "op": "containsLine", "value": "Row 4: O O O O"}, {"target": "stdout", "op": "contains", "value": "SPLASH!"}, {"target": "stdout", "op": "containsLine", "value": "GAME OVER — the rack is empty. Chug up!"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(", "message": "Use a for loop to print the triangle rack."},
+    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(", "message": "Use a while loop to simulate the throws."},
+    {"target": "code", "op": "contains", "value": "Random", "message": "Create a Random rng = new Random(); to roll for each throw."},
+    {"target": "code", "op": "contains", "value": "nextInt", "message": "Use rng.nextInt(4) to roll 0-3 for each throw."},
+    {"target": "stdout", "op": "containsLine", "value": "Row 4: O O O O", "message": "Print the full 4-row triangle rack, ending with \"Row 4: O O O O\"."},
+    {"target": "stdout", "op": "contains", "value": "SPLASH!", "message": "Print \"Throw {n}: SPLASH! {cupsLeft} cups left.\" on a hit."},
+    {"target": "stdout", "op": "containsLine", "value": "GAME OVER — the rack is empty. Chug up!", "message": "Print \"GAME OVER — the rack is empty. Chug up!\" once cupsLeft reaches 0."}
+  ]}$j$::jsonb
 ),
 
 -- ─────────────────────────── DAY 3 — classes & objects / projects ───────────────────────────
@@ -1962,7 +2111,7 @@ $sol$)
 ;
 
 -- ─────────────────────────── set memberships ───────────────────────────
---   Day 1: 0–8 (9)   Day 2: 9–32 (24)   Day 3: 33–39 (7)   total 40
+--   Day 1: 0–9 (10)   Day 2: 10–33 (24)   Day 3: 34–40 (7)   total 41
 
 WITH ordered(slug, ord) AS (VALUES
   ('hello-itu', 0),
@@ -1973,38 +2122,39 @@ WITH ordered(slug, ord) AS (VALUES
   ('string-concatenation', 5),
   ('kroner-to-euro', 6),
   ('functions', 7),
-  ('your-semester-in-ects', 8),
-  ('at-itu-welcome', 9),
-  ('scrollbar-friday', 10),
-  ('is-friday-boolean', 11),
-  ('canteen-lunch', 12),
-  ('fitness-access', 13),
-  ('student-day-place', 14),
-  ('while-five-lines', 15),
-  ('while-loop-quiz-1', 16),
-  ('while-loop-quiz-2', 17),
-  ('while-loop-quiz-3', 18),
-  ('while-loop-quiz-4', 19),
-  ('while-loop-quiz-5', 20),
-  ('while-loop-quiz-6', 21),
-  ('analog-tickets-while', 22),
-  ('analog-tickets-for', 23),
-  ('for-loop-quiz-1', 24),
-  ('for-loop-quiz-2', 25),
-  ('for-loop-quiz-3', 26),
-  ('for-loop-quiz-4', 27),
-  ('for-loop-quiz-5', 28),
-  ('for-loop-quiz-6', 29),
-  ('gym-workout', 30),
-  ('analog-reusable-cup-stamps', 31),
-  ('beerpong-at-scrollbar', 32),
-  ('person-class', 33),
-  ('flight-ticket-class', 34),
-  ('container-class', 35),
-  ('build-a-tree', 36),
-  ('grandpas-time-machine', 37),
-  ('grandmas-blackmarket-kitchen', 38),
-  ('seat-selector', 39)
+  ('functions-with-parameters', 8),
+  ('your-semester-in-ects', 9),
+  ('at-itu-welcome', 10),
+  ('scrollbar-friday', 11),
+  ('is-friday-boolean', 12),
+  ('canteen-lunch', 13),
+  ('fitness-access', 14),
+  ('student-day-place', 15),
+  ('while-five-lines', 16),
+  ('while-loop-quiz-1', 17),
+  ('while-loop-quiz-2', 18),
+  ('while-loop-quiz-3', 19),
+  ('while-loop-quiz-4', 20),
+  ('while-loop-quiz-5', 21),
+  ('while-loop-quiz-6', 22),
+  ('analog-tickets-while', 23),
+  ('analog-tickets-for', 24),
+  ('for-loop-quiz-1', 25),
+  ('for-loop-quiz-2', 26),
+  ('for-loop-quiz-3', 27),
+  ('for-loop-quiz-4', 28),
+  ('for-loop-quiz-5', 29),
+  ('for-loop-quiz-6', 30),
+  ('gym-workout', 31),
+  ('analog-reusable-cup-stamps', 32),
+  ('beerpong-at-scrollbar', 33),
+  ('person-class', 34),
+  ('flight-ticket-class', 35),
+  ('container-class', 36),
+  ('build-a-tree', 37),
+  ('grandpas-time-machine', 38),
+  ('grandmas-blackmarket-kitchen', 39),
+  ('seat-selector', 40)
 ),
 resolved AS (
   SELECT t.id AS assignment_id, o.ord
@@ -2012,11 +2162,11 @@ resolved AS (
   JOIN assignment t ON t.slug = o.slug
 )
 INSERT INTO assignment_set_assignment (assignment_set_id, assignment_id, order_index)
-SELECT 'day1-2026', assignment_id, ord         FROM resolved WHERE ord BETWEEN 0 AND 8
+SELECT 'day1-2026', assignment_id, ord         FROM resolved WHERE ord BETWEEN 0 AND 9
 UNION ALL
-SELECT 'day2-2026', assignment_id, ord - 9     FROM resolved WHERE ord BETWEEN 9 AND 32
+SELECT 'day2-2026', assignment_id, ord - 10    FROM resolved WHERE ord BETWEEN 10 AND 33
 UNION ALL
-SELECT 'day3-2026', assignment_id, ord - 33    FROM resolved WHERE ord BETWEEN 33 AND 39
+SELECT 'day3-2026', assignment_id, ord - 34    FROM resolved WHERE ord BETWEEN 34 AND 40
 UNION ALL
 SELECT 'all-assignments-for-solo-2026', assignment_id, ord FROM resolved;
 
@@ -2024,8 +2174,8 @@ DO $check$
 DECLARE n int;
 BEGIN
   SELECT count(*) INTO n FROM assignment_set_assignment WHERE assignment_set_id = 'all-assignments-for-solo-2026';
-  IF n <> 40 THEN
-    RAISE EXCEPTION 'seed error: expected 40 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
+  IF n <> 41 THEN
+    RAISE EXCEPTION 'seed error: expected 41 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
   END IF;
 END
 $check$;
