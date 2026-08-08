@@ -91,7 +91,7 @@ public class SubmissionService : ISubmissionService
 
         var row = new SessionSubmissionDto(
             submission.SubId, submission.StudentId, submission.AssignmentId,
-            submission.Passed, submission.SubmittedAt);
+            DeriveStatus(submission.Passed, submission.ResultJson), submission.SubmittedAt);
 
         try
         {
@@ -106,6 +106,25 @@ public class SubmissionService : ISubmissionService
             _logger.LogWarning(ex, "SubmissionRecorded broadcast failed for room {RoomCode}, submission {SubId}",
                 roomCode, submission.SubId);
         }
+    }
+
+    /// <summary>
+    /// Folds a submission's grading verdict and persisted execution result into the one
+    /// string the history-list DTOs carry. A compile/runtime error always wins — the code
+    /// never ran correctly regardless of what `Passed` says — otherwise this mirrors the
+    /// `passed !== false` convention the frontend already used for null (ungraded: predict
+    /// has no result to check, and an unchecked Code submission that ran fine reads as
+    /// "passed" rather than an indeterminate third thing).
+    /// </summary>
+    private static string DeriveStatus(bool? passed, string? resultJson)
+    {
+        if (resultJson is not null)
+        {
+            var result = JsonSerializer.Deserialize<ExecuteResponseDto>(resultJson, ResultJsonOptions);
+            if (result?.Status is ExecuteStatus.COMPILE_ERROR or ExecuteStatus.RUNTIME_ERROR)
+                return "error";
+        }
+        return passed != false ? "passed" : "tried";
     }
 
     private async Task<(ExecuteResponseDto? Result, bool? Passed, IReadOnlyList<string>? Feedback)> RunAndGradeAsync(Assignment assignment, JsonElement content)
@@ -191,15 +210,22 @@ public class SubmissionService : ISubmissionService
         return (verdict.Passed, verdict.Feedback);
     }
 
-    public async Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId) =>
-        await _db.Submission.AsNoTracking()
+    public async Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId)
+    {
+        var rows = await _db.Submission.AsNoTracking()
             .Where(s => s.StudentId == studentId)
             .OrderByDescending(s => s.SubmittedAt)          // newest-first, per CONTRACT
-            .Select(s => new SubmissionHistoryDto(
+            .Select(s => new {
                 s.SubId, s.AssignmentId,
-                s.Session != null ? s.Session.Code : null,  // null for solo
-                s.Passed, s.SubmittedAt))
-                .ToListAsync();
+                SessionCode = s.Session != null ? s.Session.Code : null,  // null for solo
+                s.Passed, s.ResultJson, s.SubmittedAt })
+            .ToListAsync();
+
+        return rows.Select(r => new SubmissionHistoryDto(
+                r.SubId, r.AssignmentId, r.SessionCode,
+                DeriveStatus(r.Passed, r.ResultJson), r.SubmittedAt))
+            .ToList();
+    }
 
 
     public async Task<SubmissionDetailDto?> GetSubmissionAsync(Guid subId)
@@ -230,11 +256,15 @@ public class SubmissionService : ISubmissionService
         if (session is null) return null;
         
 
-        return await _db.Submission.AsNoTracking()
+        var rows = await _db.Submission.AsNoTracking()
             .Where(s => s.SessionId == session.SessionId)
             .OrderByDescending(s => s.SubmittedAt)
-            .Select(s => new SessionSubmissionDto(
-                s.SubId, s.StudentId, s.AssignmentId, s.Passed, s.SubmittedAt))
+            .Select(s => new { s.SubId, s.StudentId, s.AssignmentId, s.Passed, s.ResultJson, s.SubmittedAt })
             .ToListAsync();
+
+        return rows.Select(r => new SessionSubmissionDto(
+                r.SubId, r.StudentId, r.AssignmentId,
+                DeriveStatus(r.Passed, r.ResultJson), r.SubmittedAt))
+            .ToList();
     }
 }

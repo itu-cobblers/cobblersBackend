@@ -96,7 +96,36 @@ public sealed class SubmissionHistoryTests : IAsyncLifetime
         Assert.Null(only.SessionId);
     }
 
-    [Fact] 
+    [Fact]
+    public async Task GetHistoryAsync_CompileError_StatusIsError()
+    {
+        // Given — no grading rules, so `Passed` stays null; before the `status` field
+        // existed, this would have read as "passed" even though the code never ran.
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.COMPILE_ERROR, "", "error: ';' expected"));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = TestServices.Submissions(ctx, executor);
+        var request = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("class Main {"));
+        await service.SubmitAsync(assignmentId, request);
+
+        // Then
+        var result = await service.GetHistoryAsync(studentId);
+        Assert.Equal("error", Assert.Single(result).Status);
+    }
+
+    [Fact]
     public async Task GetHistoryAsync_ValidSessionCode_SessionIdIsCode()
     {
         // Given 

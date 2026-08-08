@@ -169,20 +169,32 @@ Predict: not used — ContentJson.expectedOutput already is the answer
 | `Passed` | bool? | Server-computed verdict (see [Design decisions](#grading-rules-are-data-evaluated-by-one-backend-engine)). Null = not automatically gradable (e.g. Project today). |
 | `SubmittedAt` | datetime | **DB-owned** — stamped `now()` on insert, not nullable. Needed to order history and to tell submissions apart. See [Value generation](#value-generation--who-owns-each-column). |
 
-> **Implementation note — `GET /api/students/{studentId}/submissions` (S5).**
+> **Implementation note — `GET /api/students/{studentId}/submissions` (S5)
+> and `GET /api/sessions/{code}/submissions` (S10) — both thin, both share
+> `SubmissionService.DeriveStatus`.**
 > A single filtered, ordered read — no new query object needed:
 > `Submission.Where(s => s.StudentId == studentId).OrderByDescending(s => s.SubmittedAt)`,
-> projected to the wire DTO in [CONTRACT.md](CONTRACT.md#submission). Two
+> projected to the wire DTO in [CONTRACT.md](CONTRACT.md#submission). Three
 > details that aren't obvious from the entity alone:
 > - The wire field `sessionId` is the room's **`Session.Code`** (e.g.
 >   `"ABCD"`), not `Submission.SessionId` (the internal `Session` PK) — join
 >   to `Session` (`LEFT JOIN`, since `SessionId` is nullable) and project
 >   `Code`, or the frontend can't display/compare it against
 >   `GET /api/sessions/{code}`'s `code`.
-> - Deliberately **thin** — no `ContentJson`/`ResultJson` in the response.
->   The frontend's "My Progress" panel only needs `passed` + `submittedAt` +
->   which room; it never needs to replay past code/output. Don't widen this
->   DTO without a frontend reason — see CONTRACT.md's response shape.
+> - The wire field is `status` (`"passed"` / `"tried"` / `"error"`), not the
+>   raw `Passed` column — a compile/runtime error stored in `ResultJson`
+>   otherwise reads as an indistinguishable `"tried"` (or even `"passed"`,
+>   for an ungraded kind where `Passed` stays null), which is exactly the
+>   distinction the frontend's `StatusBadge` needs. `DeriveStatus` still
+>   only needs `Passed` + `ResultJson`, deserialized in-memory after the
+>   `Select()`/`ToListAsync()` rather than unpacked inside the SQL
+>   projection — this is a thin, low-traffic list, not worth Postgres-side
+>   jsonb extraction.
+> - Still deliberately **thin** — no `ContentJson`/full `ResultJson` in the
+>   response, just the one derived `status` string. The frontend only needs
+>   `status` + `submittedAt` + which room; it never needs to replay past
+>   code/output from this list. Don't widen this DTO further without a
+>   frontend reason — see CONTRACT.md's response shape.
 
 ---
 

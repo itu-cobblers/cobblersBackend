@@ -404,7 +404,7 @@ public sealed class ApiEndpointTests : IAsyncLifetime
         // The post-contract-change shape: assignmentId in, displayName out.
         Assert.Equal(seed.AssignmentId, row.GetProperty("assignmentId").GetInt32());
         Assert.Equal("student-maria", row.GetProperty("studentId").GetString());
-        Assert.True(row.GetProperty("passed").GetBoolean());
+        Assert.Equal("passed", row.GetProperty("status").GetString());
         Assert.False(row.TryGetProperty("displayName", out _));
         Assert.True(row.TryGetProperty("subId", out _));
         Assert.True(row.TryGetProperty("submittedAt", out _));

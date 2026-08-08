@@ -20,7 +20,7 @@ public record SubmissionHistoryDto(
     [property: JsonPropertyName("subId")]        Guid SubId,
     [property: JsonPropertyName("assignmentId")] int AssignmentId,
     [property: JsonPropertyName("sessionId")]    string? SessionId, // =Session.Code, null for solo
-    [property: JsonPropertyName("passed")]       bool? Passed,
+    [property: JsonPropertyName("status")]       string Status,     // "passed" | "tried" | "error" — see SubmissionService.DeriveStatus
     [property: JsonPropertyName("submittedAt")]  DateTimeOffset SubmittedAt);
 
 public record SubmissionDetailDto(
@@ -38,7 +38,7 @@ public record SessionSubmissionDto(
     [property: JsonPropertyName("subId")] Guid SubId,
     [property: JsonPropertyName("studentId")] string StudentId,
     [property: JsonPropertyName("assignmentId")] int AssignmentId,
-    [property: JsonPropertyName("passed")] bool? Passed,
+    [property: JsonPropertyName("status")] string Status, // "passed" | "tried" | "error" — see SubmissionService.DeriveStatus
     [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt);
     
 /// <summary>
