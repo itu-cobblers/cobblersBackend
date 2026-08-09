@@ -404,7 +404,7 @@ public sealed class ApiEndpointTests : IAsyncLifetime
         // The post-contract-change shape: assignmentId in, displayName out.
         Assert.Equal(seed.AssignmentId, row.GetProperty("assignmentId").GetInt32());
         Assert.Equal("student-maria", row.GetProperty("studentId").GetString());
-        Assert.True(row.GetProperty("passed").GetBoolean());
+        Assert.Equal("passed", row.GetProperty("status").GetString());
         Assert.False(row.TryGetProperty("displayName", out _));
         Assert.True(row.TryGetProperty("subId", out _));
         Assert.True(row.TryGetProperty("submittedAt", out _));
@@ -456,6 +456,31 @@ public sealed class ApiEndpointTests : IAsyncLifetime
             Json("""{"studentId":"nobody","content":"42"}"""));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Submit_FailingCodeWithMessage_FeedbackAppearsOnWire()
+    {
+        int assignmentId;
+        await using (var ctx = _fixture.CreateContext())
+        {
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"Hello ITU!","message":"Print exactly \"Hello ITU!\"."}""";
+            ctx.Assignment.Add(assignment);
+            await ctx.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+        await _client.PutAsync("/api/students/student-1", Json("""{"displayName":"Maria"}"""));
+        _factory.PistonResponse = new() { Run = new PistonStage("nope\n", "", "nope\n", 0, null) };
+
+        var submitted = await _client.PostAsync($"/api/assignments/{assignmentId}/submissions",
+            Json("""{"studentId":"student-1","content":"ignored"}"""));
+
+        Assert.Equal(HttpStatusCode.OK, submitted.StatusCode);
+        var body = await ReadJson(submitted);
+        Assert.False(body.GetProperty("passed").GetBoolean());
+        var feedback = body.GetProperty("feedback").EnumerateArray().Select(e => e.GetString()).ToList();
+        Assert.Equal(new[] { "Print exactly \"Hello ITU!\"." }, feedback);
     }
 
     [Fact]

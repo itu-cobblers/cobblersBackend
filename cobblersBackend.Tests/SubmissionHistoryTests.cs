@@ -96,7 +96,36 @@ public sealed class SubmissionHistoryTests : IAsyncLifetime
         Assert.Null(only.SessionId);
     }
 
-    [Fact] 
+    [Fact]
+    public async Task GetHistoryAsync_CompileError_StatusIsError()
+    {
+        // Given — no grading rules, so `Passed` stays null; before the `status` field
+        // existed, this would have read as "passed" even though the code never ran.
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.COMPILE_ERROR, "", "error: ';' expected"));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = TestServices.Submissions(ctx, executor);
+        var request = new SubmissionRequestDto(studentId, null, JsonSerializer.SerializeToElement("class Main {"));
+        await service.SubmitAsync(assignmentId, request);
+
+        // Then
+        var result = await service.GetHistoryAsync(studentId);
+        Assert.Equal("error", Assert.Single(result).Status);
+    }
+
+    [Fact]
     public async Task GetHistoryAsync_ValidSessionCode_SessionIdIsCode()
     {
         // Given 
@@ -200,6 +229,39 @@ public sealed class SubmissionHistoryTests : IAsyncLifetime
         Assert.Equal(content.GetString(), result.Content.GetString());
         Assert.NotNull(result.Result);
         Assert.True(result.Passed);
+    }
+
+    [Fact]
+    public async Task GetSubmissionAsync_FailingCodeWithMessage_RoundTripsFeedback()
+    {
+        // Given
+        string studentId = "student-1";
+        int assignmentId;
+        await using (var write = _fixture.CreateContext())
+        {
+            write.Student.Add(TestData.MakeStudent(studentId));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"hello","message":"Print hello, not goodbye."}""";
+            write.Assignment.Add(assignment);
+            await write.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "goodbye", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = TestServices.Submissions(ctx, executor);
+        JsonElement content = JsonSerializer.SerializeToElement("""{"code": "class Main {}"}""");
+        var request1 = new SubmissionRequestDto(studentId, null, content);
+        var response = await service.SubmitAsync(assignmentId, request1);
+
+        var result = await service.GetSubmissionAsync(response!.SubId);
+
+        // Then
+        Assert.NotNull(result);
+        Assert.False(result.Passed);
+        Assert.Equal(new[] { "Print hello, not goodbye." }, result.Feedback);
     }
 
     [Fact]

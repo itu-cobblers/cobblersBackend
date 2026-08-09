@@ -8,6 +8,7 @@ public class Submission
     public string? SessionId { get; set; }
     public required string ContentJson { get; set; }
     public string? ResultJson { get; set; }
+    public string? FeedbackJson { get; set; }
     public bool? Passed { get; set; }
     public DateTimeOffset SubmittedAt { get; set; }
 

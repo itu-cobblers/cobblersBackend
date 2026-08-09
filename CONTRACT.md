@@ -707,9 +707,9 @@ including an `ended` one, since there's nothing live left to hydrate.
 ```json
 // → 200 OK
 [
-  { "subId": "uuid-1", "assignmentId": 101, "studentId": "uuid-maria", "passed": true,  "submittedAt": "2026-06-19T14:28:00Z" },
-  { "subId": "uuid-0", "assignmentId": 101, "studentId": "uuid-maria", "passed": false, "submittedAt": "2026-06-19T14:25:00Z" },
-  { "subId": "uuid-2", "assignmentId": 118, "studentId": "uuid-jonas", "passed": true,  "submittedAt": "2026-06-19T14:20:00Z" }
+  { "subId": "uuid-1", "assignmentId": 101, "studentId": "uuid-maria", "status": "passed", "submittedAt": "2026-06-19T14:28:00Z" },
+  { "subId": "uuid-0", "assignmentId": 101, "studentId": "uuid-maria", "status": "tried",  "submittedAt": "2026-06-19T14:25:00Z" },
+  { "subId": "uuid-2", "assignmentId": 118, "studentId": "uuid-jonas", "status": "error",  "submittedAt": "2026-06-19T14:20:00Z" }
 ]
 ```
 
@@ -724,8 +724,20 @@ optionally student) is selected.
 | `subId`        | string   | Same id as `submission`'s response — the key into [`GET /api/submissions/{subId}`](#get-apisubmissionssubid-shared--full-detail-for-one-submission) for the code + result replay. |
 | `assignmentId` | number   | Which assignment this attempt belongs to.                                                                            |
 | `studentId`    | string   | Join against [`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration) for `displayName`.             |
-| `passed`       | boolean? | `null` for a kind with no automated grader.                                                                          |
+| `status`       | string   | One of `"passed"` / `"tried"` / `"error"` — server-derived (see below). Replaces the old `passed: boolean?` field.  |
 | `submittedAt`  | string   |                                                                                                                      |
+
+`status` folds together the grading verdict and the persisted execution
+result so the frontend doesn't have to separately fetch `result.status` to
+tell "wrong answer" apart from "the code didn't even compile/run":
+
+- `"error"` — the stored `result.status` is `"compile_error"` or
+  `"runtime_error"`. Wins regardless of `passed`, since the code never ran
+  correctly either way.
+- `"passed"` — otherwise, `passed !== false` (i.e. `true` **or** `null` —
+  an ungraded kind, or a `code` submission with no automated grader, reads
+  as passed as long as it didn't error).
+- `"tried"` — otherwise (`passed === false`, no stored error).
 
 This list is deliberately **thin, same as the student's own history below** —
 no `content`/`result` per row. Col 3 filters this list to the selected
@@ -746,16 +758,18 @@ list lets it index into whichever shape it needs.
 everyone on [`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration)
 × non-`project` assignments — mirrors S5's "any attempt" rule):
 
-- `"passed"` — **at least one** row for this pair has `passed = true`.
-- `"failed"` — at least one row exists, but **none** has `passed = true`.
+- `"passed"` — **at least one** row for this pair has `status = "passed"`.
+- `"failed"` — at least one row exists, but **none** has `status = "passed"`
+  (an `"error"` row counts toward `"failed"`, not its own bucket, at this
+  aggregate level — a fourth bucket here is a possible follow-up, not done
+  yet).
 - `"untried"` — **no** row exists for this pair yet.
 
 `kind: "project"` assignments never appear in this array — they have no
 `Submission` at all (see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only)).
-Treat a missing pair the same as `"untried"`. `passed = null` rows do not
-count as `"passed"` or `"failed"`. Col 1's `passedNum` is the count of
-attendees with derived `"passed"` for that assignment; `totalNum` is
-[`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration)'s
+Treat a missing pair the same as `"untried"`. Col 1's `passedNum` is the
+count of attendees with derived `"passed"` for that assignment; `totalNum`
+is [`/attendance`](#get-apisessionscodeattendance-teacher-roster-hydration)'s
 length (the full ever-joined roll — offline / Leave does not shrink it).
 
 `404 Not Found` under the same session-lookup rule as `/attendance` above.
@@ -785,7 +799,7 @@ progress has its own event below.
 ### `SubmissionRecorded` (a student's submission is graded)
 
 ```json
-{ "subId": "uuid-1", "assignmentId": 101, "studentId": "uuid-maria", "passed": true, "submittedAt": "2026-06-19T14:28:00Z" }
+{ "subId": "uuid-1", "assignmentId": 101, "studentId": "uuid-maria", "status": "passed", "submittedAt": "2026-06-19T14:28:00Z" }
 ```
 
 Broadcast to every observer in Group `code` whenever
@@ -893,16 +907,18 @@ frontend's `check()` no longer decides `passed`.
 ```json
 {
   "subId": "uuid",
-  "passed": true,
-  "result": { "status": "success", "stdout": "Hello World!\n", "stderr": "" },
+  "passed": false,
+  "result": { "status": "success", "stdout": "Not allowed\n", "stderr": "" },
+  "feedback": ["With hasMembership=false and isFreeTrialTuesday=true, output should be exactly \"Accessed\" — check your || condition."],
   "submittedAt": "2026-06-19T14:30:00Z"
 }
 ```
 
-| Field    | Type     | Notes                                                                                                          |
-| -------- | -------- | -------------------------------------------------------------------------------------------------------------- |
-| `passed` | boolean? | Server-computed. `null` for any assignment without an automated grader. (`project` never reaches this response at all — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only).) |
-| `result` | object?  | Present for `code` (same shape as `execute`'s response). `null` for `predict` — nothing is executed. |
+| Field      | Type      | Notes                                                                                                          |
+| ---------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| `passed`   | boolean?  | Server-computed. `null` for any assignment without an automated grader. (`project` never reaches this response at all — see [Mini-projects are VS-Code-only](#mini-projects-are-vs-code-only).) |
+| `result`   | object?   | Present for `code` (same shape as `execute`'s response). `null` for `predict` — nothing is executed. |
+| `feedback` | string[]? | Present only when `passed` is `false` **and** the failing grading rule(s) authored a `"message"` (see [SCHEMA.md](SCHEMA.md#grading-rules-are-data-evaluated-by-one-backend-engine)). `null`/absent otherwise — including every passing submission, and any failing one where no rule had a message to give. Never a substitute for `result.stdout`/`stderr`; it explains *which requirement* wasn't met, not the raw execution output. |
 
 Submission history — used for the resume flow (a student returning across the
 3 days, in or out of a room) and for reviewing a solo student's practice:
@@ -916,7 +932,7 @@ Submission history — used for the resume flow (a student returning across the
     "subId": "uuid",
     "assignmentId": 101,
     "sessionId": "ABCD",
-    "passed": true,
+    "status": "passed",
     "submittedAt": "2026-06-19T14:30:00Z"
   }
 ]
@@ -929,11 +945,19 @@ solo/practice submission. Deliberately thin: no `content`/`result` — see
 [SCHEMA.md](SCHEMA.md#submission) for why this stays a lightweight list, not
 a full replay of each attempt.
 
+`status` is one of `"passed"` / `"tried"` / `"error"` — same server-derived
+field and rules as
+[`GET /api/sessions/{code}/submissions`](#get-apisessionscodesubmissions-teacher--all-thin-submissions-in-this-room)
+above. It replaces the `passed: boolean?` this endpoint originally shipped
+with — widened so the frontend can show a distinct "Error" state (compile/
+runtime failure) instead of folding it into the same "Tried" as a wrong
+answer, without a second fetch of `result.status` per row.
+
 > **Status: implemented on the backend** (STORIES.md S5).
 > The frontend's "My Progress" panel (`ProgressModal`, opened from the
 > Toolbar or the entry screen) calls this on load and groups the response by
 > `assignmentId` — showing every attempt, but the assignment-level status is
-> "passed" if **any** attempt has `passed: true` (not the latest attempt,
+> "passed" if **any** attempt has `status: "passed"` (not the latest attempt,
 > not an average). It also seeds which assignments already show as done in
 > the stepper across a reload or the next day's session. Until the backend
 > route exists, every 404/network error is treated as "no history yet" — an
@@ -952,6 +976,7 @@ a full replay of each attempt.
   "sessionId": "ABCD",
   "content": "public class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello ITU!\");\n  }\n}",
   "result": { "status": "success", "stdout": "Hello ITU!\n", "stderr": "" },
+  "feedback": null,
   "passed": true,
   "submittedAt": "2026-06-19T14:28:00Z"
 }
@@ -961,6 +986,7 @@ a full replay of each attempt.
 | ----------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `content`   | string \| `{name, content}[]`   | Same shape as the [submission request's `content`](#post-apiassignmentsassignmentidsubmissions).                |
 | `result`    | object?                          | Same shape as `execute`'s response. `null` for `predict` (nothing executed).                                    |
+| `feedback`  | string[]?                       | Same as on the submit response above — the per-rule failure messages for this attempt, replayed back. `null` when the attempt passed or no rule authored a message. |
 | `sessionId` | string \| null                  | The room's join code, same convention as [`GET /api/students/{studentId}/submissions`](#get-apistudentsstudentidsubmissions). `null` for a solo submission. |
 
 **One endpoint, two callers.** `subId` is a globally unique surrogate key

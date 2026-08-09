@@ -169,20 +169,32 @@ Predict: not used — ContentJson.expectedOutput already is the answer
 | `Passed` | bool? | Server-computed verdict (see [Design decisions](#grading-rules-are-data-evaluated-by-one-backend-engine)). Null = not automatically gradable (e.g. Project today). |
 | `SubmittedAt` | datetime | **DB-owned** — stamped `now()` on insert, not nullable. Needed to order history and to tell submissions apart. See [Value generation](#value-generation--who-owns-each-column). |
 
-> **Implementation note — `GET /api/students/{studentId}/submissions` (S5).**
+> **Implementation note — `GET /api/students/{studentId}/submissions` (S5)
+> and `GET /api/sessions/{code}/submissions` (S10) — both thin, both share
+> `SubmissionService.DeriveStatus`.**
 > A single filtered, ordered read — no new query object needed:
 > `Submission.Where(s => s.StudentId == studentId).OrderByDescending(s => s.SubmittedAt)`,
-> projected to the wire DTO in [CONTRACT.md](CONTRACT.md#submission). Two
+> projected to the wire DTO in [CONTRACT.md](CONTRACT.md#submission). Three
 > details that aren't obvious from the entity alone:
 > - The wire field `sessionId` is the room's **`Session.Code`** (e.g.
 >   `"ABCD"`), not `Submission.SessionId` (the internal `Session` PK) — join
 >   to `Session` (`LEFT JOIN`, since `SessionId` is nullable) and project
 >   `Code`, or the frontend can't display/compare it against
 >   `GET /api/sessions/{code}`'s `code`.
-> - Deliberately **thin** — no `ContentJson`/`ResultJson` in the response.
->   The frontend's "My Progress" panel only needs `passed` + `submittedAt` +
->   which room; it never needs to replay past code/output. Don't widen this
->   DTO without a frontend reason — see CONTRACT.md's response shape.
+> - The wire field is `status` (`"passed"` / `"tried"` / `"error"`), not the
+>   raw `Passed` column — a compile/runtime error stored in `ResultJson`
+>   otherwise reads as an indistinguishable `"tried"` (or even `"passed"`,
+>   for an ungraded kind where `Passed` stays null), which is exactly the
+>   distinction the frontend's `StatusBadge` needs. `DeriveStatus` still
+>   only needs `Passed` + `ResultJson`, deserialized in-memory after the
+>   `Select()`/`ToListAsync()` rather than unpacked inside the SQL
+>   projection — this is a thin, low-traffic list, not worth Postgres-side
+>   jsonb extraction.
+> - Still deliberately **thin** — no `ContentJson`/full `ResultJson` in the
+>   response, just the one derived `status` string. The frontend only needs
+>   `status` + `submittedAt` + which room; it never needs to replay past
+>   code/output from this list. Don't widen this DTO further without a
+>   frontend reason — see CONTRACT.md's response shape.
 
 ---
 
@@ -294,12 +306,25 @@ A rule node is one of:
 { "op": "custom", "key": "<slug>" }                             // escape hatch — see below
 ```
 
+Any node above may also carry an optional `"message"` string — pure authoring
+metadata, never read by the pass/fail logic itself. When that node is the (or a)
+reason a submission fails, its message is bubbled into `Verdict.Feedback` and
+returned to the student as `feedback` on the submission response, so a failure
+reads as "you declared the variable but printed a hardcoded value instead of
+printing it back," not just `false`. `"all"` bubbles every failing child's
+message (independent requirements, worth surfacing together); `"any"` prefers
+its own message over dumping every branch's when all branches fail; `"not"`
+uses its own message if the forbidden pattern is found. Messages are optional —
+a rule with no `"message"` simply contributes nothing to `Feedback` on failure.
+
 Grading only runs on a successful execution — a non-zero exit code fails
-before any rule is evaluated. The current frontend `check()` functions
-decompose into these primitives (or a close approximation stored in
-`scripts/seed-tasks.sql`, verified against the frontend's `assignments.ts` +
-`lib/grade.ts`); the frontend's `signals` side-channel stays a client-side
-nicety derived from stdout — the server verdict is just `passed`.
+before any rule is evaluated (and produces no `Feedback` — the execution
+result's `status`/`stderr` already say the code didn't compile/run). The
+current frontend `check()` functions decompose into these primitives (or a
+close approximation stored in `scripts/seed-tasks.sql`, verified against the
+frontend's `assignments.ts` + `lib/grade.ts`); the frontend's `signals`
+side-channel stays a client-side nicety derived from stdout — the server
+verdict is `passed` plus, when available, the `feedback` explaining why.
 
 - `Predict` assignments use a dedicated `GradingJson` document (not the code
   rule tree):
