@@ -1829,6 +1829,7 @@ Methods:
 * **addCargo(int a)**: Adds the specified number of boxes (**a**) to the container's **amount**.
 * Capacity Constraint: The container cannot be over-filled. If adding a would cause the amount to exceed max, the addition must be rejected entirely.$txt$,
   NULL,
+  NULL,
   jsonb_build_object(
     'starterFiles', jsonb_build_array(
       jsonb_build_object('name', 'Main.java', 'content', $java$public class Main {
