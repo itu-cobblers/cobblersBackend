@@ -11,7 +11,9 @@ namespace cobblersBackend.Services;
 ///   { "all": [node, ...] }   { "any": [node, ...] }   { "not": node }
 ///   { "target": "stdout"|"code", "op": "contains",     "value": "..." }
 ///   { "target": "stdout",        "op": "containsLine", "value": "..." }
-///   { "target": "stdout"|"code", "op": "regex", "pattern": "...", "flags": "i"? }
+///   { "target": "stdout"|"code", "op": "regex", "pattern": "...", "flags": "i"|"s"? }
+///     "i" = IgnoreCase, "s" = Singleline (so "." also matches newlines — needed to
+///     match a multi-line block like an if-body with a regex).
 ///   { "op": "nonEmptyStdout" }
 ///   { "op": "custom", "key": "&lt;slug&gt;" }   // escape hatch, C# registry keyed by slug
 ///   { "predict": { "compare": "normalized"|"exact", "expectedOutput": "...", "accept"?: [...] } }
@@ -190,9 +192,10 @@ public class AssignmentGrader : IAssignmentGrader
     private static RegexOptions RegexOptions(JsonElement node)
     {
         var flags = node.TryGetProperty("flags", out var f) ? f.GetString() ?? "" : "";
-        return flags.Contains('i')
-            ? System.Text.RegularExpressions.RegexOptions.IgnoreCase
-            : System.Text.RegularExpressions.RegexOptions.None;
+        var options = System.Text.RegularExpressions.RegexOptions.None;
+        if (flags.Contains('i')) options |= System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+        if (flags.Contains('s')) options |= System.Text.RegularExpressions.RegexOptions.Singleline;
+        return options;
     }
 
     private bool Custom(string key, CheckResult result) =>

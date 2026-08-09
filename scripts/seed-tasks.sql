@@ -20,7 +20,7 @@
 --   * Predict grading_json: { "predict": { "compare", "expectedOutput", "accept"? } }
 --     — graded by AssignmentGrader on submit (no Piston run).
 --
--- Counts: Day 1 = 9, Day 2 = 24, Day 3 = 7, total = 40.
+-- Counts: Day 1 = 10, Day 2 = 25, Day 3 = 7, total = 42.
 -- ============================================================================
 
 BEGIN;
@@ -571,8 +571,8 @@ $java$::text),
 -- ─────────────────────────── DAY 2 — conditionals, loops, input ───────────────────────────
 (
   'at-itu-welcome', 'code', 'Welcome to ITU',
-  $txt$You just walked into the ITU atrium. You have a boolean atItu. Print "Welcome to ITU!" only if atItu is true. If you set atItu to false, the program should print nothing.$txt$,
-  $txt$if (atItu) { System.out.println("Welcome to ITU!"); }$txt$,
+  $txt$You just walked into the ITU atrium. You have a boolean **atItu**. Print "Welcome to ITU!" only if **atItu** is **true**. If you set **atItu** to **false**, the program should print nothing.$txt$,
+  null,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$An if runs a block of code only when a condition is true. If the condition is false, Java simply skips the block and continues.$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$if (condition) {
@@ -598,128 +598,84 @@ $java$
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*atItu\\s*\\)", "message": "Guard the print with if (atItu) — the print must be conditional on atItu, not unconditional."},
-    {"target": "stdout", "op": "containsLine", "value": "Welcome to ITU!", "message": "Print exactly \"Welcome to ITU!\"."}
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*atItu\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "The println call must be inside the if (atItu) { ... } block, not outside of it."},
+    {"op": "nonEmptyStdout", "message": "Your program should print a welcome message when atItu is true."}
   ]}$j$::jsonb
 ),
 (
   'scrollbar-friday', 'code', 'Scrollbar Friday',
   $txt$Fun fact: Scrollbar is the Friday bar at ITU — open every Friday after 15:00 during the semester.
 
-Write a program that prints whether it is Scrollbar day. One clear true case: Friday.
+**Write** a method that prints whether it is Scrollbar day for a given weekday:
 
-Set the day yourself with a String (no live calendar — BootIT is on Thursday, so you can flip the value to test both branches):
+- static void **IsScrollBarOpen(String weekday)**
+- **If weekday == "Friday"** → Yes, it is Friday, Scrollbar will open today!
+- **Otherwise** → No, Scrollbar is closed.
 
-- If weekday == "Friday" → Yes, it is Friday, Scrollbar will open today!
-- Otherwise → No, Scrollbar is closed.
-
-Try both "Friday" and "Thursday".$txt$,
-  $txt$if (weekday == "Friday") { ... } else { ... }$txt$,
+Call it twice from main, once with weekday="Friday" and another with "Thursday"$txt$,
+  $txt$static void IsScrollBarOpen(String weekday) { if (weekday == "Friday") { ... } else { ... } }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$With if / else, exactly one of the two branches runs — to be, or not to be:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$// code that is always executed
-
-if (condition) {
-    System.out.println("To be");
-} else {
-    System.out.println("Not to be");
-}
-
-// code that is always executed$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$With if-else, exactly one of the two branches runs $txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$static void toBeOrNotToBe(Boolean condition) {
+    if (condition) {
+        System.out.println("To be");
+    } else {
+        System.out.println("Not to be");
+    }
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
+
+    // declare method IsScrollBarOpen(String weekday) here
+
     public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
-        // Print Yes... or No...
+        IsScrollBarOpen("Friday");
+        IsScrollBarOpen("Thursday");
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
+
+    static void IsScrollBarOpen(String weekday) {
         if (weekday == "Friday") {
             System.out.println("Yes, it is Friday, Scrollbar will open today!");
         } else {
             System.out.println("No, Scrollbar is closed.");
         }
     }
-}
-$java$::text),
-  $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*weekday\\s*==\\s*\"Friday\"\\s*\\)", "message": "Branch on if (weekday == \"Friday\") { ... } else { ... }."},
-    {"any": [
-      {"target": "stdout", "op": "containsLine", "value": "Yes, it is Friday, Scrollbar will open today!"},
-      {"target": "stdout", "op": "containsLine", "value": "No, Scrollbar is closed."}
-    ], "message": "Print the exact sentence for whichever branch runs — \"Yes, it is Friday, Scrollbar will open today!\" or \"No, Scrollbar is closed.\""}
-  ]}$j$::jsonb
-),
-(
-  'is-friday-boolean', 'code', 'Is Friday? (boolean)',
-  $txt$Rewrite the Scrollbar Friday check from the previous assignment using a boolean variable.
 
-1. Keep a settable String weekday (e.g. "Friday" or "Thursday").
-2. Create boolean isFriday = (weekday == "Friday");
-3. Use if (isFriday) { ... } else { ... } (do not write if (isFriday == true)).
-4. Keep the same two print messages.$txt$,
-  $txt$boolean isFriday = (weekday == "Friday"); then if (isFriday) ...$txt$,
-  jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$A boolean variable can take only two values: true and false.$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$String weekday = "Thursday"; // BootIT day
-boolean isThursday = (weekday == "Thursday");
-
-// Idiomatic Java: use the boolean directly
-if (isThursday) {
-    System.out.println("It is Thursday");
-}$txt$)
-  ),
-  jsonb_build_object(
-    'starter', $java$public class Main {
     public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
-        // boolean isFriday = ...
-        // if (isFriday) ...
-    }
-}
-$java$
-  ),
-  to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
-        boolean isFriday = (weekday == "Friday");
-
-        if (isFriday) {
-            System.out.println("Yes, it is Friday, Scrollbar will open today!");
-        } else {
-            System.out.println("No, Scrollbar is closed.");
-        }
+        IsScrollBarOpen("Friday");
+        IsScrollBarOpen("Thursday");
     }
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "\\bboolean\\s+isFriday\\s*=\\s*\\(?\\s*weekday\\s*==\\s*\"Friday\"\\s*\\)?", "message": "Declare boolean isFriday = (weekday == \"Friday\");"},
-    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*isFriday\\s*\\)", "message": "Branch with if (isFriday) { ... } else { ... } — not if (isFriday == true)."},
-    {"any": [
-      {"target": "stdout", "op": "containsLine", "value": "Yes, it is Friday, Scrollbar will open today!"},
-      {"target": "stdout", "op": "containsLine", "value": "No, Scrollbar is closed."}
-    ], "message": "Print the exact sentence for whichever branch runs — \"Yes, it is Friday, Scrollbar will open today!\" or \"No, Scrollbar is closed.\""}
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "static\\s+void\\s+IsScrollBarOpen\\s*\\(\\s*String\\s+weekday\\s*\\)\\s*\\{(?:(?!\\}).)*if\\s*\\(\\s*weekday\\s*==\\s*\"[A-Za-z]+\"\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "Declare static void IsScrollBarOpen(String weekday) with an if (weekday == \"...\") { ... } branch that prints inside it."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "static\\s+void\\s+IsScrollBarOpen\\s*\\(\\s*String\\s+weekday\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "The else { ... } branch of IsScrollBarOpen must also print inside it."},
+    {"target": "code", "op": "regex", "pattern": "IsScrollBarOpen\\s*\\(\\s*\"Friday\"\\s*\\)", "message": "Call IsScrollBarOpen(\"Friday\") from main."},
+    {"target": "code", "op": "regex", "pattern": "IsScrollBarOpen\\s*\\(\\s*\"Thursday\"\\s*\\)", "message": "Call IsScrollBarOpen(\"Thursday\") from main."},
+    {"target": "stdout", "op": "regex", "flags": "s", "pattern": "Yes.*No", "message": "IsScrollBarOpen(\"Friday\") should print a \"Yes\" message and IsScrollBarOpen(\"Thursday\") should print a \"No\" message — in that order. Check you haven't swapped the if/else branches."}
   ]}$j$::jsonb
 ),
 (
   'canteen-lunch', 'code', 'Canteen lunch hours',
-  $txt$The ITU canteen serves lunch Monday–Friday, 11:00–14:00. After 13:45 there is a late-lunch discount.
+  $txt$The ITU canteen serves lunch from Monday to Friday, 11:00 to 14:00.
 
-Assume it is already a weekday — check the clock with nested conditions.
+Declare **isCanteenOpen(boolean isWeekday, double hour)** so it prints whether the canteen is open, using **nested if**, three layers deep:
 
-Use a double for the time of day (e.g. 11.0 = 11:00, 13.75 = 13:45).
+1. Outer layer — is it a weekday? Use the parameter **isWeekday**.
+2. Middle layer (only checked when it is a weekday) — is **hour < 11.0**?
+3. Inner layer (only checked when the middle layer is false) — is **hour > 14.0**?
+$txt$,
+  $txt$if (isWeekday) {
+    if (hour < 11.0) { ... }
+    else { if (hour > 14.0) { ... } else { ... } }
+} else { ... }
 
-- time < 11.0 → Too early — lunch starts at 11:00.
-- time >= 14.0 → Too late — lunch ended at 14:00.
-- otherwise:
-  - print Lunch is being served.
-  - then if time >= 13.75 → Late lunch discount applies! else → Full price.$txt$,
-  $txt$Nest if/else. Try time = 13.75, 10.5, 12.0, 14.5.$txt$,
+(Or swap which boundary check comes first — either nesting order passes.)$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$You can put an if inside another if. The inner block only runs when the outer condition is also true.$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$int number = 42;
@@ -736,193 +692,375 @@ if (number > 0) {
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
+
+    // declare method isCanteenOpen(boolean isWeekday, double hour) here
+
     public static void main(String[] args) {
-        double time = 13.75; // try 10.5, 12.0, 13.5, 14.5
-        // Nested if/else for early / late / serving + discount
+      // This is how the method should be called; no changes are needed here.
+        isCanteenOpen(false, 12.0); //Close
+        isCanteenOpen(true, 9.0);  //Close
+        isCanteenOpen(true, 11.0);  //Open
+        isCanteenOpen(true, 14.0);  //Open
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        double time = 13.75; // try 10.5, 12.0, 13.5, 14.5
 
-        if (time < 11.0) {
-            System.out.println("Too early — lunch starts at 11:00.");
-        } else {
-            if (time >= 14.0) {
-                System.out.println("Too late — lunch ended at 14:00.");
+    static void isCanteenOpen(boolean isWeekday, double hour) {
+        if (isWeekday) {
+            if (hour < 11.0) {
+                System.out.println("Close");
             } else {
-                System.out.println("Lunch is being served.");
-                if (time >= 13.75) {
-                    System.out.println("Late lunch discount applies!");
+                if (hour > 14.0) {
+                    System.out.println("Close");
                 } else {
-                    System.out.println("Full price.");
+                    System.out.println("Open");
                 }
             }
+        } else {
+            System.out.println("Close");
         }
+    }
+
+    public static void main(String[] args) {
+        isCanteenOpen(false, 12.0); //Close
+        isCanteenOpen(true, 9.0);  //Close
+        isCanteenOpen(true, 11.0);  //Open
+        isCanteenOpen(true, 14.0);  //Open
     }
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "\\btime\\s*<\\s*11\\.0\\b", "message": "Check time < 11.0 for the too-early case."},
-    {"target": "code", "op": "regex", "pattern": "\\btime\\s*>=\\s*14\\.0\\b", "message": "Check time >= 14.0 for the too-late case."},
-    {"target": "code", "op": "regex", "pattern": "\\btime\\s*>=\\s*13\\.75\\b", "message": "Check time >= 13.75 for the late-lunch discount."},
-    {"target": "stdout", "op": "containsLine", "value": "Lunch is being served.", "message": "For time = 13.75, print \"Lunch is being served.\" as its own line."},
-    {"target": "stdout", "op": "containsLine", "value": "Late lunch discount applies!", "message": "For time = 13.75, print \"Late lunch discount applies!\" as its own line."}
+    {"target": "code", "op": "regex", "flags": "i", "pattern": "isCanteenOpen\\s*\\(\\s*boolean\\s+isWeekday\\s*,\\s*double\\s+hour\\s*\\)", "message": "Declare isCanteenOpen(boolean isWeekday, double hour) — keep those parameter names."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*isWeekday\\s*\\)\\s*\\{\\s*if\\s*\\(\\s*[^)]*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*else\\s*\\{\\s*if\\s*\\(\\s*[^)]*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*\\}\\s*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "Nest three layers deep: if (isWeekday) { if (...) { ... } else { if (...) { ... } else { ... } } } else { ... } — either boundary check (hour < 11.0 or hour > 14.0) may come first."},
+    {"target": "stdout", "op": "regex", "pattern": "^Close\\nClose\\nOpen\\nOpen$", "message": "Calling isCanteenOpen(false, 12.0), isCanteenOpen(true, 9.0), isCanteenOpen(true, 11.0), isCanteenOpen(true, 14.0) in that order should print Close, Close, Open, Open — one per line. Note hour = 14.0 should still be Open; only later than 14.0 counts as closed."}
   ]}$j$::jsonb
 ),
 (
-  'fitness-access', 'code', 'Fitness access',
-  $txt$The ITU fitness room (basement, beneath Scrollbar) needs a membership — but on the first Tuesday of every month there is free trial access.
+  'canteen-lunch-discount', 'code', 'Canteen lunch discount',
+  $txt$The ITU Canteen offers a late lunch discount on weekdays after 13:45. 
+Assuming it is already a weekday, **implement** the lunch-hour check using a single 
+**if-else-if ladder** that includes the late lunch discount logic and **print**:
 
-You may enter if you have a membership OR it is free-trial Tuesday:
+Use a **double** for the time of day (e.g. 11.0 = 11:00, 13.75 = 13:45):
 
-if (hasMembership || isFreeTrialTuesday) print "Accessed" else print "Not allowed".
-
-Flip the two booleans and check both outcomes.$txt$,
-  $txt$if (hasMembership || isFreeTrialTuesday) { ... }$txt$,
+- Earlier than 11.0 (< 11.0) → Too early. Lunch starts at 11:00.
+- Between 11.0 and 13.75 (>= 11.0 and < 13.75) → Lunch is being served at full price.
+- Between 13.75 and 14.0  (>= 13.75 and < 14.0)→ Lunch is being served with a late lunch discount!
+- After 14.0 (>= 14) → Too late - lunch ended at 14:00.
+$txt$,
+  $txt$You can check the largest threshold first (time >= 14.0, then >= 13.75, then >= 11.0) or the smallest first (time < 11.0, then < 13.75, then < 14.0) — either direction works, just keep the thresholds in the right order for whichever one you pick.$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Boolean comparisons: == != < > <= >=
-Logical operators: ! (not), && (and), || (or) — at least one must be true for ||.$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$You can chain multiple conditions using else if. In this chain, only the first (from top to bottom) matching condition will execute.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$if (number >= 100) {
+    System.out.println("3+ digits");
+} else if (number >= 10) {
+    System.out.println("2 digits");
+} else {
+    System.out.println("1 digit");
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
-    public static void main(String[] args) {
-        boolean hasMembership = false;
-        boolean isFreeTrialTuesday = true; // first Tuesday of the month
 
-        // if either is true → Accessed, else → Not allowed
+    // declare method printLunchStatus(double time) here
+
+    public static void main(String[] args) {
+        // This is how the method should be called; no changes are needed here.
+        printLunchStatus(10.5);  // Too early - lunch starts at 11:00.
+        printLunchStatus(12.0);  // Lunch is being served at full price.
+        printLunchStatus(13.8); // Lunch is being served with a late lunch discount!
+        printLunchStatus(14.5);  // Too late - lunch ended at 14:00.
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        boolean hasMembership = false;
-        boolean isFreeTrialTuesday = true;
 
+    static void printLunchStatus(double time) {
+        if (time >= 14.0) {
+            System.out.println("Too late - lunch ended at 14:00.");
+        } else if (time >= 13.75) {
+            System.out.println("Lunch is being served with a late lunch discount!");
+        } else if (time >= 11.0) {
+            System.out.println("Lunch is being served at full price.");
+        } else {
+            System.out.println("Too early - lunch starts at 11:00.");
+        }
+    }
+
+    public static void main(String[] args) {
+        printLunchStatus(10.5);  // Too early - lunch starts at 11:00.
+        printLunchStatus(12.0);  // Lunch is being served at full price.
+        printLunchStatus(13.8); // Lunch is being served with a late lunch discount!
+        printLunchStatus(14.5);  // Too late - lunch ended at 14:00.
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "flags": "i", "pattern": "printLunchStatus\\s*\\(\\s*double\\s+time\\s*\\)", "message": "Declare printLunchStatus(double time) — keep that parameter name."},
+    {"any": [
+      {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*time\\s*>=\\s*14\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*>=\\s*13\\.75\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*>=\\s*11\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*\\}"},
+      {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*time\\s*<\\s*11\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*<\\s*13\\.75\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*<\\s*14\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*\\}"}
+    ], "message": "Write a single if / else if / else if / else ladder inside printLunchStatus that checks 11.0, 13.75, and 14.0 in order — largest-to-smallest with >=, or smallest-to-largest with < — no if nested inside another if."},
+    {"target": "stdout", "op": "regex", "pattern": "^Too early - lunch starts at 11:00\\.\\nLunch is being served at full price\\.\\nLunch is being served with a late lunch discount!\\nToo late - lunch ended at 14:00\\.$", "message": "Calling printLunchStatus(10.5), printLunchStatus(12.0), printLunchStatus(13.8), printLunchStatus(14.5) in that order should print those four lines, one per line."}
+  ]}$j$::jsonb
+),
+(
+  'fitness-access-boolean', 'code', 'Fitness access',
+  $txt$The ITU fitness room (located in the basement, beneath Scrollbar) requires a membership. Declare **checkFitnessAccess(boolean hasMembership)** so it stores membership in a **boolean** parameter, then **branches on the boolean** directly.
+
+**Print** "Accessed" if they have a membership; **otherwise**, print "Not allowed".
+$txt$,
+  $txt$if (hasMembership) → Accessed;
+else → Not allowed$txt$,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A boolean variable can take only two values: true and false. Once you have one, you can branch on it directly instead of repeating a comparison inside if.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$boolean isRaining = true;
+
+if (isRaining) {
+    System.out.println("Bring an umbrella");
+} else {
+    System.out.println("Enjoy the sun");
+}$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // declare method checkFitnessAccess(boolean hasMembership) here
+
+    public static void main(String[] args) {
+        // This is how the method should be called; no changes are needed here.
+        checkFitnessAccess(true);  // Accessed
+        checkFitnessAccess(false); // Not allowed
+    }
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static void checkFitnessAccess(boolean hasMembership) {
+        if (hasMembership) {
+            System.out.println("Accessed");
+        } else {
+            System.out.println("Not allowed");
+        }
+    }
+
+    public static void main(String[] args) {
+        checkFitnessAccess(true);  // Accessed
+        checkFitnessAccess(false); // Not allowed
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "checkFitnessAccess\\s*\\(\\s*boolean\\s+hasMembership\\s*\\)", "message": "Declare checkFitnessAccess(boolean hasMembership) — keep that parameter name."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*!?\\s*hasMembership\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "Branch on if (hasMembership) { ... } — the boolean itself (or its negation, !hasMembership) — and print inside the block."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*!?\\s*hasMembership\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "The else { ... } branch must also print inside it."},
+    {"target": "stdout", "op": "regex", "pattern": "^Accessed\\nNot allowed$", "message": "Calling checkFitnessAccess(true) then checkFitnessAccess(false) should print Accessed then Not allowed, one per line."}
+  ]}$j$::jsonb
+),
+(
+  'fitness-access-free-trial', 'code', 'Fitness access (free trial)',
+  $txt$The ITU fitness room offers a free trial on the first Tuesday of every month. 
+     
+Now, you need to update the ITU fitness room access logic. 
+Declare **checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday)**: a student may enter if they have a membership or if it is free-trial Tuesday.
+
+Print "Accessed"; otherwise, print "Not allowed".$txt$,
+  $txt$if (hasMembership || isFreeTrialTuesday) { ... }$txt$,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$Boolean comparisons: **==**, **!=**, **<**,** >**, **<=**, **>=**
+Logical operators: **! (not)**, **&& (and)**, **|| (or)**$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$// comparisons
+1 == 1   // is equal to        -> true
+1 != 2   // is not equal to    -> true
+1 < 2    // is less than       -> true
+2 > 1    // is greater than    -> true
+1 <= 2   // is less than or equal to    -> true
+2 >= 2   // is greater than or equal to -> true
+
+// logical operators
+!(1 > 2)          // not -> true, because (1 > 2) is false
+(2 > 1) && (3 > 2) // and -> true, both sides are true
+(2 < 1) || (2 == 2) // or  -> true, at least one side is true$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // declare method checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday) here
+
+    public static void main(String[] args) {
+        // This is how the method should be called; no changes are needed here.
+        checkFitnessAccess(false, false); // Not allowed
+        checkFitnessAccess(true, false);  // Accessed
+        checkFitnessAccess(false, true);  // Accessed
+        checkFitnessAccess(true, true);   // Accessed
+    }
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static void checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday) {
         if (hasMembership || isFreeTrialTuesday) {
             System.out.println("Accessed");
         } else {
             System.out.println("Not allowed");
         }
     }
+
+    public static void main(String[] args) {
+        checkFitnessAccess(false, false); // Not allowed
+        checkFitnessAccess(true, false);  // Accessed
+        checkFitnessAccess(false, true);  // Accessed
+        checkFitnessAccess(true, true);   // Accessed
+    }
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*(?:hasMembership\\s*\\|\\|\\s*isFreeTrialTuesday|isFreeTrialTuesday\\s*\\|\\|\\s*hasMembership)\\s*\\)", "message": "Branch with if (hasMembership || isFreeTrialTuesday) { ... } else { ... }."},
-    {"target": "stdout", "op": "containsLine", "value": "Accessed", "message": "With hasMembership=false and isFreeTrialTuesday=true, output should be exactly \"Accessed\" — check your || condition."}
+    {"target": "code", "op": "regex", "pattern": "checkFitnessAccess\\s*\\(\\s*boolean\\s+hasMembership\\s*,\\s*boolean\\s+isFreeTrialTuesday\\s*\\)", "message": "Declare checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday) — keep those parameter names."},
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*(?:hasMembership\\s*\\|\\|\\s*isFreeTrialTuesday|isFreeTrialTuesday\\s*\\|\\|\\s*hasMembership|!\\s*hasMembership\\s*&&\\s*!\\s*isFreeTrialTuesday|!\\s*isFreeTrialTuesday\\s*&&\\s*!\\s*hasMembership)\\s*\\)", "message": "Branch with if (hasMembership || isFreeTrialTuesday) { ... } else { ... } (or !hasMembership && !isFreeTrialTuesday)."},
+    {"target": "stdout", "op": "regex", "pattern": "^Not allowed\\nAccessed\\nAccessed\\nAccessed$", "message": "Calling checkFitnessAccess(false,false), (true,false), (false,true), (true,true) in that order should print Not allowed, Accessed, Accessed, Accessed — one per line."}
   ]}$j$::jsonb
 ),
 (
-  'student-day-place', 'code', 'A common day as an ITU student',
-  $txt$Write a method place(String period) that returns where a student probably is:
+  'student-day-place', 'code', 'Glass boxes',
+  $txt$Glass boxes are group study rooms in the ITU building. You can reserve them on the same day at the info desk. Some of these rooms operate on a "first-come, first-served" basis.
 
-- morning → lectures, exercises, or a group room
-- break → the Cafe Analog coffee queue
-- noon → the canteen rush
-- afternoon → the outdoor grass (if the sun is out)
+Declare a method named IsFirstComeFirstServe that returns a boolean.
 
-From main, set a period and print:
-System.out.println("During " + period + ", an ITU student is probably at " + place(period));$txt$,
-  $txt$static String place(String period) { return ...; }$txt$,
+The complete list of these room numbers is: 2A03, 2A07, 3A03, 4A01, 4A03, 4A07, 5A03, 5A07.
+
+Make sure the method returns the correct values for the examples called in the main function.$txt$,
+  NULL,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Previous methods were mostly void (they printed). A method can also return a value to the caller with return. The return type goes where void used to be (String, int, boolean, …).$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Instead of void (no return values), a method can send a specific value back to the caller using the return keyword.
+The data type being returned must be declared in the method signature exactly where void used to be.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
+    public static int addNumbers(int a, int b) {
+        // Returns the calculated result to the caller
+        return a + b;
+    }
+
+    public static void main(String[] args) {
+        int result = addNumbers(2, 3);
+        System.out.println(result);
+    }
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
-    public static void main(String[] args) {
-        String period = "morning"; // try "break", "noon", "afternoon"
-        System.out.println("During " + period + ", an ITU student is probably at " + place(period));
-    }
 
-    static String place(String period) {
-        // return the matching place
-        return "";
+    // Declare method IsFirstComeFirstServe(String roomNumber) here that returns a boolean
+
+    public static void main(String[] args) {
+
+        // This is how the method should be called; no changes are needed here.
+
+        // You can call the method "IsFirstComeFirstServe" and use the return value as a parameter to another method "System.out.println".
+        System.out.println(IsFirstComeFirstServe("2A03")); // true
+
+        // You can also store the return values of the method "IsFirstComeFirstServe", and use it later.
+        boolean result_2A05 = IsFirstComeFirstServe("2A05");
+        System.out.println(result_2A05); // false
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        String period = "morning";
-        System.out.println("During " + period + ", an ITU student is probably at " + place(period));
+
+    static boolean IsFirstComeFirstServe(String roomNumber) {
+        return (roomNumber == "2A03" || roomNumber == "2A07" || roomNumber == "3A03" ||
+                roomNumber == "4A01" || roomNumber == "4A03" || roomNumber == "4A07" ||
+                roomNumber == "5A03" || roomNumber == "5A07");
     }
 
-    static String place(String period) {
-        if (period == "morning") {
-            return "lectures, exercises, or a group room";
-        } else if (period == "break") {
-            return "the Cafe Analog coffee queue";
-        } else if (period == "noon") {
-            return "the canteen rush";
+    public static void main(String[] args) {
+        System.out.println(IsFirstComeFirstServe("2A03")); // true
+
+        boolean result_2A05 = IsFirstComeFirstServe("2A05");
+        System.out.println(result_2A05); // false
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+boolean\\s+IsFirstComeFirstServe\\s*\\(\\s*String\\s+\\w+\\s*\\)", "message": "Declare static boolean IsFirstComeFirstServe(String roomNumber) — a method that returns a boolean."},
+    {"target": "code", "op": "contains", "value": "return", "message": "IsFirstComeFirstServe(...) must return a value, not print it directly."},
+    {"target": "stdout", "op": "regex", "pattern": "^true\\nfalse$", "message": "IsFirstComeFirstServe(\"2A03\") should return true and IsFirstComeFirstServe(\"2A05\") should return false — check against the full room list."}
+  ]}$j$::jsonb
+),
+(
+  'while-sun-out', 'code', 'While the sun out',
+  $txt$In Copenhagen, the summer days are long. We love to sit on the grass outside the ITU building until the sun goes down at 21:00.
+
+Declare a method named **isSunOut** that takes an **int** for the **time** and **returns a boolean**. Each time it runs, it should also **print the current time**.
+
+Use a **while loop** in the main function starting at 14:00. The loop should keep running as long as the sun is out, checking the status and **incrementing** the time by 1 each round.$txt$,
+  NULL,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A while loop keeps running as long as its condition evaluates to true.
+The loop condition doesn't have to be a simple math comparison like i < 10. It can be any boolean expression — including a boolean variable or a method that returns a boolean!
+The loop checks the condition before every iteration. Once the condition becomes false, the loop immediately stops and skips the body.$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$Important: You must always update the variables involved in your condition inside the loop (the increment/update step). If you forget to update them, the condition will never become false, creating an infinite loop that runs forever and crashes your program!$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // Declare the method isSunOut(int time) here that returns a boolean.
+    // It should print the current time and return true or false based on it.
+
+    public static void main(String[] args) {
+
+        // initialization
+        // Declare an int variable for time starting at 14
+        // Declare a boolean variable sunIsOut starting as true
+
+        // loop condition
+        // Create a while loop that runs as long as sunIsOut is true
+
+            // Inside the loop body:
+            // 1. Update sunIsOut by calling the isSunOut method with the current time
+            // 2. Increment the time by 1 so you don't create an infinite loop!
+
+    }
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static boolean isSunOut(int time) {
+        if (time < 21) {
+            System.out.println("The time is now " + time + ": The sun is still out, let's sit on the grass!");
+            return true;
         } else {
-            return "the outdoor grass (if the sun is out)";
+            System.out.println("The time is now " + time + ": The sun is not out, let's go home.");
+            return false;
+        }
+    }
+
+    public static void main(String[] args) {
+        // initialization
+        int time = 14;
+        boolean sunIsOut = true;
+
+        while (sunIsOut) { // loop condition
+            sunIsOut = isSunOut(time);
+            time = time + 1; // increment
         }
     }
 }
 $java$::text),
   $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "static\\s+String\\s+place\\s*\\(\\s*String\\s+\\w+\\s*\\)", "message": "Declare static String place(String period) — a method that returns a String."},
-    {"target": "code", "op": "contains", "value": "return", "message": "place(...) must return a value, not print it directly."},
-    {"target": "stdout", "op": "containsLine", "value": "During morning, an ITU student is probably at lectures, exercises, or a group room", "message": "For period = \"morning\", place(period) should describe lectures/exercises/group room — check your morning branch."}
-  ]}$j$::jsonb
-),
-(
-  'while-five-lines', 'code', 'While loop — five lines',
-  $txt$Loops turn repetition into initialize → condition → body → increment.
-
-Start from the starter. Right now it runs while i < 10 (i goes 0 … 9). Change only the loop condition so the program prints exactly 5 lines.
-
-Hint: which number should replace 10, and why?$txt$,
-  $txt$while (i < 5) runs for i = 0,1,2,3,4 — exactly 5 times.$txt$,
-  jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Without a loop you copy-paste. With while:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$int i = 0;                 // initialization
-while (i < 10) {           // loop condition
-    System.out.println("I will push my code before the deadline!");
-    i = i + 1;             // increment
-}$txt$),
-    jsonb_build_object('kind', 'text', 'text', $txt$i starts at 0, condition i < 10 → body runs for 0..9 (10 times). It never runs with i == 10.$txt$)
-  ),
-  jsonb_build_object(
-    'starter', $java$public class Main {
-
-    static void function(int number) {
-        System.out.println("Line " + number + ": I will push my code before the deadline!");
-    }
-
-    public static void main(String[] args) {
-        int i = 0; // initialization
-        while (i < 10) { // loop condition — change this
-            function(i);
-            i = i + 1; // increment
-        }
-    }
-}
-$java$
-  ),
-  to_jsonb($java$public class Main {
-
-    static void function(int number) {
-        System.out.println("Line " + number + ": I will push my code before the deadline!");
-    }
-
-    public static void main(String[] args) {
-        int i = 0;
-        while (i < 5) { // 0,1,2,3,4 → exactly 5 lines
-            function(i);
-            i = i + 1;
-        }
-    }
-}
-$java$::text),
-  $j${"all": [
-    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(\\s*i\\s*(?:<\\s*5|<=\\s*4)\\s*\\)", "message": "Change the loop condition on i to stop after exactly 5 lines — while (i < 5) (or i <= 4)."},
-    {"target": "stdout", "op": "containsLine", "value": "Line 0: I will push my code before the deadline!", "message": "The first line should read \"Line 0: I will push my code before the deadline!\""},
-    {"target": "stdout", "op": "containsLine", "value": "Line 4: I will push my code before the deadline!", "message": "The last (5th) line should read \"Line 4: I will push my code before the deadline!\""},
-    {"not": {"target": "stdout", "op": "contains", "value": "Line 5:"}, "message": "There should be no \"Line 5:\" — that would be a 6th line."}
+    {"target": "code", "op": "regex", "pattern": "static\\s+boolean\\s+isSunOut\\s*\\(\\s*int\\s+\\w+\\s*\\)", "message": "Declare static boolean isSunOut(int time) — a method that returns a boolean."},
+    {"target": "code", "op": "contains", "value": "return", "message": "isSunOut(...) must return a value, not just print it."},
+    {"target": "code", "op": "regex", "pattern": "\\bboolean\\s+sunIsOut\\s*=\\s*true\\b", "message": "Declare boolean sunIsOut = true; before the loop."},
+    {"target": "code", "op": "regex", "pattern": "\\bint\\s+time\\s*=\\s*14\\b", "message": "Start the time variable at 14 (14:00)."},
+    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(\\s*sunIsOut\\s*\\)", "message": "Loop with while (sunIsOut) — the condition should be the boolean variable itself."},
+    {"target": "code", "op": "regex", "pattern": "\\btime\\s*(?:=\\s*time\\s*\\+\\s*1\\b|\\+\\+|\\+=\\s*1\\b)", "message": "Increment time inside the loop body (time = time + 1) — otherwise the loop never ends."},
+    {"target": "stdout", "op": "regex", "pattern": "\\b14\\b[\\s\\S]*\\b15\\b[\\s\\S]*\\b16\\b[\\s\\S]*\\b17\\b[\\s\\S]*\\b18\\b[\\s\\S]*\\b19\\b[\\s\\S]*\\b20\\b[\\s\\S]*\\b21\\b", "message": "Print the current time on every call to isSunOut — the output should show 14 through 21, in order."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "\\b22\\b"}, "message": "The loop should stop right after 21 — isSunOut(21) must return false so the loop doesn't keep going to 22."}
   ]}$j$::jsonb
 ),
 (
@@ -1019,8 +1157,8 @@ while (i < 100) {
 ),
 (
   'while-loop-quiz-4', 'predict', 'While Loop Quiz 4',
-  $txt$Careful with this one! Predict what it prints — some loops never stop.$txt$,
-  $txt$What is 1 × 1? Does i ever change?$txt$,
+  $txt$Read the loop and predict exactly what it prints. Type your answer in the output window; use return/enter for each println line.$txt$,
+  NULL,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Predict the exact output of the snippet. Type your answer in the output box. Use a new line for each System.out.println (press Enter / return between lines). If the loop never stops, answer: infinite loop.$txt$)
   ),
@@ -1094,10 +1232,10 @@ while (i >= 2) {
 ),
 (
   'analog-tickets-while', 'code', 'Analog tickets (while)',
-  $txt$Cafe Analog has a mobile app where you can buy 5 tickets at once with a discount. You are a heavy coffee drinker and want 50 tickets in one go — so you need a loop that buys a pack of 5 tickets, ten times.
+  $txt$Cafe Analog has a mobile app where you can buy 5 tickets at once with a discount. You are a heavy coffee drinker and want 50 tickets in one go — so you need a **loop** that buys a pack of **5 tickets, ten times**.
 
-Using a while loop, print the running total after each pack: 5, 10, 15, …, 50 (one number per line).$txt$,
-  $txt$Accumulate total += ticketsPerPack inside while (packs < 10).$txt$,
+Using a **while loop**, print the running total after each pack: 5, 10, 15, …, 50 (one number per line).$txt$,
+  $txt$Declare two int variables, total and pack, to accumulate the numbers we want to print and to use as the loop condition.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Use a while loop when you know you need to repeat until a counter reaches a limit. Initialize → check → body → increment.$txt$)
   ),
@@ -1130,8 +1268,13 @@ $java$::text),
 ),
 (
   'analog-tickets-for', 'code', 'Analog tickets (for)',
-  $txt$Rewrite the Cafe Analog tickets program. Same output (5 … 50), but use a for loop instead of while. The starter is the while solution — change it to for.$txt$,
-  $txt$for (int packs = 0; packs < 10; packs = packs + 1) { ... }$txt$,
+  $txt$Cafe Analog has a mobile app where you can buy 5 tickets at once with a discount. 
+
+You are a heavy coffee drinker and want 50 tickets in one go — so you need a **loop** that buys a pack of **5 tickets, ten times**. 
+
+Rewrite the Cafe Analog tickets program. Same output (5 … 50), but use a **for loop** this time.
+$txt$,
+  $txt$Review the previous while loop solution. Try to figure out which variable should be used for the initialization and the condition in the for loop header.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$The for loop packs initialization, condition, and increment into one header — nicer when you already know how many times to repeat:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$for (int i = 0; i < 10; i = i + 1) {
@@ -1217,8 +1360,8 @@ $java$::text),
 ),
 (
   'for-loop-quiz-3', 'predict', 'For Loop Quiz 3',
-  $txt$Careful with this one! Predict what it prints — some loops never stop.$txt$,
-  $txt$What is 1 × 1? Does i ever grow?$txt$,
+  $txt$Read the loop and predict exactly what it prints.$$txt$,
+  NULL,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Predict the exact output of the snippet. Type your answer in the output box. Use a new line for each System.out.println (press Enter / return between lines). If the loop never stops, answer: infinite loop.$txt$)
   ),
@@ -1310,7 +1453,7 @@ $java$::text),
 ),
 (
   'gym-workout', 'code', 'Gym workout (nested for)',
-  $txt$You are in the ITU fitness room. Today's plan: 4 sets, 12 reps each. Use a nested for to log every rep — outer loop = set (1…4), inner loop = rep (1…12):
+  $txt$You are in the ITU fitness room. Today's plan: 4 sets, 12 reps each. Use a **nested for** to log every rep — outer loop = set (1…4), inner loop = rep (1…12):
 
 Set 1 Rep 1
 …
@@ -1318,9 +1461,15 @@ Set 4 Rep 12$txt$,
   $txt$for (int set = 1; set <= 4; set++) { for (int rep = 1; rep <= 12; rep++) { ... } }$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Sometimes you need two counters. A nested for reads like the shape of the data:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$for (int set = 1; set <= 2; set = set + 1) {
-    for (int rep = 1; rep <= 3; rep = rep + 1) {
-        System.out.println("Set " + set + " Rep " + rep);
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
+    public static void main(String[] args) {
+        for (int y = 0; y < 3; y++) {
+            for (int x = 0; x < 3; x++) {
+                System.out.print("(" + x + ", " + y + ") ");
+            }
+            System.out.println();
+        }
+
     }
 }$txt$)
   ),
@@ -1356,12 +1505,12 @@ $java$::text),
   'analog-reusable-cup-stamps', 'code', 'Help Analog go sustainable',
   $txt$Cafe Analog wants fewer disposable cups. Every time you buy a drink and bring your own cup, you get a stamp on your card — the 10th stamp is a free cup, and you start a fresh card right after.
 
-Simulate 24 drinks bought (one per loop iteration) with a for or while loop: stamps starts at 0, and each drink adds one stamp.
-- While stamps != 10: print "Brought my own cup, got a stamp! ({stamps}/10)".
-- The moment stamps == 10: print "Free cup! Here's a new stamp card." instead, then reset stamps back to 0.$txt$,
+Simulate 24 drinks bought (one per loop iteration) with a **for** or **while loop**: stamps **starts at 0**, and each drink adds one stamp.
+- While **stamps != 10**: print "Brought my own cup, got a stamp! ({stamps}/10)".
+- The moment **stamps == 10**: print "Free cup! Here's a new stamp card." instead, then reset stamps back to 0.$txt$,
   $txt$if (stamps != 10) { ... } else { System.out.println("Free cup! Here's a new stamp card."); stamps = 0; }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Nothing new here — just a loop combined with if/else, the same way you did for the canteen and fitness room. The trick is that the stamp counter resets itself once it is spent.$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Nothing new here — just a loop combined with if/else, the same way you did for the canteen and fitness room.$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
@@ -1404,21 +1553,43 @@ $java$::text),
 ),
 (
   'beerpong-at-scrollbar', 'code', 'Beer pong at Scrollbar',
-  $txt$Friday at Scrollbar (ITU's Friday bar) means one thing: beer pong. Set up the rack, then simulate a full round.
+  $txt$Friday at Scrollbar means one thing: beer pong! Let's set up the rack and simulate a full game.
 
-1) Print the triangle rack with a nested for loop — one line per row: "Row 1: O", "Row 2: O O", "Row 3: O O O", "Row 4: O O O O" (10 cups total).
-2) Simulate throws with a while loop. cupsLeft starts at 10. Each throw, roll with Random rng = new Random(): int roll = rng.nextInt(4) gives 0, 1, 2 or 3, each equally likely — treat roll == 0 as a hit (25% chance). On a hit, remove a cup and print "Throw {n}: SPLASH! {cupsLeft} cups left."; otherwise print "Throw {n}: MISS! {cupsLeft} cups left." Keep throwing until cupsLeft is 0, then print "GAME OVER — the rack is empty. Chug up!"$txt$,
-  $txt$Random rng = new Random(); int roll = rng.nextInt(4); if (roll == 0) { ... hit ... } else { ... miss ... }$txt$,
+**Part 1**: Use a nested **for** loop to print a 4-row triangle cup rack.
+(Hint: think about how the row number relates to the number of cups in that row.)
+
+Expected output for this part: Row 1: O Row 2: O O Row 3: O O O Row 4: O O O O
+
+**Part 2**: Simulate throws using a **while** loop until all 10 cups are cleared. You will need to keep track of the remaining cups and the total number of throws.
+
+Game rules:
+
+* For each throw, use **java.util.Random** to generate a random number between 0 and 1 (inclusive).
+* Treat a roll of 0 as a hit (a 50% chance). A hit removes one cup.
+* A roll of 1 is a miss.
+* Print the result of every throw. When the rack is empty, print a final game over message.
+
+Expected output format for Part 2:
+Throw 1: MISS! 10 cups left. Throw 2: SPLASH! 9 cups left. Throw 3: MISS! 9 cups left. ... Throw 20: SPLASH! 0 cups left. GAME OVER - the rack is empty. Chug up!$txt$,
+  $txt$Random rng = new Random(); int roll = rng.nextInt(2); if (roll == 0) { ... hit ... } else { ... miss ... }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$One new tool: java.util.Random gives pseudo-random numbers. Calling nextInt(4) produces 0, 1, 2, or 3; use one of those values to decide whether the throw is a hit or miss.$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$Think of Java's utilities as a built-in toolbox. You can use these tools by importing them at the top of your program.
+
+java.util.Random is one of them, which generates pseudo-random numbers.
+
+For example, calling nextInt(2) produces 0 or 1 (each 50% likely).$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$import java.util.Random;
 
-Random rng = new Random();
-int roll = rng.nextInt(4);     // 0, 1, 2, or 3 -- each 25% likely
-if (roll == 0) {
-    System.out.println("Hit!");
-}$txt$),
-    jsonb_build_object('kind', 'text', 'text', $txt$Everything else — the while loop, if/else, and the cupsLeft counter — is exactly what you already know.$txt$)
+public class Main {
+    public static void main(String[] args) {
+        Random rng = new Random();
+        int roll = rng.nextInt(2);
+
+        if (roll == 0) {
+            System.out.println("Hit!");
+        }
+    }
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$import java.util.Random;
@@ -1429,7 +1600,7 @@ public class Main {
 
         // 2) Simulate throws until the rack (10 cups) is empty.
         //    Random rng = new Random();
-        //    Each throw: int roll = rng.nextInt(4); roll == 0 -> hit (25% chance)
+        //    Each throw: int roll = rng.nextInt(2); roll == 0 -> hit (50% chance)
     }
 }
 $java$
@@ -1452,7 +1623,7 @@ public class Main {
 
         while (cupsLeft > 0) {
             throwNumber = throwNumber + 1;
-            int roll = rng.nextInt(4);
+            int roll = rng.nextInt(2);
             if (roll == 0) {
                 cupsLeft = cupsLeft - 1;
                 System.out.println("Throw " + throwNumber + ": SPLASH! " + cupsLeft + " cups left.");
@@ -1461,7 +1632,7 @@ public class Main {
             }
         }
 
-        System.out.println("GAME OVER — the rack is empty. Chug up!");
+        System.out.println("GAME OVER - the rack is empty. Chug up!");
     }
 }
 $java$::text),
@@ -1469,10 +1640,10 @@ $java$::text),
     {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(", "message": "Use a for loop to print the triangle rack."},
     {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(", "message": "Use a while loop to simulate the throws."},
     {"target": "code", "op": "contains", "value": "Random", "message": "Create a Random rng = new Random(); to roll for each throw."},
-    {"target": "code", "op": "contains", "value": "nextInt", "message": "Use rng.nextInt(4) to roll 0-3 for each throw."},
+    {"target": "code", "op": "contains", "value": "nextInt", "message": "Use rng.nextInt(2) to roll 0-1 for each throw."},
     {"target": "stdout", "op": "containsLine", "value": "Row 4: O O O O", "message": "Print the full 4-row triangle rack, ending with \"Row 4: O O O O\"."},
     {"target": "stdout", "op": "contains", "value": "SPLASH!", "message": "Print \"Throw {n}: SPLASH! {cupsLeft} cups left.\" on a hit."},
-    {"target": "stdout", "op": "containsLine", "value": "GAME OVER — the rack is empty. Chug up!", "message": "Print \"GAME OVER — the rack is empty. Chug up!\" once cupsLeft reaches 0."}
+    {"target": "stdout", "op": "containsLine", "value": "GAME OVER - the rack is empty. Chug up!", "message": "Print \"GAME OVER - the rack is empty. Chug up!\" once cupsLeft reaches 0."}
   ]}$j$::jsonb
 ),
 
@@ -2126,35 +2297,36 @@ WITH ordered(slug, ord) AS (VALUES
   ('your-semester-in-ects', 9),
   ('at-itu-welcome', 10),
   ('scrollbar-friday', 11),
-  ('is-friday-boolean', 12),
-  ('canteen-lunch', 13),
-  ('fitness-access', 14),
-  ('student-day-place', 15),
-  ('while-five-lines', 16),
-  ('while-loop-quiz-1', 17),
-  ('while-loop-quiz-2', 18),
-  ('while-loop-quiz-3', 19),
-  ('while-loop-quiz-4', 20),
-  ('while-loop-quiz-5', 21),
-  ('while-loop-quiz-6', 22),
-  ('analog-tickets-while', 23),
-  ('analog-tickets-for', 24),
-  ('for-loop-quiz-1', 25),
-  ('for-loop-quiz-2', 26),
-  ('for-loop-quiz-3', 27),
-  ('for-loop-quiz-4', 28),
-  ('for-loop-quiz-5', 29),
-  ('for-loop-quiz-6', 30),
-  ('gym-workout', 31),
-  ('analog-reusable-cup-stamps', 32),
-  ('beerpong-at-scrollbar', 33),
-  ('person-class', 34),
-  ('flight-ticket-class', 35),
-  ('container-class', 36),
-  ('build-a-tree', 37),
-  ('grandpas-time-machine', 38),
-  ('grandmas-blackmarket-kitchen', 39),
-  ('seat-selector', 40)
+  ('canteen-lunch', 12),
+  ('canteen-lunch-discount', 13),
+  ('fitness-access-boolean', 14),
+  ('fitness-access-free-trial', 15),
+  ('student-day-place', 16),
+  ('while-sun-out', 17),
+  ('while-loop-quiz-1', 18),
+  ('while-loop-quiz-2', 19),
+  ('while-loop-quiz-3', 20),
+  ('while-loop-quiz-4', 21),
+  ('while-loop-quiz-5', 22),
+  ('while-loop-quiz-6', 23),
+  ('analog-tickets-while', 24),
+  ('analog-tickets-for', 25),
+  ('for-loop-quiz-1', 26),
+  ('for-loop-quiz-2', 27),
+  ('for-loop-quiz-3', 28),
+  ('for-loop-quiz-4', 29),
+  ('for-loop-quiz-5', 30),
+  ('for-loop-quiz-6', 31),
+  ('gym-workout', 32),
+  ('analog-reusable-cup-stamps', 33),
+  ('beerpong-at-scrollbar', 34),
+  ('person-class', 35),
+  ('flight-ticket-class', 36),
+  ('container-class', 37),
+  ('build-a-tree', 38),
+  ('grandpas-time-machine', 39),
+  ('grandmas-blackmarket-kitchen', 40),
+  ('seat-selector', 41)
 ),
 resolved AS (
   SELECT t.id AS assignment_id, o.ord
@@ -2164,9 +2336,9 @@ resolved AS (
 INSERT INTO assignment_set_assignment (assignment_set_id, assignment_id, order_index)
 SELECT 'day1-2026', assignment_id, ord         FROM resolved WHERE ord BETWEEN 0 AND 9
 UNION ALL
-SELECT 'day2-2026', assignment_id, ord - 10    FROM resolved WHERE ord BETWEEN 10 AND 33
+SELECT 'day2-2026', assignment_id, ord - 10    FROM resolved WHERE ord BETWEEN 10 AND 34
 UNION ALL
-SELECT 'day3-2026', assignment_id, ord - 34    FROM resolved WHERE ord BETWEEN 34 AND 40
+SELECT 'day3-2026', assignment_id, ord - 35    FROM resolved WHERE ord BETWEEN 35 AND 41
 UNION ALL
 SELECT 'all-assignments-for-solo-2026', assignment_id, ord FROM resolved;
 
@@ -2174,8 +2346,8 @@ DO $check$
 DECLARE n int;
 BEGIN
   SELECT count(*) INTO n FROM assignment_set_assignment WHERE assignment_set_id = 'all-assignments-for-solo-2026';
-  IF n <> 41 THEN
-    RAISE EXCEPTION 'seed error: expected 41 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
+  IF n <> 42 THEN
+    RAISE EXCEPTION 'seed error: expected 42 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
   END IF;
 END
 $check$;
