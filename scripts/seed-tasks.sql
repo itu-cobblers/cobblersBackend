@@ -1650,7 +1650,20 @@ $java$::text),
 -- ─────────────────────────── DAY 3 — classes & objects / projects ───────────────────────────
 (
   'person-class', 'code', 'Person class',
-  $txt$Warm-up: make a Person class with fields name and age, a constructor Person(String n, int a), display() that prints "Niek (25 years old)", and birthday() that adds a year.$txt$,
+  $txt$Create a **Person** class that meets the following requirements:
+Fields:
+
+* **name** (String)
+* **age** (int)
+
+Constructor:
+
+* **Person(String n, int a)**: Initializes the **name** and **age** fields.
+
+Methods:
+
+* **display()**: Prints the person's information in the exact format: **"[name] ([age] years old)"**. (Example output: **"Niek (25 years old)"**)
+* **birthday()**: Increases the person's age by 1.$txt$,
   $txt$display(): System.out.println(name + " (" + age + " years old)");$txt$,
   NULL,
   jsonb_build_object(
@@ -1713,7 +1726,21 @@ $java$)
 ),
 (
   'flight-ticket-class', 'code', 'FlightTicket class',
-  $txt$Make a FlightTicket class: fields from, to, price; constructor (f, t, p); show() prints "CPH --> JFK (7500 DKK)"; discount() takes 500 DKK off. Make sure discount() can't be abused (price must never go negative).$txt$,
+  $txt$Create a **FlightTicket** class that meets the following requirements:
+Fields:
+
+* **from** (String)
+* **to** (String)
+* **price** (int or double)
+
+Constructor:
+
+* **FlightTicket(String f, String t, int p)**: Initializes the **from**, **to**, and **price** fields.
+
+Methods:
+
+* **show()**: Prints the ticket information in the exact format: **"[from] --> [to] ([price] DKK)"**. (Example output: **"CPH --> JFK (7500 DKK)"**)
+* **discount()**: Reduces the ticket price by 500. You must add logic to ensure this method cannot be abused (i.e., the price must never drop below 0).$txt$,
   $txt$In discount(), only subtract if the price stays >= 0.$txt$,
   NULL,
   jsonb_build_object(
@@ -1785,10 +1812,22 @@ $java$)
 ),
 (
   'container-class', 'code', 'Container class',
-  $txt$Make a Container class: fields id, amount, max; constructor Container(String i, int max) (amount starts at 0); show() prints "Container: AX35 (23/30)"; addCargo(int a) adds boxes. Make sure the container can't be over-filled.
+  $txt$Create a **Container** class that meets the following requirements:
+Fields:
 
-Be strict about what "can't be over-filled" means: if an addCargo(a) would push amount past max, reject that addition in full — amount stays exactly what it was before the call. Don't partially fill up to max instead (e.g. addCargo(40) on a 23/30 container must leave it at 23/30, not jump to 30/30).$txt$,
-  $txt$In addCargo, only add if amount + a <= max (mirror the Account guard pattern).$txt$,
+* **id** (String)
+* **amount** (int)
+* **max** (int)
+
+Constructor:
+
+* **Container(String i, int max)**: Initializes the **id** and **max** fields. The **amount** field must always start at **0**.
+
+Methods:
+
+* **show()**: Prints the container's information in the exact format: **"Container: [id] ([amount]/[max])"**. (Example output: **"Container: AX35 (23/30)"**)
+* **addCargo(int a)**: Adds the specified number of boxes (**a**) to the container's **amount**.
+* Capacity Constraint: The container cannot be over-filled. If adding a would cause the amount to exceed max, the addition must be rejected entirely.$txt$,
   NULL,
   jsonb_build_object(
     'starterFiles', jsonb_build_array(
