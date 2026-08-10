@@ -81,6 +81,68 @@ public sealed class SubmissionServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SubmitAsync_FailingCodeWithMessage_ReturnsAndPersistsFeedback()
+    {
+        // Given
+        int assignmentId;
+        await using (var setup = _fixture.CreateContext())
+        {
+            setup.Student.Add(TestData.MakeStudent("student-1"));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"goodbye","message":"Print goodbye, not hi."}""";
+            setup.Assignment.Add(assignment);
+            await setup.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "hi\n", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = TestServices.Submissions(ctx, executor);
+        var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
+        var result = await service.SubmitAsync(assignmentId, request);
+
+        // Then
+        Assert.False(result!.Passed);
+        Assert.Equal(new[] { "Print goodbye, not hi." }, result.Feedback);
+        await using var read = _fixture.CreateContext();
+        var submission = await read.Submission.SingleAsync();
+        Assert.NotNull(submission.FeedbackJson);
+        Assert.Contains("Print goodbye, not hi.", submission.FeedbackJson);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_PassingCode_FeedbackStaysNull()
+    {
+        // Given
+        int assignmentId;
+        await using (var setup = _fixture.CreateContext())
+        {
+            setup.Student.Add(TestData.MakeStudent("student-1"));
+            var assignment = TestData.MakeAssignment(AssignmentKind.Code);
+            assignment.GradingJson = """{"target":"stdout","op":"containsLine","value":"hi","message":"should never surface"}""";
+            setup.Assignment.Add(assignment);
+            await setup.SaveChangesAsync();
+            assignmentId = assignment.Id;
+        }
+
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.SUCCESS, "hi\n", ""));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var service = TestServices.Submissions(ctx, executor);
+        var request = new SubmissionRequestDto("student-1", null, JsonSerializer.SerializeToElement("ignored"));
+        var result = await service.SubmitAsync(assignmentId, request);
+
+        // Then
+        Assert.True(result!.Passed);
+        Assert.Null(result.Feedback);
+        await using var read = _fixture.CreateContext();
+        Assert.Null((await read.Submission.SingleAsync()).FeedbackJson);
+    }
+
+    [Fact]
     public async Task SubmitAsync_CodeKind_GradingNull_PassedPersistsNull()
     {
         // Given

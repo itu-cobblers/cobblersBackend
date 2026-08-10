@@ -115,7 +115,7 @@ public sealed class SessionSubmissionsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetSessionSubmissionsAsync_CarriesPassedIncludingNull()
+    public async Task GetSessionSubmissionsAsync_DerivesStatusFromPassedIncludingNull()
     {
         // Given — middle passed, oldest failed, newest was never graded.
         var seed = await RoomSeeder.WithAttemptsAsync(_fixture);
@@ -124,11 +124,12 @@ public sealed class SessionSubmissionsTests : IAsyncLifetime
         await using var ctx = _fixture.CreateContext();
         var rows = await TestServices.Submissions(ctx, hub: _hub.Object).GetSessionSubmissionsAsync(seed.Code);
 
-        // Then — `passed: null` survives as null; the frontend must not read it as failed.
+        // Then — an ungraded (null) attempt reads as "passed", same as the frontend's
+        // existing `passed !== false` convention for a result with no execution error.
         Assert.NotNull(rows);
-        Assert.True(rows.Single(r => r.SubId == seed.Middle).Passed);
-        Assert.False(rows.Single(r => r.SubId == seed.Oldest).Passed);
-        Assert.Null(rows.Single(r => r.SubId == seed.Newest).Passed);
+        Assert.Equal("passed", rows.Single(r => r.SubId == seed.Middle).Status);
+        Assert.Equal("tried", rows.Single(r => r.SubId == seed.Oldest).Status);
+        Assert.Equal("passed", rows.Single(r => r.SubId == seed.Newest).Status);
     }
 
     [Fact]
@@ -264,7 +265,7 @@ public sealed class SessionSubmissionsTests : IAsyncLifetime
         Assert.Equal(response!.SubId, row.SubId);
         Assert.Equal("student-maria", row.StudentId);
         Assert.Equal(seed.AssignmentId, row.AssignmentId);
-        Assert.True(row.Passed);
+        Assert.Equal("passed", row.Status);
         Assert.NotEqual(default, row.SubmittedAt);
     }
 
@@ -312,13 +313,14 @@ public sealed class SessionSubmissionsTests : IAsyncLifetime
 
         // Then — only `project` is excluded, not failures.
         var row = Assert.IsType<SessionSubmissionDto>(_hub.Single().Args[0]);
-        Assert.False(row.Passed);
+        Assert.Equal("tried", row.Status);
     }
 
     [Fact]
-    public async Task SubmitAsync_UngradedCodeKind_StillBroadcastsWithNullPassed()
+    public async Task SubmitAsync_UngradedCodeKindThatRanFine_StillBroadcastsAsPassed()
     {
-        // Given — a code assignment with no grading rules: passed stays null.
+        // Given — a code assignment with no grading rules: passed stays null, but the
+        // default fake executor reports a clean run, so there's no error to surface.
         var seed = await SeedSubmittableRoomAsync(AssignmentKind.Code);
 
         // When
@@ -327,10 +329,30 @@ public sealed class SessionSubmissionsTests : IAsyncLifetime
                                                JsonSerializer.SerializeToElement("class Main {}"));
         await TestServices.Submissions(ctx, hub: _hub.Object).SubmitAsync(seed.AssignmentId, request);
 
-        // Then — `passed: null` reaches the frontend as null, which derives to neither
-        // passed nor failed (same rule as the hydrated list).
+        // Then — `passed: null` derives to "passed" (same rule as the hydrated list),
+        // matching how the frontend already treated an unresolved null before this DTO existed.
         var row = Assert.IsType<SessionSubmissionDto>(_hub.Single().Args[0]);
-        Assert.Null(row.Passed);
+        Assert.Equal("passed", row.Status);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_UngradedCodeKindThatFailsToCompile_BroadcastsAsError()
+    {
+        // Given — a code assignment with no grading rules, but the code doesn't compile.
+        // Before this DTO carried a status, `passed: null` here would have misread as
+        // "passed" — this is the case the `status` field exists to fix.
+        var seed = await SeedSubmittableRoomAsync(AssignmentKind.Code);
+        var executor = new FakeExecutorService(new ExecuteResponseDto(ExecuteStatus.COMPILE_ERROR, "", "error: ';' expected"));
+
+        // When
+        await using var ctx = _fixture.CreateContext();
+        var request = new SubmissionRequestDto("student-maria", seed.Code,
+                                               JsonSerializer.SerializeToElement("class Main {"));
+        await TestServices.Submissions(ctx, executor, _hub.Object).SubmitAsync(seed.AssignmentId, request);
+
+        // Then
+        var row = Assert.IsType<SessionSubmissionDto>(_hub.Single().Args[0]);
+        Assert.Equal("error", row.Status);
     }
 
     [Fact]

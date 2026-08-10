@@ -52,7 +52,7 @@ public class SubmissionService : ISubmissionService
             roomCode = session.Code;
         }
 
-        var (result, passed) = await RunAndGradeAsync(assignment, request.Content);
+        var (result, passed, feedback) = await RunAndGradeAsync(assignment, request.Content);
 
         var submission = new Submission
         {
@@ -62,6 +62,7 @@ public class SubmissionService : ISubmissionService
             SessionId = sessionId,
             ContentJson = request.Content.GetRawText(),
             ResultJson = result is null ? null : JsonSerializer.Serialize(result),
+            FeedbackJson = feedback is null ? null : JsonSerializer.Serialize(feedback),
             Passed = passed,
             // SubmittedAt: DB-owned left unset
         };
@@ -71,7 +72,7 @@ public class SubmissionService : ISubmissionService
         await BroadcastSubmissionRecordedAsync(assignment, submission, roomCode);
 
         return new SubmissionResponseDto(
-            submission.SubId, submission.Passed, result, submission.SubmittedAt);
+            submission.SubId, submission.Passed, result, feedback, submission.SubmittedAt);
     }
 
     /// <summary>
@@ -90,7 +91,7 @@ public class SubmissionService : ISubmissionService
 
         var row = new SessionSubmissionDto(
             submission.SubId, submission.StudentId, submission.AssignmentId,
-            submission.Passed, submission.SubmittedAt);
+            DeriveStatus(submission.Passed, submission.ResultJson), submission.SubmittedAt);
 
         try
         {
@@ -107,31 +108,55 @@ public class SubmissionService : ISubmissionService
         }
     }
 
-    private async Task<(ExecuteResponseDto? Result, bool? Passed)> RunAndGradeAsync(Assignment assignment, JsonElement content)
+    /// <summary>
+    /// Folds a submission's grading verdict and persisted execution result into the one
+    /// string the history-list DTOs carry. A compile/runtime error always wins — the code
+    /// never ran correctly regardless of what `Passed` says — otherwise this mirrors the
+    /// `passed !== false` convention the frontend already used for null (ungraded: predict
+    /// has no result to check, and an unchecked Code submission that ran fine reads as
+    /// "passed" rather than an indeterminate third thing).
+    /// </summary>
+    private static string DeriveStatus(bool? passed, string? resultJson)
     {
-        return assignment.Kind switch
+        if (resultJson is not null)
         {
-            AssignmentKind.Code => await GradeCodeAsync(assignment, content),
-            AssignmentKind.Predict => (null, GradePredict(assignment, content)),
-            // Project: no automated grader yet (CONTRACT.md / SCHEMA.md).
-            _ => (null, null),
-        };
+            var result = JsonSerializer.Deserialize<ExecuteResponseDto>(resultJson, ResultJsonOptions);
+            if (result?.Status is ExecuteStatus.COMPILE_ERROR or ExecuteStatus.RUNTIME_ERROR)
+                return "error";
+        }
+        return passed != false ? "passed" : "tried";
     }
 
-    private async Task<(ExecuteResponseDto? Result, bool? Passed)> GradeCodeAsync(Assignment assignment, JsonElement content)
+    private async Task<(ExecuteResponseDto? Result, bool? Passed, IReadOnlyList<string>? Feedback)> RunAndGradeAsync(Assignment assignment, JsonElement content)
+    {
+        switch (assignment.Kind)
+        {
+            case AssignmentKind.Code:
+                return await GradeCodeAsync(assignment, content);
+            case AssignmentKind.Predict:
+                var (predictPassed, predictFeedback) = GradePredict(assignment, content);
+                return (null, predictPassed, predictFeedback);
+            default:
+                // Project: no automated grader yet (CONTRACT.md / SCHEMA.md).
+                return (null, null, null);
+        }
+    }
+
+    private async Task<(ExecuteResponseDto? Result, bool? Passed, IReadOnlyList<string>? Feedback)> GradeCodeAsync(Assignment assignment, JsonElement content)
     {
         var (files, codeForGrading) = ParseCodeContent(content);
         var executed = await _executor.ExecuteAsync(files, "Main");
 
-        bool? passed = assignment.GradingJson is null
-            ? null
-            : _grader.Grade(assignment.GradingJson, new CheckResult(
-                codeForGrading,
-                executed.Stdout,
-                executed.Stderr,
-                executed.Status == ExecuteStatus.SUCCESS ? 0 : 1)).Passed;
+        if (assignment.GradingJson is null)
+            return (executed, null, null);
 
-        return (executed, passed);
+        var verdict = _grader.Grade(assignment.GradingJson, new CheckResult(
+            codeForGrading,
+            executed.Stdout,
+            executed.Stderr,
+            executed.Status == ExecuteStatus.SUCCESS ? 0 : 1));
+
+        return (executed, verdict.Passed, verdict.Feedback);
     }
 
     private static (IReadOnlyList<FileDto> Files, string CodeForGrading) ParseCodeContent(JsonElement content)
@@ -169,30 +194,38 @@ public class SubmissionService : ISubmissionService
     /// Grade a predict answer from GradingJson `{ "predict": { compare, expectedOutput, accept? } }`.
     /// Nothing is executed — result stays null.
     /// </summary>
-    private bool? GradePredict(Assignment assignment, JsonElement content)
+    private (bool? Passed, IReadOnlyList<string>? Feedback) GradePredict(Assignment assignment, JsonElement content)
     {
-        if (assignment.GradingJson is null) return null;
+        if (assignment.GradingJson is null) return (null, null);
 
         var answer = content.ValueKind == JsonValueKind.String
             ? content.GetString() ?? ""
             : content.GetRawText();
 
-        return _grader.Grade(assignment.GradingJson, new CheckResult(
+        var verdict = _grader.Grade(assignment.GradingJson, new CheckResult(
             answer,
             Stdout: "",
             Stderr: "",
-            ExitCode: 0)).Passed;
+            ExitCode: 0));
+        return (verdict.Passed, verdict.Feedback);
     }
 
-    public async Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId) =>
-        await _db.Submission.AsNoTracking()
+    public async Task<IReadOnlyList<SubmissionHistoryDto>> GetHistoryAsync(string studentId)
+    {
+        var rows = await _db.Submission.AsNoTracking()
             .Where(s => s.StudentId == studentId)
             .OrderByDescending(s => s.SubmittedAt)          // newest-first, per CONTRACT
-            .Select(s => new SubmissionHistoryDto(
+            .Select(s => new {
                 s.SubId, s.AssignmentId,
-                s.Session != null ? s.Session.Code : null,  // null for solo
-                s.Passed, s.SubmittedAt))
-                .ToListAsync();
+                SessionCode = s.Session != null ? s.Session.Code : null,  // null for solo
+                s.Passed, s.ResultJson, s.SubmittedAt })
+            .ToListAsync();
+
+        return rows.Select(r => new SubmissionHistoryDto(
+                r.SubId, r.AssignmentId, r.SessionCode,
+                DeriveStatus(r.Passed, r.ResultJson), r.SubmittedAt))
+            .ToList();
+    }
 
 
     public async Task<SubmissionDetailDto?> GetSubmissionAsync(Guid subId)
@@ -202,7 +235,7 @@ public class SubmissionService : ISubmissionService
             .Select(s => new {
                 s.SubId, s.StudentId, s.AssignmentId,
                 SessionCode = s.Session != null ? s.Session.Code : null,
-                s.ContentJson, s.ResultJson, s.Passed, s.SubmittedAt})
+                s.ContentJson, s.ResultJson, s.FeedbackJson, s.Passed, s.SubmittedAt})
             .FirstOrDefaultAsync();
         if (row is null) return null;
 
@@ -210,6 +243,7 @@ public class SubmissionService : ISubmissionService
             row.SubId, row.StudentId, row.AssignmentId, row.SessionCode,
             JsonSerializer.Deserialize<JsonElement>(row.ContentJson),
             row.ResultJson is null ? null : JsonSerializer.Deserialize<ExecuteResponseDto>(row.ResultJson, ResultJsonOptions),
+            row.FeedbackJson is null ? null : JsonSerializer.Deserialize<IReadOnlyList<string>>(row.FeedbackJson, ResultJsonOptions),
             row.Passed, row.SubmittedAt);
     }
 
@@ -222,11 +256,15 @@ public class SubmissionService : ISubmissionService
         if (session is null) return null;
         
 
-        return await _db.Submission.AsNoTracking()
+        var rows = await _db.Submission.AsNoTracking()
             .Where(s => s.SessionId == session.SessionId)
             .OrderByDescending(s => s.SubmittedAt)
-            .Select(s => new SessionSubmissionDto(
-                s.SubId, s.StudentId, s.AssignmentId, s.Passed, s.SubmittedAt))
+            .Select(s => new { s.SubId, s.StudentId, s.AssignmentId, s.Passed, s.ResultJson, s.SubmittedAt })
             .ToListAsync();
+
+        return rows.Select(r => new SessionSubmissionDto(
+                r.SubId, r.StudentId, r.AssignmentId,
+                DeriveStatus(r.Passed, r.ResultJson), r.SubmittedAt))
+            .ToList();
     }
 }

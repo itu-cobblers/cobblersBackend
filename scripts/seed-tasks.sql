@@ -20,7 +20,7 @@
 --   * Predict grading_json: { "predict": { "compare", "expectedOutput", "accept"? } }
 --     — graded by AssignmentGrader on submit (no Piston run).
 --
--- Counts: Day 1 = 9, Day 2 = 24, Day 3 = 7, total = 40.
+-- Counts: Day 1 = 10, Day 2 = 25, Day 3 = 7, total = 42.
 -- ============================================================================
 
 BEGIN;
@@ -48,7 +48,7 @@ INSERT INTO assignment (slug, kind, title, description, hint, lesson_json, conte
 -- ─────────────────────────── DAY 1 — basics ───────────────────────────
 (
   'hello-itu', 'code', 'Hello ITU',
-  $txt$Now it is your turn: print a sentence to say hello to your new university. Print exactly: Hello ITU!$txt$,
+  $txt$Now it is your turn: **print a sentence** to say hello to your new university. For example: Hello ITU!$txt$,
   $txt$System.out.println("Hello ITU!");$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Printing a message is the most basic thing every programming language can do. In Java it takes a class, a main method, and one print statement:$txt$),
@@ -72,15 +72,22 @@ $java$
     }
 }
 $java$::text),
-  $j${"target": "stdout", "op": "containsLine", "value": "Hello ITU!"}$j$::jsonb
+  $j${"op": "nonEmptyStdout", "message": "Print something to say hello — any message works, just make sure it prints."}$j$::jsonb
 ),
 (
-  'print-three-values', 'code', 'Print three values',
-  $txt$Print three things, each on its own line:
-1. A greeting with your name, like "Hello, my name is Aiting!"
-2. The year you were born — a whole number
-3. How many years you have lived in Copenhagen — with a decimal point (1.0 for exactly one year, 3.5 for three and a half)$txt$,
-  $txt$Three println statements. 1996 is an int, 3.5 is a double, "Hello!" is a String.$txt$,
+  'print-three-values', 'code', 'Self introduction',
+  $txt$Your new friend is interested to know you better. Here are 3 questions from them, in order:
+1. What's your name? — print it as **text**
+2. Where do you live, in Danish zip code? — print it as a **whole number**
+3. How long have you been here, in decimal years? — print it as a **decimal number** (1.0 for exactly one year, 3.5 for three and a half)
+
+**Print your three answers** in that exact order, each on its own line. Example:
+IT University of Copenhagen
+2300
+26.9
+
+Note: if you don't feel like answering with your actual info, that's fine — just print any 1. text, 2. whole number, 3. number with a decimal point, in that order.$txt$,
+  $txt$Three println statements, in order: a String, then an int, then a double.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$println can print more than text — whole numbers and decimal numbers work too. Notice that numbers need no quotes:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$System.out.println("Hello World!");
@@ -90,25 +97,38 @@ System.out.println(3.14);$txt$)
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        // 1) a greeting  2) your birth year  3) years in Copenhagen (with a decimal)
+        // 1) your name (text)  2) Danish zip code (whole number)  3) years here (with a decimal)
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
-        System.out.println("Hello, my name is Aiting!");
-        System.out.println(1996);
-        System.out.println(1.95);
+        System.out.println("IT University of Copenhagen");
+        System.out.println(2300);
+        System.out.println(26.9);
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+$"}, {"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+\\.\\d+$"}, {"target": "stdout", "op": "regex", "pattern": "[A-Za-z]{2,}"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)[^\\n]*[A-Za-z]{2,}[^\\n]*(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+(?=\\n|$)[\\s\\S]*?(?:^|\\n)-?\\d+\\.\\d+(?=\\n|$)", "message": "Print three lines in order — text (your name), then a whole number (zip code), then a decimal number (years here) — each on its own line."},
+    {"target": "code", "op": "regex", "pattern": "println\\s*\\(\\s*\"[^\"]*[A-Za-z][^\"]*\"\\s*\\)[\\s\\S]*?println\\s*\\(\\s*-?\\d+\\s*\\)[\\s\\S]*?println\\s*\\(\\s*-?\\d+\\.\\d+\\s*\\)", "message": "The zip code and years-here values must be printed as actual numbers, not text in quotes — println(2300), not println(\"2300\")."}
+  ]}$j$::jsonb
 ),
 (
-  'use-variables', 'code', 'Use variables',
-  $txt$Print the same three values as before, but this time store each one in a variable first, then print the variable. Pick the right type: String for the greeting, int for the year, double for the years in Copenhagen.$txt$,
-  $txt$String greeting = "Hello, my name is …!"; then System.out.println(greeting);$txt$,
+  'use-variables', 'code', 'Self introduction (variables)',
+  $txt$Another new friend is asking you the same 3 questions:
+1. What's your name? — as **text**
+2. Where do you live, in Danish zip code? — as a **whole number**
+3. How long have you been here, in decimal years? — as a **decimal number** (1.0 for exactly one year, 3.5 for three and a half)
+
+This time, **store each answer in a variable** first, so you can reuse it easily instead of repeating yourself. **Then print the three variables** in that exact order, each on its own line. Example:
+IT University of Copenhagen
+2300
+26.9
+
+Note: if you don't feel like answering with your actual info, that's fine — just store any 1. text, 2. whole number, 3. number with a decimal point, in that order.$txt$,
+  $txt$String name = "…"; then System.out.println(name);$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$The same values can be stored in variables first. A variable has a type, a name, and a value:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$int x = 42;
@@ -138,24 +158,28 @@ $java$
   ),
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
-        String greeting = "Hello, my name is Aiting!";
-        int birthYear = 1996;
-        double yearsInCopenhagen = 1.95;
+        String name = "IT University of Copenhagen";
+        int zipCode = 2300;
+        double yearsHere = 26.9;
 
-        System.out.println(greeting);
-        System.out.println(birthYear);
-        System.out.println(yearsInCopenhagen);
+        System.out.println(name);
+        System.out.println(zipCode);
+        System.out.println(yearsHere);
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bString\\s+\\w+\\s*="}, {"target": "code", "op": "regex", "pattern": "\\bint\\s+\\w+\\s*="}, {"target": "code", "op": "regex", "pattern": "\\bdouble\\s+\\w+\\s*="}, {"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+$"}, {"target": "stdout", "op": "regex", "pattern": "(?m)^-?\\d+\\.\\d+$"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bString\\s+(\\w+)\\s*=\\s*\"[^\"]*\"[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare a String variable holding your name, then print that same variable back with println — don't print a hardcoded string."},
+    {"target": "code", "op": "regex", "pattern": "\\bint\\s+(\\w+)\\s*=\\s*-?\\d+\\b[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare an int variable for your birth year, then print that same variable back with println — don't print a hardcoded number."},
+    {"target": "code", "op": "regex", "pattern": "\\bdouble\\s+(\\w+)\\s*=\\s*-?\\d+\\.\\d+\\b[\\s\\S]*?\\bprintln\\s*\\(\\s*\\1\\s*\\)", "message": "Declare a double variable (with a decimal point) for years in Copenhagen, then print that same variable back with println — don't print a hardcoded number."}
+  ]}$j$::jsonb
 ),
 (
   'variable-assignment', 'code', 'Variable assignment',
-  $txt$Use one int variable called age (starting at 27) to print "ITU is 27 years old." Then update the SAME variable with age = age + 1 and use it again to print "Next year ITU will be 28 years old."$txt$,
-  $txt$Build each sentence with String +, or use print/println.$txt$,
+  $txt$Use one **int** variable called **age** (starting at 27) to print "ITU has been open for 27", then print the variable value after. Then **update** the **SAME variable**, and print "Next year, ITU will have been open for 28".$txt$,
+  $txt$Build each line with two statements: System.out.print for the text, then System.out.println for the number.$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$A variable can be given a new value later — that is why it is called a variable. The same variable then prints a different value:$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$A variable can be given a new value later — that is why it is called a variable. The same variable then represents a different value:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$int year = 2026;
 System.out.print("The year is ");
 System.out.println(year);   // The year is 2026
@@ -169,7 +193,7 @@ System.out.println(year);   // The year is now 2027$txt$),
     'starter', $java$public class Main {
     public static void main(String[] args) {
         int age = 27;
-        // Print both sentences — update age in between
+        // Print both lines — update age in between
     }
 }
 $java$
@@ -177,22 +201,26 @@ $java$
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
         int age = 27;
-        System.out.println("ITU is " + age + " years old.");
+        System.out.print("ITU has been open for ");
+        System.out.println(age);
 
         age = age + 1;
-        System.out.println("Next year ITU will be " + age + " years old.");
+        System.out.print("ITU will have been open for ");
+        System.out.println(age);
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "contains", "value": "ITU is 27 years old."}, {"target": "stdout", "op": "contains", "value": "Next year ITU will be 28 years old."}, {"target": "code", "op": "regex", "pattern": "\\bage\\s*=\\s*age\\s*\\+\\s*1\\b|\\bage\\s*\\+\\+|\\bage\\s*\\+=\\s*1\\b"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bint\\s+age\\s*=\\s*27\\b[\\s\\S]*?\\b(?:print|println)\\s*\\(\\s*age\\s*\\)", "message": "Print the age variable itself (print or println(age)) — don't print a hardcoded number."},
+    {"target": "code", "op": "regex", "pattern": "\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b", "message": "Reassign the same age variable that started at 27 — age = age + 1, age++, or age += 1 — don't declare a second variable or hardcode 28."},
+    {"target": "code", "op": "regex", "pattern": "\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b[\\s\\S]*?\\b(?:print|println)\\s*\\(\\s*age\\s*\\)", "message": "After reassigning age, print the variable again (print or println(age)) — don't print a hardcoded number."}
+  ]}$j$::jsonb
 ),
 (
   'operators', 'code', 'Operators',
-  $txt$Fun facts from ITU Key figures 2025: about 23.4% of students are international. The Master of Software Design intake is around 130 students in recent years.
-
-Print how many of those ~130 Soft Design masters students are international (approximately): 130 * 23.4 / 100.0 → 30.42
-
-Use * and / in your code.$txt$,
+  $txt$Fun fact: According to ITU's 2025 figures, about 23.4% of students are international. The Master in Software Design program admits around 130 students per year.' ||
+                            '
+Write code to **calculate and print** the estimated number of international students in this program. $txt$,
   $txt$Use a double for 23.4 and divide by 100.0 so you keep the decimals.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Java can calculate with + (plus), - (minus), * (multiply) and / (divide):$txt$),
@@ -225,11 +253,16 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "contains", "value": "30.42"}, {"target": "code", "op": "contains", "value": "*"}, {"target": "code", "op": "contains", "value": "/"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "regex", "pattern": "^30\\.42\\s*$", "message": "Output should be exactly 30.42 — only the number, nothing else before or after it."},
+    {"target": "code", "op": "regex", "pattern": "\\d+\\.\\d+", "message": "Use a decimal (double) literal like 23.4 or 100.0 somewhere in your calculation — don't rely on pure integer math."},
+    {"target": "code", "op": "contains", "value": "*", "message": "Use * (multiply) in your calculation."},
+    {"target": "code", "op": "contains", "value": "/", "message": "Use / (divide) in your calculation."}
+  ]}$j$::jsonb
 ),
 (
   'string-concatenation', 'code', 'String concatenation',
-  $txt$The starter prints "Hello my friend!". Ask the person sitting next to you for their name, then modify the code to greet them personally: Hello my friend, {Name}!$txt$,
+  $txt$Ask the person sitting next to you for their name, then modify the code to greet them personally: Hello my friend, {Name}! **Declare a variable** to hold the name, and print the **concatenated sentence**.$txt$,
   $txt$Add a String name = "…"; and concatenate it after "friend, ".$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$+ between Strings glues them together — this is called concatenation:$txt$),
@@ -245,29 +278,31 @@ System.out.println("The year is " + year);$txt$)
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        String first = "Hello";
-        String second = "my";
-        String third = "friend";
-        System.out.println(first + " " + second + " " + third + "!");
+        String greet = "Hello my friend, ";
+        // Declare a variable to hold the name, and print the concatenated sentence.
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
     public static void main(String[] args) {
-        String first = "Hello";
-        String second = "my";
-        String third = "friend";
+        String greet = "Hello my friend, ";
         String name = "Aiting";
-        System.out.println(first + " " + second + " " + third + ", " + name + "!");
+        System.out.println(greet + name + "!");
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "regex", "pattern": "Hello my friend, .+!"}, {"target": "code", "op": "contains", "value": "+"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "contains", "value": "+", "message": "Use + to concatenate the strings."},
+    {"target": "code", "op": "regex", "pattern": "\\b(?:print|println)\\s*\\(", "message": "Print the concatenated sentence with print/println."}
+  ]}$j$::jsonb
 ),
 (
   'kroner-to-euro', 'code', 'Kroner to euro',
-  $txt$Modify the code so it converts the opposite way: from kroner to euro. For a 20 dkk coffee, print: "20 dkk corresponds to 2.6845637583892616 euro." (All the decimals are fine — that is just how doubles print.)$txt$,
+  $txt$Modify the code so it **converts** the opposite way: **from kroner to euro**. 
+  For a 20 dkk coffee, print: "20 dkk corresponds to {eur} euro." 
+
+ Note: All the decimals are fine, that is just how doubles print.$txt$,
   $txt$Divide instead of multiply: dkk / 7.45$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$During the break you meet a friend at ITU's own café, Cafe Analog. A coffee costs 20 dkk. Your friend says that is cheap — but you want to see it in euro. This code converts the other way, from euro to kroner:$txt$),
@@ -282,9 +317,11 @@ $java$::text),
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        int eur = 100;
-        double dkk = eur * 7.45;
-        System.out.println(eur + " euro corresponds to " + dkk + " kr.");
+        /*
+         * DKK = Danish Crown, abbreviated as kr
+         * EUR = Euros
+         * The exchange rate is 1 eur = 7.45 dkk
+         */
     }
 }
 $java$
@@ -297,88 +334,193 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "stdout", "op": "contains", "value": "20"}, {"target": "stdout", "op": "contains", "value": "corresponds to"}, {"target": "stdout", "op": "contains", "value": "euro"}, {"target": "stdout", "op": "regex", "pattern": "2\\.68"}, {"target": "code", "op": "regex", "pattern": "/\\s*7\\.45"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "stdout", "op": "contains", "value": "20", "message": "Print the dkk amount, 20, in your output line."},
+    {"target": "stdout", "op": "contains", "value": "corresponds to", "message": "Use the phrase \"corresponds to\" in your output line."},
+    {"target": "stdout", "op": "contains", "value": "euro", "message": "Say \"euro\" (not \"eur\") in your output line."},
+    {"target": "stdout", "op": "regex", "pattern": "2\\.68", "message": "Print 20 dkk converted to euro — should come out to approximately 2.68."},
+    {"target": "code", "op": "regex", "pattern": "/\\s*7\\.45", "message": "Divide by 7.45 to convert dkk to euro (don't multiply)."}
+  ]}$j$::jsonb
 ),
 (
-  'functions', 'code', 'Functions',
-  $txt$The no-parameter version always converts 100 kr. Rewrite it so dkk2eur takes one parameter — the amount in dkk — and prints "{dkk} kr corresponds to {eur} euro". Call it twice from main: once with 20 (your Analog coffee) and once with another price, e.g. 15.$txt$,
-  $txt$static void dkk2eur(double dkk) { … }$txt$,
+  'functions', 'code', 'Methods',
+  $txt$Declare a new **method eurToDkk()** that converts 100 euro to dkk and **prints** "{eur} euro corresponds to {dkk} kr". **Call** it from main, after dkkToEur().$txt$,
+  $txt$static void eurToDkk() { double eur = 100; double dkk = eur * 7.45; … }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Functions let us reuse code and give a snippet a clear responsibility. This does exactly the same as the previous exercise, wrapped in a function:$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$A method wraps a snippet of code and gives it a name, so it can be reused just by calling that name:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
-    static void dkk2eur() {
+    static void dkkToEur() {
         double dkk = 100;
         double eur = dkk / 7.45;
         System.out.println(dkk + " kr corresponds to " + eur + " euro");
     }
 
     public static void main(String[] args) {
-        dkk2eur();
+        dkkToEur();
     }
 }$txt$),
-    jsonb_build_object('kind', 'text', 'text', $txt$But this function always converts 100 kr. With a parameter, the same function works for any value:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$static void dkk2eur(double dkk) {
-    double eur = dkk / 7.45;
-    System.out.println(dkk + " kr corresponds to " + eur + " euro");
-}
-
-public static void main(String[] args) {
-    dkk2eur(100);
-    dkk2eur(20);
-}$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Converting the other way (euro to dkk) is another method, with its own body — multiply instead of divide.$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
 
-    // Change this to take one parameter: static void dkk2eur(double dkk)
-    static void dkk2eur() {
+    static void dkkToEur() {
         double dkk = 100;
         double eur = dkk / 7.45;
         System.out.println(dkk + " kr corresponds to " + eur + " euro");
     }
 
+    // Declare eurToDkk() here
+
     public static void main(String[] args) {
-        // Call dkk2eur twice with different prices
-        dkk2eur();
+        dkkToEur();
+        // call eurToDkk() here
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
 
-    static void dkk2eur(double dkk) {
+    static void dkkToEur() {
+        double dkk = 100;
+        double eur = dkk / 7.45;
+        System.out.println(dkk + " kr corresponds to " + eur + " euro");
+    }
+
+    static void eurToDkk() {
+        double eur = 100;
+        double dkk = eur * 7.45;
+        System.out.println(eur + " euro corresponds to " + dkk + " kr");
+    }
+
+    public static void main(String[] args) {
+        dkkToEur();
+        eurToDkk();
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+eurToDkk\\s*\\(\\s*\\)", "message": "Declare static void eurToDkk() with no parameters."},
+    {"target": "code", "op": "regex", "pattern": "eurToDkk\\s*\\(\\s*\\)\\s*;", "message": "Call eurToDkk() from main."},
+    {"target": "code", "op": "regex", "pattern": "\\*\\s*7\\.45", "message": "Multiply by 7.45 to convert eur to dkk (don't divide)."},
+    {"target": "stdout", "op": "contains", "value": "100.0 euro corresponds to 745.0 kr", "message": "Print \"100.0 euro corresponds to 745.0 kr\" from eurToDkk()."}
+  ]}$j$::jsonb
+),
+(
+  'functions-with-parameters', 'code', 'Methods with Parameters',
+  $txt$The previous dkkToEur and eurToDkk always convert a fixed 100. **Rewrite** both so they take a **parameter** instead:
+
+- dkkToEur(double dkk) — prints "{dkk} kr corresponds to {eur} euro"
+- eurToDkk(double eur) — prints "{eur} euro corresponds to {dkk} kr"
+
+**Call** dkkToEur(100) and eurToDkk(100) from main — the output should match the previous exercise, but now the same methods work for any amount.$txt$,
+  $txt$static void dkkToEur(double dkk) { … }   static void eurToDkk(double eur) { … }$txt$,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A parameter goes inside the parentheses in the method's declaration, with a type and a name. Whatever value the caller passes in is bound to that name inside the method body:$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
+    static void dkkToEur(double dkk) {
         double eur = dkk / 7.45;
         System.out.println(dkk + " kr corresponds to " + eur + " euro");
     }
 
     public static void main(String[] args) {
-        dkk2eur(20);
-        dkk2eur(15);
+        dkkToEur(100);
+        dkkToEur(20);
     }
-}
-$java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "static\\s+void\\s+\\w+\\s*\\(\\s*(?:int|double)\\s+\\w+\\s*\\)"}, {"target": "stdout", "op": "regex", "pattern": "corresponds to", "flags": "i"}, {"target": "stdout", "op": "contains", "value": "euro"}]}$j$::jsonb
-),
-(
-  'your-semester-in-ects', 'code', 'Your semester in ECTS',
-  $txt$Write a function printCourse(String name, double ects, int semester) that prints "{name} ({ects} ECTS) is in semester {semester}."
-
-You are starting Software Design. Call it from main for all three semester-1 courses:
-- Introductory Programming (15 ECTS)
-- Discrete Mathematics (7.5 ECTS)
-- Software Engineering (7.5 ECTS)
-all in semester 1.$txt$,
-  $txt$Three parameters: static void printCourse(String name, double ects, int semester)$txt$,
-  jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$At ITU every course is worth ECTS points, and a full semester adds up to 30 ECTS. A function with several parameters can print any course the same way. Software Design semester 1: Introductory Programming (15), Discrete Mathematics (7.5), Software Engineering (7.5).$txt$)
+}$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$Now the same method works for any amount, instead of always converting a fixed 100.$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
 
-    // Declare printCourse here
+    // Declare dkkToEur(double dkk) here
+    // Declare eurToDkk(double eur) here
 
     public static void main(String[] args) {
-        // Print all three Soft Design semester-1 courses
+        // call dkkToEur(100) here
+        // call eurToDkk(100) here
+    }
+
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static void dkkToEur(double dkk) {
+        double eur = dkk / 7.45;
+        System.out.println(dkk + " kr corresponds to " + eur + " euro");
+    }
+
+    static void eurToDkk(double eur) {
+        double dkk = eur * 7.45;
+        System.out.println(eur + " euro corresponds to " + dkk + " kr");
+    }
+
+    public static void main(String[] args) {
+        dkkToEur(100);
+        eurToDkk(100);
+    }
+
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+dkkToEur\\s*\\(\\s*double\\s+\\w+\\s*\\)", "message": "Declare dkkToEur to take one double parameter (the amount in dkk)."},
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+eurToDkk\\s*\\(\\s*double\\s+\\w+\\s*\\)", "message": "Declare eurToDkk to take one double parameter (the amount in eur)."},
+    {"target": "code", "op": "regex", "pattern": "dkkToEur\\s*\\(\\s*100\\s*\\)\\s*;", "message": "Call dkkToEur(100) from main."},
+    {"target": "code", "op": "regex", "pattern": "eurToDkk\\s*\\(\\s*100\\s*\\)\\s*;", "message": "Call eurToDkk(100) from main."},
+    {"target": "stdout", "op": "contains", "value": "100.0 kr corresponds to", "message": "dkkToEur(100) should print \"100.0 kr corresponds to ... euro\"."},
+    {"target": "stdout", "op": "contains", "value": "100.0 euro corresponds to 745.0 kr", "message": "eurToDkk(100) should print \"100.0 euro corresponds to 745.0 kr\"."}
+  ]}$j$::jsonb
+),
+(
+  'your-semester-in-ects', 'code', 'Your semester in ECTS',
+  $txt$At ITU every course is worth ECTS points, and a full semester adds up to 30 ECTS. You are starting Software Design. **Write printCourse(String name, double ects, int semester)**, to print one course's line: "{name} ({ects} ECTS) is in {semester} semester".
+
+Then **build one layer on top of it**: a method per semester that calls printCourse for each of that semester's courses.
+- printFirstSemester() calls printCourse(): Introductory Programming (15 ECTS), Discrete Mathematics (7.5 ECTS), Software Engineering (7.5 ECTS)
+- printSecondSemester() calls printCourse(): Introduction to Database System (7.5 ECTS), Algorithm and Data Structures (7.5 ECTS)
+
+**main** calls **printFirstSemester()** and **printSecondSemester()**.$txt$, null,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A method with several parameters can print many different values the same way.$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$A method isn't only called from main — it can call another method too.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $java$public class Main {
+    static void dkkToEur(double dkk) {
+        double eur = dkk / 7.45;
+        System.out.println(dkk + " kr corresponds to " + eur + " euro");
+    }
+
+    static void buyFilterAtAnalog() {
+        System.out.println("A cup of filter coffee cost " + 15 + " dkk");
+        dkkToEur(15);
+    }
+
+    static void buyCapuccianoAtAnalog() {
+        System.out.println("A cup of capucciano cost " + 20 + " dkk");
+        dkkToEur(20);
+    }
+
+    public static void main(String[] args) {
+        buyFilterAtAnalog();
+        buyCapuccianoAtAnalog();
+    }
+}$java$),
+    jsonb_build_object('kind', 'text', 'text', $txt$That builds layers: a low-level method that does one small thing, and a higher-level method that reuses it several times. The caller of a layer only needs to know what it does, not how.$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // Declare printCourse(String name, double ects, int semester) here — same as before
+
+    // Declare printFirstSemester() here
+    // It takes no parameters — call printCourse for each semester-1 course
+
+    // Declare printSecondSemester() here
+    // It takes no parameters — call printCourse for each semester-2 course
+
+    public static void main(String[] args) {
+        // Call printFirstSemester() and printSecondSemester() here
+        // Don't call printCourse directly from main
     }
 }
 $java$
@@ -386,24 +528,51 @@ $java$
   to_jsonb($java$public class Main {
 
     static void printCourse(String name, double ects, int semester) {
-        System.out.println(name + " (" + ects + " ECTS) is in semester " + semester + ".");
+        System.out.println(name + " (" + ects + " ECTS) is in " + semester + " semester");
     }
 
-    public static void main(String[] args) {
+    static void printFirstSemester() {
         printCourse("Introductory Programming", 15, 1);
         printCourse("Discrete Mathematics", 7.5, 1);
         printCourse("Software Engineering", 7.5, 1);
     }
+
+    static void printSecondSemester() {
+        printCourse("Introduction to Database System", 7.5, 2);
+        printCourse("Algorithm and Data Structures", 7.5, 2);
+    }
+
+    public static void main(String[] args) {
+        printFirstSemester();
+        printSecondSemester();
+    }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "static\\s+void\\s+\\w+\\s*\\(\\s*String\\s+\\w+\\s*,\\s*(?:int|double)\\s+\\w+\\s*,\\s*int\\s+\\w+\\s*\\)"}, {"target": "stdout", "op": "regex", "pattern": ".+ \\(.+ ECTS\\) is in semester \\d+\\."}, {"target": "stdout", "op": "contains", "value": "Introductory Programming"}, {"target": "stdout", "op": "contains", "value": "Discrete Mathematics"}, {"target": "stdout", "op": "contains", "value": "Software Engineering"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+printCourse\\s*\\(\\s*String\\s+\\w+\\s*,\\s*double\\s+\\w+\\s*,\\s*int\\s+\\w+\\s*\\)", "message": "printCourse needs three parameters in order (String, double, int) — ects must be a double so 7.5 doesn't get truncated to 7."},
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+printFirstSemester\\s*\\(\\s*\\)", "message": "Declare static void printFirstSemester() with no parameters."},
+    {"target": "code", "op": "regex", "pattern": "static\\s+void\\s+printSecondSemester\\s*\\(\\s*\\)", "message": "Declare static void printSecondSemester() with no parameters."},
+    {"target": "code", "op": "regex", "pattern": "\\bprintFirstSemester\\s*\\(\\s*\\)\\s*;", "message": "Call printFirstSemester() from main."},
+    {"target": "code", "op": "regex", "pattern": "\\bprintSecondSemester\\s*\\(\\s*\\)\\s*;", "message": "Call printSecondSemester() from main."},
+    {"target": "code", "op": "regex", "pattern": "public\\s+static\\s+void\\s+main\\s*\\([^)]*\\)\\s*\\{(?:(?!printCourse\\()[\\s\\S])*\\}", "message": "main should only call printFirstSemester() and printSecondSemester() — let those methods call printCourse, not main directly."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Introductory Programming\"", "message": "printFirstSemester should call printCourse for Introductory Programming."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Discrete Mathematics\"", "message": "printFirstSemester should call printCourse for Discrete Mathematics."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Software Engineering\"", "message": "printFirstSemester should call printCourse for Software Engineering."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Introduction to Database System\"", "message": "printSecondSemester should call printCourse for Introduction to Database System."},
+    {"target": "code", "op": "contains", "value": "printCourse(\"Algorithm and Data Structures\"", "message": "printSecondSemester should call printCourse for Algorithm and Data Structures."},
+    {"target": "stdout", "op": "contains", "value": "Introductory Programming", "message": "Your output should include a line for Introductory Programming."},
+    {"target": "stdout", "op": "contains", "value": "Discrete Mathematics", "message": "Your output should include a line for Discrete Mathematics."},
+    {"target": "stdout", "op": "contains", "value": "Software Engineering", "message": "Your output should include a line for Software Engineering."},
+    {"target": "stdout", "op": "contains", "value": "Introduction to Database System", "message": "Your output should include a line for Introduction to Database System."},
+    {"target": "stdout", "op": "contains", "value": "Algorithm and Data Structures", "message": "Your output should include a line for Algorithm and Data Structures."}
+  ]}$j$::jsonb
 ),
 
 -- ─────────────────────────── DAY 2 — conditionals, loops, input ───────────────────────────
 (
   'at-itu-welcome', 'code', 'Welcome to ITU',
-  $txt$You just walked into the ITU atrium. You have a boolean atItu. Print "Welcome to ITU!" only if atItu is true. If you set atItu to false, the program should print nothing.$txt$,
-  $txt$if (atItu) { System.out.println("Welcome to ITU!"); }$txt$,
+  $txt$You just walked into the ITU atrium. You have a boolean **atItu**. Print "Welcome to ITU!" only if **atItu** is **true**. If you set **atItu** to **false**, the program should print nothing.$txt$,
+  null,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$An if runs a block of code only when a condition is true. If the condition is false, Java simply skips the block and continues.$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$if (condition) {
@@ -428,113 +597,85 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bif\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Welcome to ITU!"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*atItu\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "The println call must be inside the if (atItu) { ... } block, not outside of it."},
+    {"op": "nonEmptyStdout", "message": "Your program should print a welcome message when atItu is true."}
+  ]}$j$::jsonb
 ),
 (
   'scrollbar-friday', 'code', 'Scrollbar Friday',
   $txt$Fun fact: Scrollbar is the Friday bar at ITU — open every Friday after 15:00 during the semester.
 
-Write a program that prints whether it is Scrollbar day. One clear true case: Friday.
+**Write** a method that prints whether it is Scrollbar day for a given weekday:
 
-Set the day yourself with a String (no live calendar — BootIT is on Thursday, so you can flip the value to test both branches):
+- static void **IsScrollBarOpen(String weekday)**
+- **If weekday == "Friday"** → Yes, it is Friday, Scrollbar will open today!
+- **Otherwise** → No, Scrollbar is closed.
 
-- If weekday == "Friday" → Yes, it is Friday, Scrollbar will open today!
-- Otherwise → No, Scrollbar is closed.
-
-Try both "Friday" and "Thursday".$txt$,
-  $txt$if (weekday == "Friday") { ... } else { ... }$txt$,
+Call it twice from main, once with weekday="Friday" and another with "Thursday"$txt$,
+  $txt$static void IsScrollBarOpen(String weekday) { if (weekday == "Friday") { ... } else { ... } }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$With if / else, exactly one of the two branches runs — to be, or not to be:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$// code that is always executed
-
-if (condition) {
-    System.out.println("To be");
-} else {
-    System.out.println("Not to be");
-}
-
-// code that is always executed$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$With if-else, exactly one of the two branches runs $txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$static void toBeOrNotToBe(Boolean condition) {
+    if (condition) {
+        System.out.println("To be");
+    } else {
+        System.out.println("Not to be");
+    }
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
+
+    // declare method IsScrollBarOpen(String weekday) here
+
     public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
-        // Print Yes... or No...
+        IsScrollBarOpen("Friday");
+        IsScrollBarOpen("Thursday");
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
+
+    static void IsScrollBarOpen(String weekday) {
         if (weekday == "Friday") {
             System.out.println("Yes, it is Friday, Scrollbar will open today!");
         } else {
             System.out.println("No, Scrollbar is closed.");
         }
     }
-}
-$java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "==\\s*\"Friday\""}, {"target": "stdout", "op": "regex", "pattern": "Yes|No", "flags": "i"}]}$j$::jsonb
-),
-(
-  'is-friday-boolean', 'code', 'Is Friday? (boolean)',
-  $txt$Rewrite the Scrollbar Friday check from the previous assignment using a boolean variable.
 
-1. Keep a settable String weekday (e.g. "Friday" or "Thursday").
-2. Create boolean isFriday = (weekday == "Friday");
-3. Use if (isFriday) { ... } else { ... } (do not write if (isFriday == true)).
-4. Keep the same two print messages.$txt$,
-  $txt$boolean isFriday = (weekday == "Friday"); then if (isFriday) ...$txt$,
-  jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$A boolean variable can take only two values: true and false.$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$String weekday = "Thursday"; // BootIT day
-boolean isThursday = (weekday == "Thursday");
-
-// Idiomatic Java: use the boolean directly
-if (isThursday) {
-    System.out.println("It is Thursday");
-}$txt$)
-  ),
-  jsonb_build_object(
-    'starter', $java$public class Main {
     public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
-        // boolean isFriday = ...
-        // if (isFriday) ...
-    }
-}
-$java$
-  ),
-  to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        String weekday = "Friday"; // try "Thursday" too
-        boolean isFriday = (weekday == "Friday");
-
-        if (isFriday) {
-            System.out.println("Yes, it is Friday, Scrollbar will open today!");
-        } else {
-            System.out.println("No, Scrollbar is closed.");
-        }
+        IsScrollBarOpen("Friday");
+        IsScrollBarOpen("Thursday");
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bboolean\\s+\\w+\\s*="}, {"target": "code", "op": "regex", "pattern": "if\\s*\\(\\s*\\w+\\s*\\)"}, {"target": "stdout", "op": "regex", "pattern": "Yes|No", "flags": "i"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "static\\s+void\\s+IsScrollBarOpen\\s*\\(\\s*String\\s+weekday\\s*\\)\\s*\\{(?:(?!\\}).)*if\\s*\\(\\s*weekday\\s*==\\s*\"[A-Za-z]+\"\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "Declare static void IsScrollBarOpen(String weekday) with an if (weekday == \"...\") { ... } branch that prints inside it."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "static\\s+void\\s+IsScrollBarOpen\\s*\\(\\s*String\\s+weekday\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "The else { ... } branch of IsScrollBarOpen must also print inside it."},
+    {"target": "code", "op": "regex", "pattern": "IsScrollBarOpen\\s*\\(\\s*\"Friday\"\\s*\\)", "message": "Call IsScrollBarOpen(\"Friday\") from main."},
+    {"target": "code", "op": "regex", "pattern": "IsScrollBarOpen\\s*\\(\\s*\"Thursday\"\\s*\\)", "message": "Call IsScrollBarOpen(\"Thursday\") from main."},
+    {"target": "stdout", "op": "regex", "flags": "s", "pattern": "Yes.*No", "message": "IsScrollBarOpen(\"Friday\") should print a \"Yes\" message and IsScrollBarOpen(\"Thursday\") should print a \"No\" message — in that order. Check you haven't swapped the if/else branches."}
+  ]}$j$::jsonb
 ),
 (
   'canteen-lunch', 'code', 'Canteen lunch hours',
-  $txt$The ITU canteen serves lunch Monday–Friday, 11:00–14:00. After 13:45 there is a late-lunch discount.
+  $txt$The ITU canteen serves lunch from Monday to Friday, 11:00 to 14:00.
 
-Assume it is already a weekday — check the clock with nested conditions.
+Declare **isCanteenOpen(boolean isWeekday, double hour)** so it prints whether the canteen is open, using **nested if**, three layers deep:
 
-Use a double for the time of day (e.g. 11.0 = 11:00, 13.75 = 13:45).
+1. Outer layer — is it a weekday? Use the parameter **isWeekday**.
+2. Middle layer (only checked when it is a weekday) — is **hour < 11.0**?
+3. Inner layer (only checked when the middle layer is false) — is **hour > 14.0**?
+$txt$,
+  $txt$if (isWeekday) {
+    if (hour < 11.0) { ... }
+    else { if (hour > 14.0) { ... } else { ... } }
+} else { ... }
 
-- time < 11.0 → Too early — lunch starts at 11:00.
-- time >= 14.0 → Too late — lunch ended at 14:00.
-- otherwise:
-  - print Lunch is being served.
-  - then if time >= 13.75 → Late lunch discount applies! else → Full price.$txt$,
-  $txt$Nest if/else. Try time = 13.75, 10.5, 12.0, 14.5.$txt$,
+(Or swap which boundary check comes first — either nesting order passes.)$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$You can put an if inside another if. The inner block only runs when the outer condition is also true.$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$int number = 42;
@@ -551,176 +692,376 @@ if (number > 0) {
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
+
+    // declare method isCanteenOpen(boolean isWeekday, double hour) here
+
     public static void main(String[] args) {
-        double time = 13.75; // try 10.5, 12.0, 13.5, 14.5
-        // Nested if/else for early / late / serving + discount
+      // This is how the method should be called; no changes are needed here.
+        isCanteenOpen(false, 12.0); //Close
+        isCanteenOpen(true, 9.0);  //Close
+        isCanteenOpen(true, 11.0);  //Open
+        isCanteenOpen(true, 14.0);  //Open
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        double time = 13.75; // try 10.5, 12.0, 13.5, 14.5
 
-        if (time < 11.0) {
-            System.out.println("Too early — lunch starts at 11:00.");
-        } else {
-            if (time >= 14.0) {
-                System.out.println("Too late — lunch ended at 14:00.");
+    static void isCanteenOpen(boolean isWeekday, double hour) {
+        if (isWeekday) {
+            if (hour < 11.0) {
+                System.out.println("Close");
             } else {
-                System.out.println("Lunch is being served.");
-                if (time >= 13.75) {
-                    System.out.println("Late lunch discount applies!");
+                if (hour > 14.0) {
+                    System.out.println("Close");
                 } else {
-                    System.out.println("Full price.");
+                    System.out.println("Open");
                 }
             }
+        } else {
+            System.out.println("Close");
         }
+    }
+
+    public static void main(String[] args) {
+        isCanteenOpen(false, 12.0); //Close
+        isCanteenOpen(true, 9.0);  //Close
+        isCanteenOpen(true, 11.0);  //Open
+        isCanteenOpen(true, 14.0);  //Open
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "if"}, {"target": "stdout", "op": "contains", "value": "Lunch is being served."}, {"target": "stdout", "op": "contains", "value": "Late lunch discount applies!"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "flags": "i", "pattern": "isCanteenOpen\\s*\\(\\s*boolean\\s+isWeekday\\s*,\\s*double\\s+hour\\s*\\)", "message": "Declare isCanteenOpen(boolean isWeekday, double hour) — keep those parameter names."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*isWeekday\\s*\\)\\s*\\{\\s*if\\s*\\(\\s*[^)]*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*else\\s*\\{\\s*if\\s*\\(\\s*[^)]*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*\\}\\s*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "Nest three layers deep: if (isWeekday) { if (...) { ... } else { if (...) { ... } else { ... } } } else { ... } — either boundary check (hour < 11.0 or hour > 14.0) may come first."},
+    {"target": "stdout", "op": "regex", "pattern": "^Close\\nClose\\nOpen\\nOpen$", "message": "Calling isCanteenOpen(false, 12.0), isCanteenOpen(true, 9.0), isCanteenOpen(true, 11.0), isCanteenOpen(true, 14.0) in that order should print Close, Close, Open, Open — one per line. Note hour = 14.0 should still be Open; only later than 14.0 counts as closed."}
+  ]}$j$::jsonb
 ),
 (
-  'fitness-access', 'code', 'Fitness access',
-  $txt$The ITU fitness room (basement, beneath Scrollbar) needs a membership — but on the first Tuesday of every month there is free trial access.
+  'canteen-lunch-discount', 'code', 'Canteen lunch discount',
+  $txt$The ITU Canteen offers a late lunch discount on weekdays after 13:45. 
+Assuming it is already a weekday, **implement** the lunch-hour check using a single 
+**if-else-if ladder** that includes the late lunch discount logic and **print**:
 
-You may enter if you have a membership OR it is free-trial Tuesday:
+Use a **double** for the time of day (e.g. 11.0 = 11:00, 13.75 = 13:45):
 
-if (hasMembership || isFreeTrialTuesday) print "Accessed" else print "Not allowed".
-
-Flip the two booleans and check both outcomes.$txt$,
-  $txt$if (hasMembership || isFreeTrialTuesday) { ... }$txt$,
+- Earlier than 11.0 (< 11.0) → Too early. Lunch starts at 11:00.
+- Between 11.0 and 13.75 (>= 11.0 and < 13.75) → Lunch is being served at full price.
+- Between 13.75 and 14.0  (>= 13.75 and < 14.0)→ Lunch is being served with a late lunch discount!
+- After 14.0 (>= 14) → Too late - lunch ended at 14:00.
+$txt$,
+  $txt$You can check the largest threshold first (time >= 14.0, then >= 13.75, then >= 11.0) or the smallest first (time < 11.0, then < 13.75, then < 14.0) — either direction works, just keep the thresholds in the right order for whichever one you pick.$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Boolean comparisons: == != < > <= >=
-Logical operators: ! (not), && (and), || (or) — at least one must be true for ||.$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$You can chain multiple conditions using else if. In this chain, only the first (from top to bottom) matching condition will execute.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$if (number >= 100) {
+    System.out.println("3+ digits");
+} else if (number >= 10) {
+    System.out.println("2 digits");
+} else {
+    System.out.println("1 digit");
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
-    public static void main(String[] args) {
-        boolean hasMembership = false;
-        boolean isFreeTrialTuesday = true; // first Tuesday of the month
 
-        // if either is true → Accessed, else → Not allowed
+    // declare method printLunchStatus(double time) here
+
+    public static void main(String[] args) {
+        // This is how the method should be called; no changes are needed here.
+        printLunchStatus(10.5);  // Too early - lunch starts at 11:00.
+        printLunchStatus(12.0);  // Lunch is being served at full price.
+        printLunchStatus(13.8); // Lunch is being served with a late lunch discount!
+        printLunchStatus(14.5);  // Too late - lunch ended at 14:00.
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        boolean hasMembership = false;
-        boolean isFreeTrialTuesday = true;
 
+    static void printLunchStatus(double time) {
+        if (time >= 14.0) {
+            System.out.println("Too late - lunch ended at 14:00.");
+        } else if (time >= 13.75) {
+            System.out.println("Lunch is being served with a late lunch discount!");
+        } else if (time >= 11.0) {
+            System.out.println("Lunch is being served at full price.");
+        } else {
+            System.out.println("Too early - lunch starts at 11:00.");
+        }
+    }
+
+    public static void main(String[] args) {
+        printLunchStatus(10.5);  // Too early - lunch starts at 11:00.
+        printLunchStatus(12.0);  // Lunch is being served at full price.
+        printLunchStatus(13.8); // Lunch is being served with a late lunch discount!
+        printLunchStatus(14.5);  // Too late - lunch ended at 14:00.
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "flags": "i", "pattern": "printLunchStatus\\s*\\(\\s*double\\s+time\\s*\\)", "message": "Declare printLunchStatus(double time) — keep that parameter name."},
+    {"any": [
+      {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*time\\s*>=\\s*14\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*>=\\s*13\\.75\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*>=\\s*11\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*\\}"},
+      {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*time\\s*<\\s*11\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*<\\s*13\\.75\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*<\\s*14\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*\\}"}
+    ], "message": "Write a single if / else if / else if / else ladder inside printLunchStatus that checks 11.0, 13.75, and 14.0 in order — largest-to-smallest with >=, or smallest-to-largest with < — no if nested inside another if."},
+    {"target": "stdout", "op": "regex", "pattern": "^Too early - lunch starts at 11:00\\.\\nLunch is being served at full price\\.\\nLunch is being served with a late lunch discount!\\nToo late - lunch ended at 14:00\\.$", "message": "Calling printLunchStatus(10.5), printLunchStatus(12.0), printLunchStatus(13.8), printLunchStatus(14.5) in that order should print those four lines, one per line."}
+  ]}$j$::jsonb
+),
+(
+  'fitness-access-boolean', 'code', 'Fitness access',
+  $txt$The ITU fitness room (located in the basement, beneath Scrollbar) requires a membership. Declare **checkFitnessAccess(boolean hasMembership)** so it stores membership in a **boolean** parameter, then **branches on the boolean** directly.
+
+**Print** "Accessed" if they have a membership; **otherwise**, print "Not allowed".
+$txt$,
+  $txt$if (hasMembership) → Accessed;
+else → Not allowed$txt$,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A boolean variable can take only two values: true and false. Once you have one, you can branch on it directly instead of repeating a comparison inside if.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$boolean isRaining = true;
+
+if (isRaining) {
+    System.out.println("Bring an umbrella");
+} else {
+    System.out.println("Enjoy the sun");
+}$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // declare method checkFitnessAccess(boolean hasMembership) here
+
+    public static void main(String[] args) {
+        // This is how the method should be called; no changes are needed here.
+        checkFitnessAccess(true);  // Accessed
+        checkFitnessAccess(false); // Not allowed
+    }
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static void checkFitnessAccess(boolean hasMembership) {
+        if (hasMembership) {
+            System.out.println("Accessed");
+        } else {
+            System.out.println("Not allowed");
+        }
+    }
+
+    public static void main(String[] args) {
+        checkFitnessAccess(true);  // Accessed
+        checkFitnessAccess(false); // Not allowed
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "checkFitnessAccess\\s*\\(\\s*boolean\\s+hasMembership\\s*\\)", "message": "Declare checkFitnessAccess(boolean hasMembership) — keep that parameter name."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*!?\\s*hasMembership\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "Branch on if (hasMembership) { ... } — the boolean itself (or its negation, !hasMembership) — and print inside the block."},
+    {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*!?\\s*hasMembership\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}", "message": "The else { ... } branch must also print inside it."},
+    {"target": "stdout", "op": "regex", "pattern": "^Accessed\\nNot allowed$", "message": "Calling checkFitnessAccess(true) then checkFitnessAccess(false) should print Accessed then Not allowed, one per line."}
+  ]}$j$::jsonb
+),
+(
+  'fitness-access-free-trial', 'code', 'Fitness access (free trial)',
+  $txt$The ITU fitness room offers a free trial on the first Tuesday of every month. 
+     
+Now, you need to update the ITU fitness room access logic. 
+Declare **checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday)**: a student may enter if they have a membership or if it is free-trial Tuesday.
+
+Print "Accessed"; otherwise, print "Not allowed".$txt$,
+  $txt$if (hasMembership || isFreeTrialTuesday) { ... }$txt$,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$Boolean comparisons: **==**, **!=**, **<**,** >**, **<=**, **>=**
+Logical operators: **! (not)**, **&& (and)**, **|| (or)**$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$// comparisons
+1 == 1   // is equal to        -> true
+1 != 2   // is not equal to    -> true
+1 < 2    // is less than       -> true
+2 > 1    // is greater than    -> true
+1 <= 2   // is less than or equal to    -> true
+2 >= 2   // is greater than or equal to -> true
+
+// logical operators
+!(1 > 2)          // not -> true, because (1 > 2) is false
+(2 > 1) && (3 > 2) // and -> true, both sides are true
+(2 < 1) || (2 == 2) // or  -> true, at least one side is true$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // declare method checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday) here
+
+    public static void main(String[] args) {
+        // This is how the method should be called; no changes are needed here.
+        checkFitnessAccess(false, false); // Not allowed
+        checkFitnessAccess(true, false);  // Accessed
+        checkFitnessAccess(false, true);  // Accessed
+        checkFitnessAccess(true, true);   // Accessed
+    }
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static void checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday) {
         if (hasMembership || isFreeTrialTuesday) {
             System.out.println("Accessed");
         } else {
             System.out.println("Not allowed");
         }
     }
+
+    public static void main(String[] args) {
+        checkFitnessAccess(false, false); // Not allowed
+        checkFitnessAccess(true, false);  // Accessed
+        checkFitnessAccess(false, true);  // Accessed
+        checkFitnessAccess(true, true);   // Accessed
+    }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "||"}, {"target": "stdout", "op": "regex", "pattern": "Accessed|Not allowed"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "checkFitnessAccess\\s*\\(\\s*boolean\\s+hasMembership\\s*,\\s*boolean\\s+isFreeTrialTuesday\\s*\\)", "message": "Declare checkFitnessAccess(boolean hasMembership, boolean isFreeTrialTuesday) — keep those parameter names."},
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(\\s*(?:hasMembership\\s*\\|\\|\\s*isFreeTrialTuesday|isFreeTrialTuesday\\s*\\|\\|\\s*hasMembership|!\\s*hasMembership\\s*&&\\s*!\\s*isFreeTrialTuesday|!\\s*isFreeTrialTuesday\\s*&&\\s*!\\s*hasMembership)\\s*\\)", "message": "Branch with if (hasMembership || isFreeTrialTuesday) { ... } else { ... } (or !hasMembership && !isFreeTrialTuesday)."},
+    {"target": "stdout", "op": "regex", "pattern": "^Not allowed\\nAccessed\\nAccessed\\nAccessed$", "message": "Calling checkFitnessAccess(false,false), (true,false), (false,true), (true,true) in that order should print Not allowed, Accessed, Accessed, Accessed — one per line."}
+  ]}$j$::jsonb
 ),
 (
-  'student-day-place', 'code', 'A common day as an ITU student',
-  $txt$Write a function place(String period) that returns where a student probably is:
+  'student-day-place', 'code', 'Glass boxes',
+  $txt$Glass boxes are group study rooms in the ITU building. You can reserve them on the same day at the info desk. Some of these rooms operate on a "first-come, first-served" basis.
 
-- morning → lectures, exercises, or a group room
-- break → the Cafe Analog coffee queue
-- noon → the canteen rush
-- afternoon → the outdoor grass (if the sun is out)
+Declare a method named IsFirstComeFirstServe that returns a boolean.
 
-From main, set a period and print:
-System.out.println("During " + period + ", an ITU student is probably at " + place(period));$txt$,
-  $txt$static String place(String period) { return ...; }$txt$,
+The complete list of these room numbers is: 2A03, 2A07, 3A03, 4A01, 4A03, 4A07, 5A03, 5A07.
+
+Make sure the method returns the correct values for the examples called in the main function.$txt$,
+  NULL,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Previous functions were mostly void (they printed). A function can also return a value to the caller with return. The return type goes where void used to be (String, int, boolean, …).$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Instead of void (no return values), a method can send a specific value back to the caller using the return keyword.
+The data type being returned must be declared in the method signature exactly where void used to be.$txt$),
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
+    public static int addNumbers(int a, int b) {
+        // Returns the calculated result to the caller
+        return a + b;
+    }
+
+    public static void main(String[] args) {
+        int result = addNumbers(2, 3);
+        System.out.println(result);
+    }
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
-    public static void main(String[] args) {
-        String period = "morning"; // try "break", "noon", "afternoon"
-        System.out.println("During " + period + ", an ITU student is probably at " + place(period));
-    }
 
-    static String place(String period) {
-        // return the matching place
-        return "";
+    // Declare method IsFirstComeFirstServe(String roomNumber) here that returns a boolean
+
+    public static void main(String[] args) {
+
+        // This is how the method should be called; no changes are needed here.
+
+        // You can call the method "IsFirstComeFirstServe" and use the return value as a parameter to another method "System.out.println".
+        System.out.println(IsFirstComeFirstServe("2A03")); // true
+
+        // You can also store the return values of the method "IsFirstComeFirstServe", and use it later.
+        boolean result_2A05 = IsFirstComeFirstServe("2A05");
+        System.out.println(result_2A05); // false
     }
 }
 $java$
   ),
   to_jsonb($java$public class Main {
-    public static void main(String[] args) {
-        String period = "morning";
-        System.out.println("During " + period + ", an ITU student is probably at " + place(period));
+
+    static boolean IsFirstComeFirstServe(String roomNumber) {
+        return (roomNumber == "2A03" || roomNumber == "2A07" || roomNumber == "3A03" ||
+                roomNumber == "4A01" || roomNumber == "4A03" || roomNumber == "4A07" ||
+                roomNumber == "5A03" || roomNumber == "5A07");
     }
 
-    static String place(String period) {
-        if (period == "morning") {
-            return "lectures, exercises, or a group room";
-        } else if (period == "break") {
-            return "the Cafe Analog coffee queue";
-        } else if (period == "noon") {
-            return "the canteen rush";
+    public static void main(String[] args) {
+        System.out.println(IsFirstComeFirstServe("2A03")); // true
+
+        boolean result_2A05 = IsFirstComeFirstServe("2A05");
+        System.out.println(result_2A05); // false
+    }
+}
+$java$::text),
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+boolean\\s+IsFirstComeFirstServe\\s*\\(\\s*String\\s+\\w+\\s*\\)", "message": "Declare static boolean IsFirstComeFirstServe(String roomNumber) — a method that returns a boolean."},
+    {"target": "code", "op": "contains", "value": "return", "message": "IsFirstComeFirstServe(...) must return a value, not print it directly."},
+    {"target": "stdout", "op": "regex", "pattern": "^true\\nfalse$", "message": "IsFirstComeFirstServe(\"2A03\") should return true and IsFirstComeFirstServe(\"2A05\") should return false — check against the full room list."}
+  ]}$j$::jsonb
+),
+(
+  'while-sun-out', 'code', 'While the sun out',
+  $txt$In Copenhagen, the summer days are long. We love to sit on the grass outside the ITU building until the sun goes down at 21:00.
+
+Declare a method named **isSunOut** that takes an **int** for the **time** and **returns a boolean**. Each time it runs, it should also **print the current time**.
+
+Use a **while loop** in the main function starting at 14:00. The loop should keep running as long as the sun is out, checking the status and **incrementing** the time by 1 each round.$txt$,
+  NULL,
+  jsonb_build_array(
+    jsonb_build_object('kind', 'text', 'text', $txt$A while loop keeps running as long as its condition evaluates to true.
+The loop condition doesn't have to be a simple math comparison like i < 10. It can be any boolean expression — including a boolean variable or a method that returns a boolean!
+The loop checks the condition before every iteration. Once the condition becomes false, the loop immediately stops and skips the body.$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$Important: You must always update the variables involved in your condition inside the loop (the increment/update step). If you forget to update them, the condition will never become false, creating an infinite loop that runs forever and crashes your program!$txt$)
+  ),
+  jsonb_build_object(
+    'starter', $java$public class Main {
+
+    // Declare the method isSunOut(int time) here that returns a boolean.
+    // It should print the current time and return true or false based on it.
+
+    public static void main(String[] args) {
+
+        // initialization
+        // Declare an int variable for time starting at 14
+        // Declare a boolean variable sunIsOut starting as true
+
+        // loop condition
+        // Create a while loop that runs as long as sunIsOut is true
+
+            // Inside the loop body:
+            // 1. Update sunIsOut by calling the isSunOut method with the current time
+            // 2. Increment the time by 1 so you don't create an infinite loop!
+
+    }
+}
+$java$
+  ),
+  to_jsonb($java$public class Main {
+
+    static boolean isSunOut(int time) {
+        if (time < 21) {
+            System.out.println("The time is now " + time + ": The sun is still out, let's sit on the grass!");
+            return true;
         } else {
-            return "the outdoor grass (if the sun is out)";
+            System.out.println("The time is now " + time + ": The sun is not out, let's go home.");
+            return false;
+        }
+    }
+
+    public static void main(String[] args) {
+        // initialization
+        int time = 14;
+        boolean sunIsOut = true;
+
+        while (sunIsOut) { // loop condition
+            sunIsOut = isSunOut(time);
+            time = time + 1; // increment
         }
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "static\\s+String\\s+\\w+\\s*\\(\\s*String\\s+\\w+\\s*\\)"}, {"target": "code", "op": "contains", "value": "return"}, {"target": "stdout", "op": "regex", "pattern": "During .+, an ITU student is probably at .+"}]}$j$::jsonb
-),
-(
-  'while-five-lines', 'code', 'While loop — five lines',
-  $txt$Loops turn repetition into initialize → condition → body → increment.
-
-Start from the starter. Right now it runs while i < 10 (i goes 0 … 9). Change only the loop condition so the program prints exactly 5 lines.
-
-Hint: which number should replace 10, and why?$txt$,
-  $txt$while (i < 5) runs for i = 0,1,2,3,4 — exactly 5 times.$txt$,
-  jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Without a loop you copy-paste. With while:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$int i = 0;                 // initialization
-while (i < 10) {           // loop condition
-    System.out.println("I will push my code before the deadline!");
-    i = i + 1;             // increment
-}$txt$),
-    jsonb_build_object('kind', 'text', 'text', $txt$i starts at 0, condition i < 10 → body runs for 0..9 (10 times). It never runs with i == 10.$txt$)
-  ),
-  jsonb_build_object(
-    'starter', $java$public class Main {
-
-    static void function(int number) {
-        System.out.println("Line " + number + ": I will push my code before the deadline!");
-    }
-
-    public static void main(String[] args) {
-        int i = 0; // initialization
-        while (i < 10) { // loop condition — change this
-            function(i);
-            i = i + 1; // increment
-        }
-    }
-}
-$java$
-  ),
-  to_jsonb($java$public class Main {
-
-    static void function(int number) {
-        System.out.println("Line " + number + ": I will push my code before the deadline!");
-    }
-
-    public static void main(String[] args) {
-        int i = 0;
-        while (i < 5) { // 0,1,2,3,4 → exactly 5 lines
-            function(i);
-            i = i + 1;
-        }
-    }
-}
-$java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "while"}, {"target": "stdout", "op": "contains", "value": "Line 0:"}, {"target": "stdout", "op": "contains", "value": "Line 4:"}, {"not": {"target": "stdout", "op": "contains", "value": "Line 5:"}}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "static\\s+boolean\\s+isSunOut\\s*\\(\\s*int\\s+\\w+\\s*\\)", "message": "Declare static boolean isSunOut(int time) — a method that returns a boolean."},
+    {"target": "code", "op": "contains", "value": "return", "message": "isSunOut(...) must return a value, not just print it."},
+    {"target": "code", "op": "regex", "pattern": "\\bboolean\\s+sunIsOut\\s*=\\s*true\\b", "message": "Declare boolean sunIsOut = true; before the loop."},
+    {"target": "code", "op": "regex", "pattern": "\\bint\\s+time\\s*=\\s*14\\b", "message": "Start the time variable at 14 (14:00)."},
+    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(\\s*sunIsOut\\s*\\)", "message": "Loop with while (sunIsOut) — the condition should be the boolean variable itself."},
+    {"target": "code", "op": "regex", "pattern": "\\btime\\s*(?:=\\s*time\\s*\\+\\s*1\\b|\\+\\+|\\+=\\s*1\\b)", "message": "Increment time inside the loop body (time = time + 1) — otherwise the loop never ends."},
+    {"target": "stdout", "op": "regex", "pattern": "\\b14\\b[\\s\\S]*\\b15\\b[\\s\\S]*\\b16\\b[\\s\\S]*\\b17\\b[\\s\\S]*\\b18\\b[\\s\\S]*\\b19\\b[\\s\\S]*\\b20\\b[\\s\\S]*\\b21\\b", "message": "Print the current time on every call to isSunOut — the output should show 14 through 21, in order."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "\\b22\\b"}, "message": "The loop should stop right after 21 — isSunOut(21) must return false so the loop doesn't keep going to 22."}
+  ]}$j$::jsonb
 ),
 (
   'while-loop-quiz-1', 'predict', 'While Loop Quiz 1',
@@ -816,8 +1157,8 @@ while (i < 100) {
 ),
 (
   'while-loop-quiz-4', 'predict', 'While Loop Quiz 4',
-  $txt$Careful with this one! Predict what it prints — some loops never stop.$txt$,
-  $txt$What is 1 × 1? Does i ever change?$txt$,
+  $txt$Read the loop and predict exactly what it prints. Type your answer in the output window; use return/enter for each println line.$txt$,
+  NULL,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Predict the exact output of the snippet. Type your answer in the output box. Use a new line for each System.out.println (press Enter / return between lines). If the loop never stops, answer: infinite loop.$txt$)
   ),
@@ -891,10 +1232,10 @@ while (i >= 2) {
 ),
 (
   'analog-tickets-while', 'code', 'Analog tickets (while)',
-  $txt$Cafe Analog has a mobile app where you can buy 5 tickets at once with a discount. You are a heavy coffee drinker and want 50 tickets in one go — so you need a loop that buys a pack of 5 tickets, ten times.
+  $txt$Cafe Analog has a mobile app where you can buy 5 tickets at once with a discount. You are a heavy coffee drinker and want 50 tickets in one go — so you need a **loop** that buys a pack of **5 tickets, ten times**.
 
-Using a while loop, print the running total after each pack: 5, 10, 15, …, 50 (one number per line).$txt$,
-  $txt$Accumulate total += ticketsPerPack inside while (packs < 10).$txt$,
+Using a **while loop**, print the running total after each pack: 5, 10, 15, …, 50 (one number per line).$txt$,
+  $txt$Declare two int variables, total and pack, to accumulate the numbers we want to print and to use as the loop condition.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Use a while loop when you know you need to repeat until a counter reaches a limit. Initialize → check → body → increment.$txt$)
   ),
@@ -920,12 +1261,20 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "contains", "value": "while"}, {"target": "stdout", "op": "containsLine", "value": "50"}, {"target": "stdout", "op": "containsLine", "value": "45"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(", "message": "Use a while loop."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)5(?=\\n|$)[\\s\\S]*?(?:^|\\n)10(?=\\n|$)[\\s\\S]*?(?:^|\\n)15(?=\\n|$)[\\s\\S]*?(?:^|\\n)20(?=\\n|$)[\\s\\S]*?(?:^|\\n)25(?=\\n|$)[\\s\\S]*?(?:^|\\n)30(?=\\n|$)[\\s\\S]*?(?:^|\\n)35(?=\\n|$)[\\s\\S]*?(?:^|\\n)40(?=\\n|$)[\\s\\S]*?(?:^|\\n)45(?=\\n|$)[\\s\\S]*?(?:^|\\n)50(?=\\n|$)", "message": "Print the running total after every pack, in order: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 — one per line."}
+  ]}$j$::jsonb
 ),
 (
   'analog-tickets-for', 'code', 'Analog tickets (for)',
-  $txt$Rewrite the Cafe Analog tickets program. Same output (5 … 50), but use a for loop instead of while. The starter is the while solution — change it to for.$txt$,
-  $txt$for (int packs = 0; packs < 10; packs = packs + 1) { ... }$txt$,
+  $txt$Cafe Analog has a mobile app where you can buy 5 tickets at once with a discount. 
+
+You are a heavy coffee drinker and want 50 tickets in one go — so you need a **loop** that buys a pack of **5 tickets, ten times**. 
+
+Rewrite the Cafe Analog tickets program. Same output (5 … 50), but use a **for loop** this time.
+$txt$,
+  $txt$Review the previous while loop solution. Try to figure out which variable should be used for the initialization and the condition in the for loop header.$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$The for loop packs initialization, condition, and increment into one header — nicer when you already know how many times to repeat:$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$for (int i = 0; i < 10; i = i + 1) {
@@ -959,7 +1308,11 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"not": {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\("}}, {"target": "stdout", "op": "containsLine", "value": "50"}, {"target": "stdout", "op": "containsLine", "value": "45"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(", "message": "Use a for loop."},
+    {"not": {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\("}, "message": "Rewrite this with a for loop — don't keep a while loop around."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:^|\\n)5(?=\\n|$)[\\s\\S]*?(?:^|\\n)10(?=\\n|$)[\\s\\S]*?(?:^|\\n)15(?=\\n|$)[\\s\\S]*?(?:^|\\n)20(?=\\n|$)[\\s\\S]*?(?:^|\\n)25(?=\\n|$)[\\s\\S]*?(?:^|\\n)30(?=\\n|$)[\\s\\S]*?(?:^|\\n)35(?=\\n|$)[\\s\\S]*?(?:^|\\n)40(?=\\n|$)[\\s\\S]*?(?:^|\\n)45(?=\\n|$)[\\s\\S]*?(?:^|\\n)50(?=\\n|$)", "message": "Print the running total after every pack, in order: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 — one per line."}
+  ]}$j$::jsonb
 ),
 (
   'for-loop-quiz-1', 'predict', 'For Loop Quiz 1',
@@ -1007,8 +1360,8 @@ $java$::text),
 ),
 (
   'for-loop-quiz-3', 'predict', 'For Loop Quiz 3',
-  $txt$Careful with this one! Predict what it prints — some loops never stop.$txt$,
-  $txt$What is 1 × 1? Does i ever grow?$txt$,
+  $txt$Read the loop and predict exactly what it prints.$$txt$,
+  NULL,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Predict the exact output of the snippet. Type your answer in the output box. Use a new line for each System.out.println (press Enter / return between lines). If the loop never stops, answer: infinite loop.$txt$)
   ),
@@ -1100,7 +1453,7 @@ $java$::text),
 ),
 (
   'gym-workout', 'code', 'Gym workout (nested for)',
-  $txt$You are in the ITU fitness room. Today's plan: 4 sets, 12 reps each. Use a nested for to log every rep — outer loop = set (1…4), inner loop = rep (1…12):
+  $txt$You are in the ITU fitness room. Today's plan: 4 sets, 12 reps each. Use a **nested for** to log every rep — outer loop = set (1…4), inner loop = rep (1…12):
 
 Set 1 Rep 1
 …
@@ -1108,9 +1461,15 @@ Set 4 Rep 12$txt$,
   $txt$for (int set = 1; set <= 4; set++) { for (int rep = 1; rep <= 12; rep++) { ... } }$txt$,
   jsonb_build_array(
     jsonb_build_object('kind', 'text', 'text', $txt$Sometimes you need two counters. A nested for reads like the shape of the data:$txt$),
-    jsonb_build_object('kind', 'code', 'code', $txt$for (int set = 1; set <= 2; set = set + 1) {
-    for (int rep = 1; rep <= 3; rep = rep + 1) {
-        System.out.println("Set " + set + " Rep " + rep);
+    jsonb_build_object('kind', 'code', 'code', $txt$public class Main {
+    public static void main(String[] args) {
+        for (int y = 0; y < 3; y++) {
+            for (int x = 0; x < 3; x++) {
+                System.out.print("(" + x + ", " + y + ") ");
+            }
+            System.out.println();
+        }
+
     }
 }$txt$)
   ),
@@ -1132,18 +1491,26 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Set 1 Rep 1"}, {"target": "stdout", "op": "containsLine", "value": "Set 4 Rep 12"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "for\\s*\\([^)]*\\)\\s*\\{[^{}]*for\\s*\\([^)]*\\)", "message": "Nest a for loop inside another for loop — one outer for per set, one inner for per rep."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 1 Rep 1", "message": "Missing \"Set 1 Rep 1\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 1 Rep 12", "message": "Missing \"Set 1 Rep 12\" — set 1 should log all 12 reps."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 2 Rep 1", "message": "Missing \"Set 2 Rep 1\" — the outer loop should move on to set 2."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 3 Rep 1", "message": "Missing \"Set 3 Rep 1\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 4 Rep 1", "message": "Missing \"Set 4 Rep 1\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Set 4 Rep 12", "message": "Missing \"Set 4 Rep 12\" — the last rep of the last set."}
+  ]}$j$::jsonb
 ),
 (
   'analog-reusable-cup-stamps', 'code', 'Help Analog go sustainable',
   $txt$Cafe Analog wants fewer disposable cups. Every time you buy a drink and bring your own cup, you get a stamp on your card — the 10th stamp is a free cup, and you start a fresh card right after.
 
-Simulate 24 drinks bought (one per loop iteration) with a for or while loop: stamps starts at 0, and each drink adds one stamp.
-- While stamps != 10: print "Brought my own cup, got a stamp! ({stamps}/10)".
-- The moment stamps == 10: print "Free cup! Here's a new stamp card." instead, then reset stamps back to 0.$txt$,
+Simulate 24 drinks bought (one per loop iteration) with a **for** or **while loop**: stamps **starts at 0**, and each drink adds one stamp.
+- While **stamps != 10**: print "Brought my own cup, got a stamp! ({stamps}/10)".
+- The moment **stamps == 10**: print "Free cup! Here's a new stamp card." instead, then reset stamps back to 0.$txt$,
   $txt$if (stamps != 10) { ... } else { System.out.println("Free cup! Here's a new stamp card."); stamps = 0; }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$Nothing new here — just a loop combined with if/else, the same way you did for the canteen and fitness room. The trick is that the stamp counter resets itself once it is spent.$txt$)
+    jsonb_build_object('kind', 'text', 'text', $txt$Nothing new here — just a loop combined with if/else, the same way you did for the canteen and fitness room.$txt$)
   ),
   jsonb_build_object(
     'starter', $java$public class Main {
@@ -1176,25 +1543,53 @@ $java$
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bif\\s*\\("}, {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(|\\bwhile\\s*\\("}, {"target": "stdout", "op": "containsLine", "value": "Free cup! Here's a new stamp card."}, {"target": "stdout", "op": "containsLine", "value": "Brought my own cup, got a stamp! (4/10)"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bif\\s*\\(", "message": "Use if/else to tell a normal stamp apart from the 10th (free-cup) stamp."},
+    {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(|\\bwhile\\s*\\(", "message": "Use a for or while loop over the 24 drinks."},
+    {"target": "stdout", "op": "containsLine", "value": "Brought my own cup, got a stamp! (4/10)", "message": "Missing \"Brought my own cup, got a stamp! (4/10)\" — check your stamp message and counter."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:Free cup! Here's a new stamp card\\.[\\s\\S]*){2}", "message": "The stamp card should reset and fill up twice in 24 drinks (10 + 10 + 4) — \"Free cup! Here's a new stamp card.\" should appear twice."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "(?:Free cup! Here's a new stamp card\\.[\\s\\S]*){3}"}, "message": "24 drinks should only fill the stamp card twice — a third \"Free cup!\" means your reset logic is off."}
+  ]}$j$::jsonb
 ),
 (
   'beerpong-at-scrollbar', 'code', 'Beer pong at Scrollbar',
-  $txt$Friday at Scrollbar (ITU's Friday bar) means one thing: beer pong. Set up the rack, then simulate a full round.
+  $txt$Friday at Scrollbar means one thing: beer pong! Let's set up the rack and simulate a full game.
 
-1) Print the triangle rack with a nested for loop — one line per row: "Row 1: O", "Row 2: O O", "Row 3: O O O", "Row 4: O O O O" (10 cups total).
-2) Simulate throws with a while loop. cupsLeft starts at 10. Each throw, roll with Random rng = new Random(): int roll = rng.nextInt(4) gives 0, 1, 2 or 3, each equally likely — treat roll == 0 as a hit (25% chance). On a hit, remove a cup and print "Throw {n}: SPLASH! {cupsLeft} cups left."; otherwise print "Throw {n}: MISS! {cupsLeft} cups left." Keep throwing until cupsLeft is 0, then print "GAME OVER — the rack is empty. Chug up!"$txt$,
-  $txt$Random rng = new Random(); int roll = rng.nextInt(4); if (roll == 0) { ... hit ... } else { ... miss ... }$txt$,
+**Part 1**: Use a nested **for** loop to print a 4-row triangle cup rack.
+(Hint: think about how the row number relates to the number of cups in that row.)
+
+Expected output for this part: Row 1: O Row 2: O O Row 3: O O O Row 4: O O O O
+
+**Part 2**: Simulate throws using a **while** loop until all 10 cups are cleared. You will need to keep track of the remaining cups and the total number of throws.
+
+Game rules:
+
+* For each throw, use **java.util.Random** to generate a random number between 0 and 1 (inclusive).
+* Treat a roll of 0 as a hit (a 50% chance). A hit removes one cup.
+* A roll of 1 is a miss.
+* Print the result of every throw. When the rack is empty, print a final game over message.
+
+Expected output format for Part 2:
+Throw 1: MISS! 10 cups left. Throw 2: SPLASH! 9 cups left. Throw 3: MISS! 9 cups left. ... Throw 20: SPLASH! 0 cups left. GAME OVER - the rack is empty. Chug up!$txt$,
+  $txt$Random rng = new Random(); int roll = rng.nextInt(2); if (roll == 0) { ... hit ... } else { ... miss ... }$txt$,
   jsonb_build_array(
-    jsonb_build_object('kind', 'text', 'text', $txt$One new tool: java.util.Random gives pseudo-random numbers. Calling nextInt(4) produces 0, 1, 2, or 3; use one of those values to decide whether the throw is a hit or miss.$txt$),
+    jsonb_build_object('kind', 'text', 'text', $txt$Think of Java's utilities as a built-in toolbox. You can use these tools by importing them at the top of your program.
+
+java.util.Random is one of them, which generates pseudo-random numbers.
+
+For example, calling nextInt(2) produces 0 or 1 (each 50% likely).$txt$),
     jsonb_build_object('kind', 'code', 'code', $txt$import java.util.Random;
 
-Random rng = new Random();
-int roll = rng.nextInt(4);     // 0, 1, 2, or 3 -- each 25% likely
-if (roll == 0) {
-    System.out.println("Hit!");
-}$txt$),
-    jsonb_build_object('kind', 'text', 'text', $txt$Everything else — the while loop, if/else, and the cupsLeft counter — is exactly what you already know.$txt$)
+public class Main {
+    public static void main(String[] args) {
+        Random rng = new Random();
+        int roll = rng.nextInt(2);
+
+        if (roll == 0) {
+            System.out.println("Hit!");
+        }
+    }
+}$txt$)
   ),
   jsonb_build_object(
     'starter', $java$import java.util.Random;
@@ -1205,7 +1600,7 @@ public class Main {
 
         // 2) Simulate throws until the rack (10 cups) is empty.
         //    Random rng = new Random();
-        //    Each throw: int roll = rng.nextInt(4); roll == 0 -> hit (25% chance)
+        //    Each throw: int roll = rng.nextInt(2); roll == 0 -> hit (50% chance)
     }
 }
 $java$
@@ -1228,7 +1623,7 @@ public class Main {
 
         while (cupsLeft > 0) {
             throwNumber = throwNumber + 1;
-            int roll = rng.nextInt(4);
+            int roll = rng.nextInt(2);
             if (roll == 0) {
                 cupsLeft = cupsLeft - 1;
                 System.out.println("Throw " + throwNumber + ": SPLASH! " + cupsLeft + " cups left.");
@@ -1237,17 +1632,38 @@ public class Main {
             }
         }
 
-        System.out.println("GAME OVER — the rack is empty. Chug up!");
+        System.out.println("GAME OVER - the rack is empty. Chug up!");
     }
 }
 $java$::text),
-  $j${"all": [{"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\("}, {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\("}, {"target": "code", "op": "contains", "value": "Random"}, {"target": "code", "op": "contains", "value": "nextInt"}, {"target": "stdout", "op": "containsLine", "value": "Row 4: O O O O"}, {"target": "stdout", "op": "contains", "value": "SPLASH!"}, {"target": "stdout", "op": "containsLine", "value": "GAME OVER — the rack is empty. Chug up!"}]}$j$::jsonb
+  $j${"all": [
+    {"target": "code", "op": "regex", "pattern": "\\bfor\\s*\\(", "message": "Use a for loop to print the triangle rack."},
+    {"target": "code", "op": "regex", "pattern": "\\bwhile\\s*\\(", "message": "Use a while loop to simulate the throws."},
+    {"target": "code", "op": "contains", "value": "Random", "message": "Create a Random rng = new Random(); to roll for each throw."},
+    {"target": "code", "op": "contains", "value": "nextInt", "message": "Use rng.nextInt(2) to roll 0-1 for each throw."},
+    {"target": "stdout", "op": "containsLine", "value": "Row 4: O O O O", "message": "Print the full 4-row triangle rack, ending with \"Row 4: O O O O\"."},
+    {"target": "stdout", "op": "contains", "value": "SPLASH!", "message": "Print \"Throw {n}: SPLASH! {cupsLeft} cups left.\" on a hit."},
+    {"target": "stdout", "op": "containsLine", "value": "GAME OVER - the rack is empty. Chug up!", "message": "Print \"GAME OVER - the rack is empty. Chug up!\" once cupsLeft reaches 0."}
+  ]}$j$::jsonb
 ),
 
 -- ─────────────────────────── DAY 3 — classes & objects / projects ───────────────────────────
 (
   'person-class', 'code', 'Person class',
-  $txt$Warm-up: make a Person class with fields name and age, a constructor Person(String n, int a), display() that prints "Niek (25 years old)", and birthday() that adds a year.$txt$,
+  $txt$Create a **Person** class that meets the following requirements:
+Fields:
+
+* **name** (String)
+* **age** (int)
+
+Constructor:
+
+* **Person(String n, int a)**: Initializes the **name** and **age** fields.
+
+Methods:
+
+* **display()**: Prints the person's information in the exact format: **"[name] ([age] years old)"**. (Example output: **"Niek (25 years old)"**)
+* **birthday()**: Increases the person's age by 1.$txt$,
   $txt$display(): System.out.println(name + " (" + age + " years old)");$txt$,
   NULL,
   jsonb_build_object(
@@ -1302,13 +1718,29 @@ $java$),
 $java$)
   )),
   $j${"all": [
-    {"target": "stdout", "op": "containsLine", "value": "Niek (25 years old)"},
-    {"target": "stdout", "op": "containsLine", "value": "Niek (26 years old)"}
+    {"target": "code", "op": "regex", "pattern": "\\bclass\\s+Person\\b", "message": "Define a Person class (in Person.java) — don't just hardcode the output directly in Main."},
+    {"target": "code", "op": "regex", "pattern": "\\bage\\s*(?:=\\s*age\\s*\\+\\s*1|\\+\\+|\\+=\\s*1)\\b", "message": "birthday() should increment the age field — age = age + 1, age++, or age += 1."},
+    {"target": "stdout", "op": "containsLine", "value": "Niek (25 years old)", "message": "The first display() call should print \"Niek (25 years old)\"."},
+    {"target": "stdout", "op": "containsLine", "value": "Niek (26 years old)", "message": "After birthday(), the second display() call should print \"Niek (26 years old)\"."}
   ]}$j$::jsonb
 ),
 (
   'flight-ticket-class', 'code', 'FlightTicket class',
-  $txt$Make a FlightTicket class: fields from, to, price; constructor (f, t, p); show() prints "CPH --> JFK (7500 DKK)"; discount() takes 500 DKK off. Make sure discount() can't be abused (price must never go negative).$txt$,
+  $txt$Create a **FlightTicket** class that meets the following requirements:
+Fields:
+
+* **from** (String)
+* **to** (String)
+* **price** (int or double)
+
+Constructor:
+
+* **FlightTicket(String f, String t, int p)**: Initializes the **from**, **to**, and **price** fields.
+
+Methods:
+
+* **show()**: Prints the ticket information in the exact format: **"[from] --> [to] ([price] DKK)"**. (Example output: **"CPH --> JFK (7500 DKK)"**)
+* **discount()**: Reduces the ticket price by 500. You must add logic to ensure this method cannot be abused (i.e., the price must never drop below 0).$txt$,
   $txt$In discount(), only subtract if the price stays >= 0.$txt$,
   NULL,
   jsonb_build_object(
@@ -1371,15 +1803,32 @@ $java$),
 $java$)
   )),
   $j${"all": [
-    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7500 DKK)"},
-    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7000 DKK)"},
-    {"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}}
+    {"target": "code", "op": "regex", "pattern": "\\bclass\\s+FlightTicket\\b", "message": "Define a FlightTicket class (in FlightTicket.java) — don't just hardcode the output directly in Main."},
+    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7500 DKK)", "message": "The first show() call should print \"CPH --> JFK (7500 DKK)\"."},
+    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (7000 DKK)", "message": "After one discount(), show() should print \"CPH --> JFK (7000 DKK)\"."},
+    {"target": "stdout", "op": "containsLine", "value": "CPH --> JFK (0 DKK)", "message": "After 21 discount() calls the price should floor at exactly 0 — \"CPH --> JFK (0 DKK)\" — not stop early or wrap negative."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}, "message": "Price must never go negative — guard discount() so it doesn't subtract past 0."}
   ]}$j$::jsonb
 ),
 (
   'container-class', 'code', 'Container class',
-  $txt$Make a Container class: fields id, amount, max; constructor Container(String i, int max) (amount starts at 0); show() prints "Container: AX35 (23/30)"; addCargo(int a) adds boxes. Make sure the container can't be over-filled.$txt$,
-  $txt$In addCargo, only add if amount + a <= max (mirror the Account guard pattern).$txt$,
+  $txt$Create a **Container** class that meets the following requirements:
+Fields:
+
+* **id** (String)
+* **amount** (int)
+* **max** (int)
+
+Constructor:
+
+* **Container(String i, int max)**: Initializes the **id** and **max** fields. The **amount** field must always start at **0**.
+
+Methods:
+
+* **show()**: Prints the container's information in the exact format: **"Container: [id] ([amount]/[max])"**. (Example output: **"Container: AX35 (23/30)"**)
+* **addCargo(int a)**: Adds the specified number of boxes (**a**) to the container's **amount**.
+* Capacity Constraint: The container cannot be over-filled. If adding a would cause the amount to exceed max, the addition must be rejected entirely.$txt$,
+  NULL,
   NULL,
   jsonb_build_object(
     'starterFiles', jsonb_build_array(
@@ -1439,8 +1888,9 @@ $java$),
 $java$)
   )),
   $j${"all": [
-    {"target": "stdout", "op": "containsLine", "value": "Container: AX35 (23/30)"},
-    {"not": {"target": "stdout", "op": "regex", "pattern": "\\((?:3[1-9]|[4-9]\\d|\\d{3,})/30\\)"}}
+    {"target": "code", "op": "regex", "pattern": "\\bclass\\s+Container\\b", "message": "Define a Container class (in Container.java) — don't just hardcode the output directly in Main."},
+    {"target": "stdout", "op": "regex", "pattern": "(?:Container: AX35 \\(23/30\\)[\\s\\S]*){2}", "message": "show() should print \"Container: AX35 (23/30)\" both before and after the rejected addCargo(40) — a full addition over max must be rejected entirely, leaving amount unchanged at 23."},
+    {"not": {"target": "stdout", "op": "regex", "pattern": "\\((?:3[1-9]|[4-9]\\d|\\d{3,})/30\\)"}, "message": "amount must never exceed max (30) — addCargo(40) should be rejected in full, not partially applied."}
   ]}$j$::jsonb
 ),
 
@@ -1872,7 +2322,7 @@ $sol$)
 ;
 
 -- ─────────────────────────── set memberships ───────────────────────────
---   Day 1: 0–8 (9)   Day 2: 9–32 (24)   Day 3: 33–39 (7)   total 40
+--   Day 1: 0–9 (10)   Day 2: 10–33 (24)   Day 3: 34–40 (7)   total 41
 
 WITH ordered(slug, ord) AS (VALUES
   ('hello-itu', 0),
@@ -1883,38 +2333,40 @@ WITH ordered(slug, ord) AS (VALUES
   ('string-concatenation', 5),
   ('kroner-to-euro', 6),
   ('functions', 7),
-  ('your-semester-in-ects', 8),
-  ('at-itu-welcome', 9),
-  ('scrollbar-friday', 10),
-  ('is-friday-boolean', 11),
+  ('functions-with-parameters', 8),
+  ('your-semester-in-ects', 9),
+  ('at-itu-welcome', 10),
+  ('scrollbar-friday', 11),
   ('canteen-lunch', 12),
-  ('fitness-access', 13),
-  ('student-day-place', 14),
-  ('while-five-lines', 15),
-  ('while-loop-quiz-1', 16),
-  ('while-loop-quiz-2', 17),
-  ('while-loop-quiz-3', 18),
-  ('while-loop-quiz-4', 19),
-  ('while-loop-quiz-5', 20),
-  ('while-loop-quiz-6', 21),
-  ('analog-tickets-while', 22),
-  ('analog-tickets-for', 23),
-  ('for-loop-quiz-1', 24),
-  ('for-loop-quiz-2', 25),
-  ('for-loop-quiz-3', 26),
-  ('for-loop-quiz-4', 27),
-  ('for-loop-quiz-5', 28),
-  ('for-loop-quiz-6', 29),
-  ('gym-workout', 30),
-  ('analog-reusable-cup-stamps', 31),
-  ('beerpong-at-scrollbar', 32),
-  ('person-class', 33),
-  ('flight-ticket-class', 34),
-  ('container-class', 35),
-  ('build-a-tree', 36),
-  ('grandpas-time-machine', 37),
-  ('grandmas-blackmarket-kitchen', 38),
-  ('seat-selector', 39)
+  ('canteen-lunch-discount', 13),
+  ('fitness-access-boolean', 14),
+  ('fitness-access-free-trial', 15),
+  ('student-day-place', 16),
+  ('while-sun-out', 17),
+  ('while-loop-quiz-1', 18),
+  ('while-loop-quiz-2', 19),
+  ('while-loop-quiz-3', 20),
+  ('while-loop-quiz-4', 21),
+  ('while-loop-quiz-5', 22),
+  ('while-loop-quiz-6', 23),
+  ('analog-tickets-while', 24),
+  ('analog-tickets-for', 25),
+  ('for-loop-quiz-1', 26),
+  ('for-loop-quiz-2', 27),
+  ('for-loop-quiz-3', 28),
+  ('for-loop-quiz-4', 29),
+  ('for-loop-quiz-5', 30),
+  ('for-loop-quiz-6', 31),
+  ('gym-workout', 32),
+  ('analog-reusable-cup-stamps', 33),
+  ('beerpong-at-scrollbar', 34),
+  ('person-class', 35),
+  ('flight-ticket-class', 36),
+  ('container-class', 37),
+  ('build-a-tree', 38),
+  ('grandpas-time-machine', 39),
+  ('grandmas-blackmarket-kitchen', 40),
+  ('seat-selector', 41)
 ),
 resolved AS (
   SELECT t.id AS assignment_id, o.ord
@@ -1922,11 +2374,11 @@ resolved AS (
   JOIN assignment t ON t.slug = o.slug
 )
 INSERT INTO assignment_set_assignment (assignment_set_id, assignment_id, order_index)
-SELECT 'day1-2026', assignment_id, ord         FROM resolved WHERE ord BETWEEN 0 AND 8
+SELECT 'day1-2026', assignment_id, ord         FROM resolved WHERE ord BETWEEN 0 AND 9
 UNION ALL
-SELECT 'day2-2026', assignment_id, ord - 9     FROM resolved WHERE ord BETWEEN 9 AND 32
+SELECT 'day2-2026', assignment_id, ord - 10    FROM resolved WHERE ord BETWEEN 10 AND 34
 UNION ALL
-SELECT 'day3-2026', assignment_id, ord - 33    FROM resolved WHERE ord BETWEEN 33 AND 39
+SELECT 'day3-2026', assignment_id, ord - 35    FROM resolved WHERE ord BETWEEN 35 AND 41
 UNION ALL
 SELECT 'all-assignments-for-solo-2026', assignment_id, ord FROM resolved;
 
@@ -1934,8 +2386,8 @@ DO $check$
 DECLARE n int;
 BEGIN
   SELECT count(*) INTO n FROM assignment_set_assignment WHERE assignment_set_id = 'all-assignments-for-solo-2026';
-  IF n <> 40 THEN
-    RAISE EXCEPTION 'seed error: expected 40 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
+  IF n <> 42 THEN
+    RAISE EXCEPTION 'seed error: expected 42 assignments in all-assignments-for-solo-2026, got % (typo in a slug?)', n;
   END IF;
 END
 $check$;

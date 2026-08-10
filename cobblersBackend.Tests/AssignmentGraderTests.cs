@@ -63,6 +63,125 @@ public class AssignmentGraderTests
         Assert.False(Grader.Grade(rule, WithCode("static void f2c(double f) {}")).Passed);
     }
 
+    [Fact]
+    public void Regex_SinglineFlag_LetsDotMatchNewlinesAcrossMultilineCode()
+    {
+        var multilineIf = "if (a) {\n    System.out.println(1);\n}";
+
+        var withSFlag = """{"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*a\\s*\\)\\s*\\{.*println"}""";
+        Assert.True(Grader.Grade(withSFlag, WithCode(multilineIf)).Passed);
+
+        // Without "s", "." doesn't match "\n" — the same pattern can't span the line break.
+        var withoutSFlag = """{"target": "code", "op": "regex", "pattern": "if\\s*\\(\\s*a\\s*\\)\\s*\\{.*println"}""";
+        Assert.False(Grader.Grade(withoutSFlag, WithCode(multilineIf)).Passed);
+    }
+
+    [Fact]
+    public void Regex_CanEnforceMultilineNestedIfStructure_RejectsFlatEquivalent()
+    {
+        // canteen-lunch's real seeded rule: nested if, three layers deep, no || shortcut allowed.
+        var rule = """
+            {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*isWeekday\\s*\\)\\s*\\{\\s*if\\s*\\(\\s*time\\s*<\\s*11\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*else\\s*\\{\\s*if\\s*\\(\\s*time\\s*>=\\s*14\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}\\s*\\}\\s*\\}\\s*else\\s*\\{(?:(?!\\}).)*System\\.out\\.println\\((?:(?!\\}).)*\\)(?:(?!\\}).)*\\}"}
+            """;
+
+        var nested = """
+            if (isWeekday) {
+                if (time < 11.0) {
+                    System.out.println("Close");
+                } else {
+                    if (time >= 14.0) {
+                        System.out.println("Close");
+                    } else {
+                        System.out.println("Open");
+                    }
+                }
+            } else {
+                System.out.println("Close");
+            }
+            """;
+        Assert.True(Grader.Grade(rule, WithCode(nested)).Passed);
+
+        // Same behavior, but flattened into one condition with && — no actual nesting.
+        var flat = """
+            if (isWeekday && time >= 11.0 && time < 14.0) {
+                System.out.println("Open");
+            } else {
+                System.out.println("Close");
+            }
+            """;
+        Assert.False(Grader.Grade(rule, WithCode(flat)).Passed);
+    }
+
+    [Fact]
+    public void Any_AcceptsEitherThresholdDirection_ForCanteenLunchDiscount()
+    {
+        // canteen-lunch-discount's real seeded rule: the reference solution checks
+        // largest-to-smallest (>= 14.0 first), but a smallest-to-largest ladder
+        // (< 11.0 first) is equally correct and must also pass — the "any" lets
+        // either direction satisfy the structural check.
+        var rule = """
+            {"all": [
+              {"target": "code", "op": "regex", "flags": "i", "pattern": "printLunchStatus\\s*\\(\\s*double\\s+time\\s*\\)"},
+              {"any": [
+                {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*time\\s*>=\\s*14\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*>=\\s*13\\.75\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*>=\\s*11\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*\\}"},
+                {"target": "code", "op": "regex", "flags": "s", "pattern": "if\\s*\\(\\s*time\\s*<\\s*11\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*<\\s*13\\.75\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s+if\\s*\\(\\s*time\\s*<\\s*14\\.0\\s*\\)\\s*\\{(?:(?!\\}).)*\\}\\s*else\\s*\\{(?:(?!\\}).)*\\}"}
+              ]},
+              {"target": "stdout", "op": "regex", "pattern": "^Too early - lunch starts at 11:00\\.\\nLunch is being served at full price\\.\\nLunch is being served with a late lunch discount!\\nToo late - lunch ended at 14:00\\.$"}
+            ]}
+            """;
+
+        var descending = """
+            static void printLunchStatus(double time) {
+                if (time >= 14.0) {
+                    System.out.println("Too late - lunch ended at 14:00.");
+                } else if (time >= 13.75) {
+                    System.out.println("Lunch is being served with a late lunch discount!");
+                } else if (time >= 11.0) {
+                    System.out.println("Lunch is being served at full price.");
+                } else {
+                    System.out.println("Too early - lunch starts at 11:00.");
+                }
+            }
+            """;
+        var descendingStdout = "Too early - lunch starts at 11:00.\nLunch is being served at full price.\nLunch is being served with a late lunch discount!\nToo late - lunch ended at 14:00.";
+        Assert.True(Grader.Grade(rule, new CheckResult(descending, descendingStdout, "", 0)).Passed);
+
+        var ascending = """
+            static void printLunchStatus(double time) {
+                if (time < 11.0) {
+                    System.out.println("Too early - lunch starts at 11:00.");
+                } else if (time < 13.75) {
+                    System.out.println("Lunch is being served at full price.");
+                } else if (time < 14.0) {
+                    System.out.println("Lunch is being served with a late lunch discount!");
+                } else {
+                    System.out.println("Too late - lunch ended at 14:00.");
+                }
+            }
+            """;
+        Assert.True(Grader.Grade(rule, new CheckResult(ascending, descendingStdout, "", 0)).Passed);
+    }
+
+    [Fact]
+    public void Regex_OrderSensitiveStdoutCheck_CatchesSwappedIfElseBranches()
+    {
+        // scrollbar-friday's real seeded rule: containsLine alone can't tell the two
+        // required substrings apart from which call produced them, so a student who
+        // swaps the if/else bodies (Friday -> "closed", Thursday -> "open") still has
+        // both substrings present — just paired with the wrong call. The rule instead
+        // requires "Yes" to appear before "No" in program output order (substring only,
+        // not the full sentence — students can phrase the message however they like).
+        var rule = """{"target": "stdout", "op": "regex", "flags": "s", "pattern": "Yes.*No"}""";
+
+        // IsScrollBarOpen("Friday") then IsScrollBarOpen("Thursday"), correct branches.
+        var correct = "Yes, it is Friday, Scrollbar will open today!\nNo, Scrollbar is closed.";
+        Assert.True(Grader.Grade(rule, WithStdout(correct)).Passed);
+
+        // Same two calls, but the if/else bodies are swapped — logic is reversed.
+        var swapped = "No, Scrollbar is closed.\nYes, it is Friday, Scrollbar will open today!";
+        Assert.False(Grader.Grade(rule, WithStdout(swapped)).Passed);
+    }
+
     [Theory]
     [InlineData("My Cozy Café", true)]
     [InlineData("   \n  ", false)]
@@ -175,6 +294,133 @@ public class AssignmentGraderTests
         var rule = """{"predict": {"compare": "exact", "expectedOutput": "10\n9"}}""";
         Assert.True(Grader.Grade(rule, WithCode("10\n9")).Passed);
         Assert.False(Grader.Grade(rule, WithCode("10\n9\n")).Passed);
+    }
+
+    // ── per-rule feedback messages ──────────────────────────────────────────
+
+    [Fact]
+    public void Leaf_FailureWithMessage_SurfacesItAsFeedback()
+    {
+        var rule = """{"target": "stdout", "op": "contains", "value": "2024", "message": "Print the year 2024."}""";
+        var verdict = Grader.Grade(rule, WithStdout("no year here"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Print the year 2024." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Leaf_FailureWithoutMessage_HasNullFeedback()
+    {
+        var rule = """{"target": "stdout", "op": "contains", "value": "2024"}""";
+        var verdict = Grader.Grade(rule, WithStdout("no year here"));
+        Assert.False(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void Leaf_Passing_HasNullFeedback()
+    {
+        var rule = """{"target": "stdout", "op": "contains", "value": "2024", "message": "Print the year 2024."}""";
+        var verdict = Grader.Grade(rule, WithStdout("2024"));
+        Assert.True(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void All_BubblesEveryFailingChildsMessage()
+    {
+        var rule = """
+            {"all": [
+              {"target": "stdout", "op": "contains", "value": "2024", "message": "Missing the year."},
+              {"target": "stdout", "op": "contains", "value": "-273.15", "message": "Missing absolute zero."},
+              {"target": "stdout", "op": "contains", "value": "hello"}
+            ]}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("nothing relevant"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Missing the year.", "Missing absolute zero." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void All_OnePassingChild_OnlyBubblesTheFailingOnes()
+    {
+        var rule = """
+            {"all": [
+              {"target": "stdout", "op": "contains", "value": "2024", "message": "Missing the year."},
+              {"target": "stdout", "op": "contains", "value": "-273.15", "message": "Missing absolute zero."}
+            ]}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("2024"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Missing absolute zero." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Any_AllFail_PrefersItsOwnMessageOverChildren()
+    {
+        var rule = """
+            {"any": [
+              {"target": "stdout", "op": "containsLine", "value": "Hello World!", "message": "child a"},
+              {"target": "stdout", "op": "containsLine", "value": "Hello, World!", "message": "child b"}
+            ], "message": "Print either \"Hello World!\" or \"Hello, World!\"."}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("hello world"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Print either \"Hello World!\" or \"Hello, World!\"." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Any_AllFail_NoOwnMessage_FallsBackToChildren()
+    {
+        var rule = """
+            {"any": [
+              {"target": "stdout", "op": "containsLine", "value": "Hello World!", "message": "child a"},
+              {"target": "stdout", "op": "containsLine", "value": "Hello, World!", "message": "child b"}
+            ]}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("hello world"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "child a", "child b" }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Any_OneChildPasses_HasNullFeedback()
+    {
+        var rule = """
+            {"any": [
+              {"target": "stdout", "op": "containsLine", "value": "Hello World!", "message": "child a"},
+              {"target": "stdout", "op": "containsLine", "value": "Hello, World!", "message": "child b"}
+            ], "message": "own message"}
+            """;
+        var verdict = Grader.Grade(rule, WithStdout("Hello World!"));
+        Assert.True(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void Not_UnexpectedlyTrue_SurfacesItsOwnMessage()
+    {
+        var rule = """{"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}, "message": "Price must never go negative."}""";
+        var verdict = Grader.Grade(rule, WithStdout("CPH --> JFK (-3000 DKK)"));
+        Assert.False(verdict.Passed);
+        Assert.Equal(new[] { "Price must never go negative." }, verdict.Feedback);
+    }
+
+    [Fact]
+    public void Not_Passing_HasNullFeedback()
+    {
+        var rule = """{"not": {"target": "stdout", "op": "regex", "pattern": "-\\d+\\s*DKK"}, "message": "Price must never go negative."}""";
+        var verdict = Grader.Grade(rule, WithStdout("CPH --> JFK (0 DKK)"));
+        Assert.True(verdict.Passed);
+        Assert.Null(verdict.Feedback);
+    }
+
+    [Fact]
+    public void Grade_NonZeroExitCode_HasNullFeedbackEvenWithMessages()
+    {
+        var rule = """{"op": "nonEmptyStdout", "message": "should never be seen"}""";
+        var verdict = Grader.Grade(rule, WithStdout("plenty of output", exitCode: 1));
+        Assert.False(verdict.Passed);
+        Assert.Null(verdict.Feedback);
     }
 
     // ── misconfiguration is loud, not a silent verdict ──────────────────────

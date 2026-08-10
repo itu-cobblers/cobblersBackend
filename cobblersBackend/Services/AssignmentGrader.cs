@@ -11,10 +11,16 @@ namespace cobblersBackend.Services;
 ///   { "all": [node, ...] }   { "any": [node, ...] }   { "not": node }
 ///   { "target": "stdout"|"code", "op": "contains",     "value": "..." }
 ///   { "target": "stdout",        "op": "containsLine", "value": "..." }
-///   { "target": "stdout"|"code", "op": "regex", "pattern": "...", "flags": "i"? }
+///   { "target": "stdout"|"code", "op": "regex", "pattern": "...", "flags": "i"|"s"? }
+///     "i" = IgnoreCase, "s" = Singleline (so "." also matches newlines — needed to
+///     match a multi-line block like an if-body with a regex).
 ///   { "op": "nonEmptyStdout" }
 ///   { "op": "custom", "key": "&lt;slug&gt;" }   // escape hatch, C# registry keyed by slug
 ///   { "predict": { "compare": "normalized"|"exact", "expectedOutput": "...", "accept"?: [...] } }
+///
+/// Any node (combinator or leaf) may also carry a "message" string. It plays no
+/// part in pass/fail logic — it's surfaced via Verdict.Feedback when that node
+/// is the reason a submission failed, so students get "why", not just a bool.
 ///
 /// For code rules, grading only runs on a successful execution — non-zero (or
 /// missing) exit code fails before any rule is evaluated. Predict documents
@@ -44,10 +50,14 @@ public class AssignmentGrader : IAssignmentGrader
         if (doc.RootElement.TryGetProperty("predict", out var predict))
             return new Verdict(EvaluatePredict(predict, result.Code));
 
+        // A non-zero/missing exit code fails before any rule runs — the raw
+        // status/stderr on the execution result already tells the student their
+        // code didn't compile/run, so no rule-level message is synthesized here.
         if (result.ExitCode is not 0)
             return new Verdict(false);
 
-        return new Verdict(Evaluate(doc.RootElement, result));
+        var (passed, messages) = Evaluate(doc.RootElement, result);
+        return new Verdict(passed, messages.Count > 0 ? messages : null);
     }
 
     /// <summary>
@@ -85,25 +95,63 @@ public class AssignmentGrader : IAssignmentGrader
         return false;
     }
 
-    private bool Evaluate(JsonElement node, CheckResult result)
+    /// <summary>
+    /// Evaluates a rule node, returning both the boolean verdict and the
+    /// "message" text (see class doc) of whichever node(s) failed. A node may
+    /// carry an optional string "message" property alongside "all"/"any"/"not"/
+    /// leaf-op — it's pure authoring metadata, never consulted by the pass/fail
+    /// logic itself, only bubbled up here so a failing submission can tell the
+    /// student *why*.
+    /// </summary>
+    private (bool Passed, List<string> Messages) Evaluate(JsonElement node, CheckResult result)
     {
         if (node.ValueKind != JsonValueKind.Object)
             throw new ArgumentException($"Grading rule must be an object, got {node.ValueKind}.");
 
         if (node.TryGetProperty("all", out var all))
-            return all.EnumerateArray().All(child => Evaluate(child, result));
+        {
+            // Every child is evaluated (no short-circuit) so a failing "all"
+            // reports all of its unmet requirements at once, not just the first.
+            var messages = new List<string>();
+            var passed = true;
+            foreach (var child in all.EnumerateArray())
+            {
+                var (childPassed, childMessages) = Evaluate(child, result);
+                if (childPassed) continue;
+                passed = false;
+                messages.AddRange(childMessages);
+            }
+            return (passed, messages);
+        }
 
         if (node.TryGetProperty("any", out var any))
-            return any.EnumerateArray().Any(child => Evaluate(child, result));
+        {
+            var childResults = any.EnumerateArray().Select(child => Evaluate(child, result)).ToList();
+            if (childResults.Any(r => r.Passed)) return (true, new List<string>());
+
+            // All branches failed: prefer the node's own message (one clear combined
+            // sentence written by the author) over dumping every branch's message.
+            var messages = NodeMessage(node) is { } ownMessage
+                ? new List<string> { ownMessage }
+                : childResults.SelectMany(r => r.Messages).ToList();
+            return (false, messages);
+        }
 
         if (node.TryGetProperty("not", out var not))
-            return !Evaluate(not, result);
+        {
+            var (childPassed, _) = Evaluate(not, result);
+            var passed = !childPassed;
+            var messages = passed || NodeMessage(node) is not { } ownMessage
+                ? new List<string>()
+                : new List<string> { ownMessage };
+            return (passed, messages);
+        }
 
         var op = node.TryGetProperty("op", out var opElement)
             ? opElement.GetString()
             : throw new ArgumentException("Grading rule has neither a combinator (all/any/not) nor an op.");
 
-        return op switch
+        var leafPassed = op switch
         {
             "contains" => Target(node, result).Contains(RequiredString(node, "value")),
             "containsLine" => ContainsLine(Target(node, result), RequiredString(node, "value")),
@@ -112,7 +160,17 @@ public class AssignmentGrader : IAssignmentGrader
             "custom" => Custom(RequiredString(node, "key"), result),
             _ => throw new ArgumentException($"Unknown grading op '{op}'."),
         };
+
+        var leafMessages = leafPassed || NodeMessage(node) is not { } leafMessage
+            ? new List<string>()
+            : new List<string> { leafMessage };
+        return (leafPassed, leafMessages);
     }
+
+    private static string? NodeMessage(JsonElement node) =>
+        node.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String
+            ? m.GetString()
+            : null;
 
     /// <summary>What the rule inspects: normalized stdout (default) or the raw submitted code.</summary>
     private static string Target(JsonElement node, CheckResult result)
@@ -134,9 +192,10 @@ public class AssignmentGrader : IAssignmentGrader
     private static RegexOptions RegexOptions(JsonElement node)
     {
         var flags = node.TryGetProperty("flags", out var f) ? f.GetString() ?? "" : "";
-        return flags.Contains('i')
-            ? System.Text.RegularExpressions.RegexOptions.IgnoreCase
-            : System.Text.RegularExpressions.RegexOptions.None;
+        var options = System.Text.RegularExpressions.RegexOptions.None;
+        if (flags.Contains('i')) options |= System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+        if (flags.Contains('s')) options |= System.Text.RegularExpressions.RegexOptions.Singleline;
+        return options;
     }
 
     private bool Custom(string key, CheckResult result) =>

@@ -12,6 +12,7 @@ public record SubmissionResponseDto(
     [property: JsonPropertyName("subId")]       Guid SubId,
     [property: JsonPropertyName("passed")]      bool? Passed,
     [property: JsonPropertyName("result")]      ExecuteResponseDto? Result,
+    [property: JsonPropertyName("feedback")]    IReadOnlyList<string>? Feedback,
     [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt
 );
 
@@ -19,7 +20,7 @@ public record SubmissionHistoryDto(
     [property: JsonPropertyName("subId")]        Guid SubId,
     [property: JsonPropertyName("assignmentId")] int AssignmentId,
     [property: JsonPropertyName("sessionId")]    string? SessionId, // =Session.Code, null for solo
-    [property: JsonPropertyName("passed")]       bool? Passed,
+    [property: JsonPropertyName("status")]       string Status,     // "passed" | "tried" | "error" — see SubmissionService.DeriveStatus
     [property: JsonPropertyName("submittedAt")]  DateTimeOffset SubmittedAt);
 
 public record SubmissionDetailDto(
@@ -29,6 +30,7 @@ public record SubmissionDetailDto(
     [property: JsonPropertyName("sessionId")]    string? SessionId,          // =Session.Code, null for solo
     [property: JsonPropertyName("content")]      JsonElement Content,        // raw ContentJson, string | {name,content}[]
     [property: JsonPropertyName("result")]       ExecuteResponseDto? Result, // null for predict
+    [property: JsonPropertyName("feedback")]     IReadOnlyList<string>? Feedback,
     [property: JsonPropertyName("passed")]       bool? Passed,
     [property: JsonPropertyName("submittedAt")]  DateTimeOffset SubmittedAt);
 
@@ -36,7 +38,7 @@ public record SessionSubmissionDto(
     [property: JsonPropertyName("subId")] Guid SubId,
     [property: JsonPropertyName("studentId")] string StudentId,
     [property: JsonPropertyName("assignmentId")] int AssignmentId,
-    [property: JsonPropertyName("passed")] bool? Passed,
+    [property: JsonPropertyName("status")] string Status, // "passed" | "tried" | "error" — see SubmissionService.DeriveStatus
     [property: JsonPropertyName("submittedAt")] DateTimeOffset SubmittedAt);
     
 /// <summary>
