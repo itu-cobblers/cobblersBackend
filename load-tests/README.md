@@ -5,6 +5,7 @@ This directory contains [k6](https://k6.io) scripts that simulate students press
 - `submit-spike.js` — 65 students submitting at roughly the same time.
 - `submit-stress.js` — ramps up to 65 virtual users by default.
 - `submit-ramp-1-65.js` — ramps from 1 to 65 students to find the latency threshold.
+- `hub-broadcast-stress.js` — joins a live room over SignalR and measures the `SubmissionRecorded` broadcast fan-out, not just the REST submit call. See [Run the SignalR broadcast fan-out test](#run-the-signalr-broadcast-fan-out-test).
 
 ## What it tests
 
@@ -21,7 +22,7 @@ That covers:
 - Piston Java code execution
 - Response serialization
 
-It does **not** test SignalR live broadcasts (`SubmissionRecorded`). If you also want to verify the teacher dashboard stays responsive during the spike, run the script while a teacher is observing the room.
+It does **not** test SignalR live broadcasts (`SubmissionRecorded`). If you also want to verify the teacher dashboard stays responsive during the spike, run the script while a teacher is observing the room — or use `hub-broadcast-stress.js` below, which measures that path directly instead of relying on manual observation.
 
 ## Install k6
 
@@ -84,6 +85,32 @@ k6 run \
   -e ASSIGNMENT_ID=1 \
   load-tests/submit-ramp-1-65.js
 ```
+
+## Run the SignalR broadcast fan-out test
+
+`submit-stress.js`/`submit-spike.js` only prove the REST submission path stays fast. Every submission also broadcasts `SubmissionRecorded` to everyone in the room over SignalR — with N students all submitting near-simultaneously, that's up to N×N small broadcast messages fanning out in a burst, and that path is untested by the REST-only scripts. `hub-broadcast-stress.js` closes that gap: each virtual user opens a real SignalR WebSocket to `/hub`, joins the room, submits, and measures how long its own broadcast takes to come back.
+
+First create an active session and note its code:
+
+```bash
+curl -X POST http://localhost:5046/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"assignmentSetId": "<your-set-id>"}'
+```
+
+Then run the test against that room:
+
+```bash
+k6 run \
+  -e ASSIGNMENT_ID=1 \
+  -e SESSION_ID=ABCD \
+  -e VUS=80 \
+  load-tests/hub-broadcast-stress.js
+```
+
+Point `BASE_URL` at whatever actually sits in front of `/hub` for the topology you care about — e.g. `https://cobblerscoders.tech`, which routes through the `frontend` (nginx) container's WebSocket proxy, the same path real students' browsers use. Hitting the backend directly (`:5046`) skips that proxy and only tells you about the backend/SignalR side.
+
+Watch `own_broadcast_latency_ms` (time from submit to receiving your own broadcast) and `submission_broadcasts_received` (should approach `VUS` per connection if nothing is dropped under load) in the k6 summary.
 
 ## Test the deployed app
 
