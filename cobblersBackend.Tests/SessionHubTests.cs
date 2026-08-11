@@ -97,7 +97,10 @@ public sealed class SessionHubTests
         // surviving into any one of them silently splits the room in two.
         attendance.Verify(a => a.RecordAttendanceAsync("ABCD", "student-maria"), Times.Once);
         groups.Verify(g => g.AddToGroupAsync("conn-1", "ABCD", It.IsAny<CancellationToken>()), Times.Once);
-        Assert.All(groupsAddressed, g => Assert.Equal("ABCD", g));
+        // Literal, not SessionCode.ObserversGroup("ABCD"): spelling the derived name
+        // out means a raw code leaking through would show up as "  abcd :observers"
+        // rather than being normalized away by the helper on both sides of the assert.
+        Assert.All(groupsAddressed, g => Assert.Equal("ABCD:observers", g));
         Assert.Single(store.GetRoster("ABCD"));
         Assert.Equal("ABCD", items["code"]);
     }
@@ -259,6 +262,73 @@ public sealed class SessionHubTests
         var (hub, _, _, _, _, _) = BuildHub();
 
         Assert.Empty(await hub.ObserveSession("ABCD"));
+    }
+
+    [Fact]
+    public async Task ObserveSession_JoinsTheRoomAndTheObserversGroup()
+    {
+        var (hub, _, _, groups, _, _) = BuildHub();
+
+        await hub.ObserveSession("abcd");
+
+        // Both, and for different reasons: the observers group carries the
+        // dashboard-only events (StudentJoined / RosterUpdated /
+        // SubmissionRecorded), while the room group is how the teacher still
+        // receives what they share with students (HandsUpdated, SessionEnded).
+        // Dropping the room membership would silently stop the teacher's hand
+        // queue from updating.
+        groups.Verify(g => g.AddToGroupAsync("conn-1", "ABCD", It.IsAny<CancellationToken>()), Times.Once);
+        groups.Verify(g => g.AddToGroupAsync("conn-1", "ABCD:observers", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // ── Broadcast scoping: observers vs the whole room ────────────────────────
+    //
+    // The three dashboard events are addressed to the observers group so that
+    // students stop receiving traffic they have no handler for. A measured
+    // 80-student join storm shipped 20.34 MB of RosterUpdated that exactly one
+    // connection could use, and the cost is quadratic in class size.
+
+    [Fact]
+    public async Task JoinSession_DashboardEvents_GoToObserversNotTheRoom()
+    {
+        var (hub, _, sent, _, _, groupsAddressed) = BuildHub();
+
+        await hub.JoinSession(Join());
+
+        Assert.Equal(["StudentJoined", "RosterUpdated"], sent.Select(b => b.Method).ToArray());
+        Assert.All(groupsAddressed, g => Assert.Equal("ABCD:observers", g));
+        Assert.DoesNotContain("ABCD", groupsAddressed);
+    }
+
+    [Fact]
+    public async Task RaiseHand_GoesToTheWholeRoom_NotJustObservers()
+    {
+        var (hub, _, _, _, _, groupsAddressed) = BuildHub();
+        await hub.JoinSession(Join());
+        groupsAddressed.Clear();
+
+        await hub.RaiseHand("ABCD", "student-maria");
+
+        // Regression guard. HandsUpdated is the one event BOTH sides handle
+        // (joinSession and observeSession each register onHandsUpdated in the
+        // frontend), so scoping it to observers alongside the other three would
+        // stop students seeing the hand queue — a silent, plausible-looking bug.
+        Assert.Equal(["ABCD"], groupsAddressed);
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_RosterGoesToObservers_HandsGoToTheRoom()
+    {
+        var (hub, _, _, _, _, groupsAddressed) = BuildHub();
+        await hub.JoinSession(Join());
+        await hub.RaiseHand("ABCD", "student-maria");
+        groupsAddressed.Clear();
+
+        await hub.OnDisconnectedAsync(null);
+
+        // One disconnect, two different audiences — the mixed case is exactly
+        // where a careless edit collapses both onto one group.
+        Assert.Equal(["ABCD:observers", "ABCD"], groupsAddressed);
     }
 
     // ── FocusAssignment ──────────────────────────────────────────────────────

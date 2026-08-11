@@ -236,9 +236,11 @@ public sealed class SessionSubmissionsTests : IAsyncLifetime
         var request = new SubmissionRequestDto("student-maria", seed.Code, JsonSerializer.SerializeToElement("42"));
         await TestServices.Submissions(ctx, hub: _hub.Object).SubmitAsync(seed.AssignmentId, request);
 
-        // Then — the group is the room code, so only that room's observers get it.
+        // Then — the observers group for that room, NOT the room itself. Students never
+        // register a SubmissionRecorded handler, so broadcasting to the room made all N
+        // of them receive every classmate's result while only the teacher used it.
         var broadcast = _hub.Single();
-        Assert.Equal(seed.Code, broadcast.Group);
+        Assert.Equal($"{seed.Code}:observers", broadcast.Group);
         Assert.Equal("SubmissionRecorded", broadcast.Method);
     }
 
@@ -369,7 +371,9 @@ public sealed class SessionSubmissionsTests : IAsyncLifetime
 
         // Then — SignalR group names are case-sensitive, so a raw code here would broadcast
         // into a group nobody is subscribed to and the dashboard would silently never update.
-        Assert.Equal(seed.Code, _hub.Single().Group);
+        // The observers suffix is derived from the normalized code, so this still catches a
+        // raw code leaking through — it would read "abcd:observers".
+        Assert.Equal($"{seed.Code}:observers", _hub.Single().Group);
     }
 
     [Fact]
