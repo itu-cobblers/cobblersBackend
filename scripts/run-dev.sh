@@ -14,7 +14,11 @@ export Piston__BaseUrl="http://localhost:2000/"
 trap 'echo "==> Stopping local Postgres + Piston containers"; docker compose stop' EXIT
 
 echo "==> Starting local Postgres + Piston containers"
-docker compose up -d
+docker compose up -d --wait
+
+echo "==> Applying EF migrations"
+dotnet tool restore 
+dotnet ef database update --project cobblersBackend
 
 echo "==> Running backend (ConnectionStrings__DefaultConnection -> local Postgres, Piston__BaseUrl -> $Piston__BaseUrl)"
 dotnet run --project cobblersBackend
