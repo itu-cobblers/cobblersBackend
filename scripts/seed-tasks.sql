@@ -61,7 +61,7 @@ INSERT INTO assignment (slug, kind, title, description, hint, lesson_json, conte
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        // Say hello to ITU
+
     }
 }
 $java$
@@ -97,7 +97,7 @@ System.out.println(3.14);$txt$)
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        // 1) your name (text)  2) Danish zip code (whole number)  3) years here (with a decimal)
+
     }
 }
 $java$
@@ -151,7 +151,7 @@ boolean — true or false$txt$)
   jsonb_build_object(
     'starter', $java$public class Main {
     public static void main(String[] args) {
-        // Declare a String, an int and a double — then print the variables
+
     }
 }
 $java$
@@ -193,7 +193,6 @@ System.out.println(year);   // The year is now 2027$txt$),
     'starter', $java$public class Main {
     public static void main(String[] args) {
         int age = 27;
-        // Print both lines — update age in between
     }
 }
 $java$
@@ -238,7 +237,6 @@ System.out.println(y / 3);   // 2$txt$),
     public static void main(String[] args) {
         int mastersStudents = 130;
         double internationalPercent = 23.4;
-        // Print international count
     }
 }
 $java$
@@ -279,7 +277,6 @@ System.out.println("The year is " + year);$txt$)
     'starter', $java$public class Main {
     public static void main(String[] args) {
         String greet = "Hello my friend, ";
-        // Declare a variable to hold the name, and print the concatenated sentence.
     }
 }
 $java$
