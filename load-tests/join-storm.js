@@ -57,28 +57,55 @@ const joinOk = new Rate('join_ok')
 
 const joinErrors = new Counter('join_errors')
 const connectFailures = new Counter('ws_connect_failures')
+
+// What STUDENTS receive. After the observers-group scoping these must be 0 —
+// students register no handler for either event, so every frame was pure waste.
 const rosterFrames = new Counter('roster_updated_frames')
 const studentJoinedFrames = new Counter('student_joined_frames')
 const rosterBytes = new Counter('roster_updated_bytes')
 
+// What the TEACHER receives. These must NOT be 0 — scoping the broadcasts is only
+// correct if the one connection that actually uses them still gets them. A student
+// would never notice this regression; the teacher's dashboard would just stop
+// updating, which is why the test has to watch both sides at once.
+const obsRosterFrames = new Counter('observer_roster_frames')
+const obsStudentJoined = new Counter('observer_student_joined_frames')
+const obsRosterBytes = new Counter('observer_roster_bytes')
+const observerOk = new Rate('observer_connected')
+
+// The observer connects first and outlives the storm, so it is listening before the
+// first student joins and still listening after the last one leaves.
+const OBSERVER_LEAD = 3
+const OBSERVER_WINDOW = OBSERVER_LEAD + RAMP + HOLD + 15
+
 export const options = {
   scenarios: {
-    storm: RAMP > 0
-      ? {
-          // Spread over RAMP seconds: 80 humans opening a laptop lid do not arrive
-          // in the same millisecond, and the arrival shape is what decides whether
-          // the connection pool is hit all at once.
-          executor: 'ramping-arrival-rate',
-          startRate: 0,
-          timeUnit: '1s',
-          preAllocatedVUs: VUS,
-          maxVUs: VUS * 2,
-          stages: [
-            { duration: `${RAMP}s`, target: Math.ceil(VUS / RAMP) },
-            { duration: '1s', target: 0 },
-          ],
-        }
-      : { executor: 'per-vu-iterations', vus: VUS, iterations: 1, maxDuration: '5m' },
+    observer: {
+      executor: 'constant-vus',
+      vus: 1,
+      duration: `${OBSERVER_WINDOW}s`,
+      startTime: '0s',
+      exec: 'observer',
+    },
+    storm: Object.assign(
+      RAMP > 0
+        ? {
+            // Spread over RAMP seconds: 80 humans opening a laptop lid do not arrive
+            // in the same millisecond, and the arrival shape is what decides whether
+            // the connection pool is hit all at once.
+            executor: 'ramping-arrival-rate',
+            startRate: 0,
+            timeUnit: '1s',
+            preAllocatedVUs: VUS,
+            maxVUs: VUS * 2,
+            stages: [
+              { duration: `${RAMP}s`, target: Math.ceil(VUS / RAMP) },
+              { duration: '1s', target: 0 },
+            ],
+          }
+        : { executor: 'per-vu-iterations', vus: VUS, iterations: 1, maxDuration: '5m' },
+      { startTime: `${OBSERVER_LEAD}s` }
+    ),
   },
   thresholds: {
     // Every one of these is an absolute requirement, and every one is counted in a
@@ -91,7 +118,101 @@ export const options = {
     ws_connect_failures: ['count==0'],
     join_errors: ['count==0'],
     'join_invoke_duration': ['p(95)<2000', 'max<10000'],
+
+    // Both halves of the observers-group scoping, asserted together.
+    observer_connected: ['rate==1'],
+    // Students must receive none of the dashboard events...
+    roster_updated_frames: ['count==0'],
+    student_joined_frames: ['count==0'],
+    // ...and the teacher must still receive them. Without this row the change could
+    // "pass" by breaking the dashboard, which is the failure mode students cannot see.
+    observer_roster_frames: ['count>0'],
+    observer_student_joined_frames: ['count>0'],
   },
+}
+
+/// The teacher: ObserveSession, then listen and count.
+export function observer() {
+  const neg = http.post(`${BASE_URL}/hub/negotiate?negotiateVersion=1`, null, {
+    tags: { name: 'negotiate_observer' },
+    timeout: '60s',
+  })
+  let token = null
+  if (neg.status === 200) {
+    try {
+      token = neg.json().connectionToken || neg.json().connectionId
+    } catch (err) {
+      token = null
+    }
+  }
+  if (!token) {
+    observerOk.add(false)
+    return
+  }
+
+  const wsUrl = `${BASE_URL.replace(/^http/, 'ws')}/hub?id=${encodeURIComponent(token)}`
+  let upgraded = false
+
+  const res = ws.connect(wsUrl, { tags: { name: 'hub_observer' } }, function (socket) {
+    socket.on('open', function () {
+      socket.send(`{"protocol":"json","version":1}${RS}`)
+    })
+
+    let buffer = ''
+    socket.on('message', function (data) {
+      buffer += data
+      const parts = buffer.split(RS)
+      buffer = parts.pop()
+
+      for (const part of parts) {
+        if (!part) continue
+        let msg
+        try {
+          msg = JSON.parse(part)
+        } catch (err) {
+          continue
+        }
+
+        if (msg.type === undefined) {
+          if (msg.error) {
+            socket.close()
+            return
+          }
+          // ObserveSession takes a bare string, not an args object.
+          socket.send(
+            JSON.stringify({
+              type: 1,
+              target: 'ObserveSession',
+              arguments: [SESSION_CODE],
+              invocationId: 'obs',
+            }) + RS
+          )
+          continue
+        }
+
+        if (msg.type === 3 && msg.invocationId === 'obs') {
+          upgraded = !msg.error
+          continue
+        }
+
+        if (msg.type === 1) {
+          if (msg.target === 'RosterUpdated') {
+            obsRosterFrames.add(1)
+            obsRosterBytes.add(part.length)
+          } else if (msg.target === 'StudentJoined') {
+            obsStudentJoined.add(1)
+          }
+        }
+      }
+    })
+
+    socket.setTimeout(function () {
+      socket.close()
+    }, (OBSERVER_WINDOW - 2) * 1000)
+  })
+
+  observerOk.add(upgraded && res && res.status === 101)
+  check(res, { 'observer ws upgraded': () => res && res.status === 101 })
 }
 
 export default function () {
@@ -239,7 +360,13 @@ export function handleSummary(data) {
   const ms = (v) => `${Math.round(v)}ms`
   const pctOf = (metric) => `${(n(metric, 'rate') * 100).toFixed(1)}%`
 
-  const roster = n('roster_updated_bytes', 'count')
+  const mb = (v) => `${(v / 1048576).toFixed(2)} MB`
+  const studentWaste = n('roster_updated_bytes', 'count')
+  const scopingOk =
+    n('roster_updated_frames', 'count') === 0 &&
+    n('student_joined_frames', 'count') === 0 &&
+    n('observer_roster_frames', 'count') > 0
+
   const lines = [
     '='.repeat(100),
     `JOIN STORM  vus=${VUS} ramp=${RAMP}s hold=${HOLD}s room=${SESSION_CODE}`,
@@ -249,10 +376,10 @@ export function handleSummary(data) {
     `  JoinSession  ${pctOf('join_ok').padEnd(8)} p50 ${ms(n('join_invoke_duration', 'med'))}  p95 ${ms(n('join_invoke_duration', 'p(95)'))}  max ${ms(n('join_invoke_duration', 'max'))}`,
     `  join errors  ${n('join_errors', 'count')}   <- HubException, incl. pool exhaustion`,
     '',
-    `  broadcast waste (students receive but never handle these):`,
-    `    StudentJoined frames  ${n('student_joined_frames', 'count')}`,
-    `    RosterUpdated frames  ${n('roster_updated_frames', 'count')}`,
-    `    RosterUpdated bytes   ${(roster / 1048576).toFixed(2)} MB`,
+    `  BROADCAST SCOPING  ${scopingOk ? 'OK — dashboard events reach the teacher only' : 'WRONG — see both rows below'}`,
+    `    students  StudentJoined ${n('student_joined_frames', 'count')}   RosterUpdated ${n('roster_updated_frames', 'count')}   ${mb(studentWaste)}   (must all be 0)`,
+    `    teacher   StudentJoined ${n('observer_student_joined_frames', 'count')}   RosterUpdated ${n('observer_roster_frames', 'count')}   ${mb(n('observer_roster_bytes', 'count'))}   (must be > 0)`,
+    `    observer connected  ${pctOf('observer_connected')}`,
     '='.repeat(100),
   ]
   return { stdout: `\n${lines.join('\n')}\n\n` }

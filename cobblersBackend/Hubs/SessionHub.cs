@@ -49,8 +49,12 @@ public class SessionHub : Hub
         var roster = _store.AddStudent(code, student);
 
         // Tell observers (teacher) live: the one who joined, then the full list.
-        await Clients.Group(code).SendAsync("StudentJoined", student);
-        await Clients.Group(code).SendAsync("RosterUpdated", roster);
+        // Scoped to the observers group, not the room: students never handle either
+        // event, and at 80 students the roster fan-out is the single largest source
+        // of hub traffic in the app. See SessionCode.ObserversGroup.
+        var observers = SessionCode.ObserversGroup(code);
+        await Clients.Group(observers).SendAsync("StudentJoined", student);
+        await Clients.Group(observers).SendAsync("RosterUpdated", roster);
 
         return new SessionState(_store.GetTimer(code), _store.GetFocusedAssignment(code), _store.GetRaisedHands(code));
     }
@@ -59,7 +63,13 @@ public class SessionHub : Hub
     public async Task<IReadOnlyList<StudentDto>> ObserveSession(string code)
     {
         code = SessionCode.Normalize(code);
+
+        // Both groups, deliberately. The room group carries what the teacher shares
+        // with students (HandsUpdated, SessionEnded); the observers group carries the
+        // dashboard-only events students have no handler for.
         await Groups.AddToGroupAsync(Context.ConnectionId, code);
+        await Groups.AddToGroupAsync(Context.ConnectionId, SessionCode.ObserversGroup(code));
+
         return _store.GetRoster(code);
     }
 
@@ -95,10 +105,13 @@ public class SessionHub : Hub
             var roster = _store.RemoveStudent(code, studentId);
             if (roster is not null)
             {
-                await Clients.Group(code).SendAsync("RosterUpdated", roster);
+                // Observers only — the roster is dashboard state (see ObserveSession).
+                await Clients.Group(SessionCode.ObserversGroup(code))
+                             .SendAsync("RosterUpdated", roster);
 
                 // RemoveStudent already dropped this student's raised hand (if any) —
                 // tell the room so a lingering entry doesn't wait for someone else's click.
+                // Room-wide, unlike the roster above: students render the hand queue too.
                 if (hadRaisedHand)
                     await Clients.Group(code).SendAsync("HandsUpdated", _store.GetRaisedHands(code));
             }

@@ -95,7 +95,12 @@ public class SubmissionService : ISubmissionService
 
         try
         {
-            await _hub.Clients.Group(roomCode).SendAsync("SubmissionRecorded", row);
+            // Observers only. Students never register a SubmissionRecorded handler, so
+            // sending this to the room made all N of them receive every classmate's
+            // result — N² frames on the request path, since this send is awaited inside
+            // the submitting student's HTTP request. See SessionCode.ObserversGroup.
+            await _hub.Clients.Group(SessionCode.ObserversGroup(roomCode))
+                      .SendAsync("SubmissionRecorded", row);
         }
         catch (Exception ex)
         {
